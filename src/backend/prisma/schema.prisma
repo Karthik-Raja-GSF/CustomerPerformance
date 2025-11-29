@@ -1,0 +1,227 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// Timestamp Convention:
+// All DateTime fields are stored in UTC.
+// API responses convert these to ISO8601 format (e.g., "2025-01-15T14:30:00.000Z")
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Example User model - replace with your actual models
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+enum PromptStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Prompt {
+  id        String       @id @default(uuid())
+  name      String
+  content   String       @db.Text
+  model     String
+  status    PromptStatus @default(INACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@map("prompts")
+}
+
+// ============================================
+// SIQ FORECAST DATA IMPORT - NORMALIZED SCHEMA
+// ============================================
+
+// Sites/Locations (GSF, NC, DORI, SC, PA, PON, NWD, HOU, JC, VI, NOLA, CIC, FW, MA)
+model Site {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  company   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items              Item[]
+  inventorySnapshots InventorySnapshot[]
+  salesActuals       SalesActual[]
+  forecasts          Forecast[]
+
+  @@map("sites")
+}
+
+// Suppliers
+model Supplier {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items Item[]
+
+  @@map("suppliers")
+}
+
+// Items (Products)
+model Item {
+  id                String   @id @default(uuid())
+  code              String
+  description       String
+  categoryClass     String?  @map("category_class")
+  zone              String?
+  erpStatus         String?  @map("erp_status")
+  abcClass          String?  @map("abc_class")
+  shelfLifeDays     Int?     @map("shelf_life_days")
+  leadTimeDays      Int?     @map("lead_time_days")
+  conditionalStatus String?  @map("conditional_status")
+  challengeStatus   String?  @map("challenge_status")
+
+  siteId     String  @map("site_id")
+  supplierId String? @map("supplier_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  site     Site      @relation(fields: [siteId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  inventorySnapshots InventorySnapshot[]
+  salesActuals       SalesActual[]
+  forecasts          Forecast[]
+  customerMetrics    CustomerMetric[]
+
+  @@unique([siteId, code])
+  @@index([code])
+  @@index([categoryClass])
+  @@index([abcClass])
+  @@map("items")
+}
+
+// Inventory Snapshots (point-in-time)
+model InventorySnapshot {
+  id           String   @id @default(uuid())
+  itemId       String   @map("item_id")
+  siteId       String   @map("site_id")
+
+  onHandQty    Int      @map("on_hand_qty")
+  safetyStock  Int?     @map("safety_stock")
+  onOrder      Int?     @map("on_order")
+  openSales    Int?     @map("open_sales")
+  openEstimates Int?    @map("open_estimates")
+  targetStock  Int?     @map("target_stock")
+  preferredMax Int?     @map("preferred_max")
+  maxStock     Int?     @map("max_stock")
+  weeksSupply  Decimal? @map("weeks_supply") @db.Decimal(6, 2)
+
+  nextPoDate   DateTime? @map("next_po_date")
+  nextPoQty    Int?      @map("next_po_qty")
+
+  snapshotDate DateTime  @map("snapshot_date")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, snapshotDate])
+  @@index([siteId, snapshotDate])
+  @@map("inventory_snapshots")
+}
+
+// Sales Actuals (Historical)
+model SalesActual {
+  id          String   @id @default(uuid())
+  itemId      String   @map("item_id")
+  siteId      String   @map("site_id")
+
+  periodType  String   @map("period_type")
+  periodLabel String   @map("period_label")
+  periodDate  DateTime @map("period_date")
+  quantity    Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, siteId, periodType, periodLabel])
+  @@index([itemId, periodDate])
+  @@index([siteId, periodDate])
+  @@map("sales_actuals")
+}
+
+// Forecasts
+model Forecast {
+  id             String   @id @default(uuid())
+  itemId         String   @map("item_id")
+  siteId         String   @map("site_id")
+
+  forecastMonth  DateTime @map("forecast_month")
+  predictedQty   Int      @map("predicted_qty")
+  variancePct    Decimal? @map("variance_pct") @db.Decimal(6, 2)
+  supplyVariance Int?     @map("supply_variance")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, siteId, forecastMonth])
+  @@index([itemId, forecastMonth])
+  @@map("forecasts")
+}
+
+// Customer Metrics (denormalized for analysis)
+model CustomerMetric {
+  id             String   @id @default(uuid())
+  itemId         String   @map("item_id")
+
+  totalCustomers Int?     @map("total_customers")
+  topCustomers   String?  @map("top_customers") @db.Text
+  buyer          String?
+
+  snapshotDate DateTime @map("snapshot_date")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, snapshotDate])
+  @@map("customer_metrics")
+}
+
+// Import History (track weekly/monthly imports)
+model ImportLog {
+  id            String       @id @default(uuid())
+  fileName      String       @map("file_name")
+  importDate    DateTime     @map("import_date")
+  status        ImportStatus @default(PENDING)
+  rowsProcessed Int?         @map("rows_processed")
+  rowsCreated   Int?         @map("rows_created")
+  rowsUpdated   Int?         @map("rows_updated")
+  rowsFailed    Int?         @map("rows_failed")
+  errorLog      String?      @map("error_log") @db.Text
+  createdAt     DateTime     @default(now()) @map("created_at")
+  completedAt   DateTime?    @map("completed_at")
+
+  @@index([importDate])
+  @@map("import_logs")
+}
+
+enum ImportStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}

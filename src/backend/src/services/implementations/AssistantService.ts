@@ -1,0 +1,215 @@
+import { injectable, inject } from 'tsyringe';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { IAssistantService } from '@/services/IAssistantService';
+import { IBedrockService, BEDROCK_SERVICE_TOKEN } from '@/services/IBedrockService';
+import { IPromptService, PROMPT_SERVICE_TOKEN } from '@/services/IPromptService';
+import { IMcpClientService, MCP_CLIENT_SERVICE_TOKEN } from '@/services/IMcpClientService';
+import { ChatRequestDto, ChatResponseDto, ModelListDto } from '@/contracts/dtos/assistant.dto';
+import { SUPPORTED_MODELS } from '@/contracts/models/assistant.model';
+import { NoActivePromptError, UnsupportedModelError } from '@/utils/errors/assistant-errors';
+
+@injectable()
+export class AssistantService implements IAssistantService {
+  private baseSystemPrompt: string;
+  private mcpInitialized = false;
+  private cachedSchema: string | null = null;
+
+  private bedrockService: IBedrockService;
+  private promptService: IPromptService;
+  private mcpClient: IMcpClientService;
+
+  constructor(
+    @inject(BEDROCK_SERVICE_TOKEN) bedrockService: IBedrockService,
+    @inject(PROMPT_SERVICE_TOKEN) promptService: IPromptService,
+    @inject(MCP_CLIENT_SERVICE_TOKEN) mcpClient: IMcpClientService
+  ) {
+    this.bedrockService = bedrockService;
+    this.promptService = promptService;
+    this.mcpClient = mcpClient;
+    this.baseSystemPrompt = this.loadBaseSystemPrompt();
+  }
+
+  private async ensureMcpInitialized(): Promise<void> {
+    if (!this.mcpInitialized) {
+      await this.mcpClient.initialize();
+      this.mcpInitialized = true;
+    }
+  }
+
+  private async getSchemaInfo(): Promise<string> {
+    if (this.cachedSchema) {
+      return this.cachedSchema;
+    }
+    this.cachedSchema = await this.mcpClient.getSchemaInfo();
+    return this.cachedSchema;
+  }
+
+  private buildSqlGenerationPrompt(schema: string, question: string): string {
+    return `You are a SQL query generator for a demand planning system.
+
+## Valid Tables (USE THESE)
+- sites - locations/warehouses
+- suppliers - vendor information
+- items - products
+- inventory_snapshots - stock levels
+- sales_actuals - historical sales
+- forecasts - demand predictions
+- customer_metrics - customer analysis
+
+## Database Schema
+${schema}
+
+## Query Building Rule
+When the user's question relates to allowed database tables, you MUST:
+1. Identify which tables contain relevant information for the question
+2. Review the table schema to understand column names, types, and relationships
+3. Include descriptive columns (name, description, title) in SELECT statements when they exist
+4. Use appropriate JOINs to get related entity names instead of returning just IDs
+5. Build a well-formed SQL query that retrieves all relevant details needed to answer the question
+6. When listing entities, always include identifying information like name, code, or description
+
+## When to Generate SQL
+Generate a query for questions about:
+- Sites, suppliers, items, inventory, sales, forecasts, customer metrics
+- Counting, listing, aggregating, or comparing data
+
+## When NOT to Generate SQL (return "NO_QUERY_NEEDED")
+- Questions about database schema or table structure
+- Questions about system tables: users, prompts, import_logs
+- Greetings or general conversation
+
+## SQL Rules
+- Generate ONLY SELECT queries
+- Return SQL in \`\`\`sql code blocks
+- Use JOINs when data spans tables
+- Limit to 100 rows unless aggregating
+
+## User Question
+${question}
+
+Generate the SQL query:`;
+  }
+
+  private extractSqlFromResponse(response: string): string | null {
+    const sqlMatch = response.match(/```sql\n([\s\S]*?)\n```/);
+    if (sqlMatch && sqlMatch[1]) {
+      return sqlMatch[1].trim();
+    }
+
+    if (response.includes('NO_QUERY_NEEDED')) {
+      return null;
+    }
+
+    return null;
+  }
+
+  private isSelectQuery(sql: string): boolean {
+    const normalized = sql.trim().toUpperCase();
+    return (
+      normalized.startsWith('SELECT') &&
+      !normalized.includes('INSERT') &&
+      !normalized.includes('UPDATE') &&
+      !normalized.includes('DELETE') &&
+      !normalized.includes('DROP') &&
+      !normalized.includes('ALTER') &&
+      !normalized.includes('TRUNCATE')
+    );
+  }
+
+  private buildAnswerPrompt(base: string, dbPrompt: string, queryResults: string): string {
+    let prompt = `${base}\n\n## Additional Context\n\n${dbPrompt}`;
+
+    if (queryResults) {
+      prompt += `\n\n## Database Query Results\n\nHere is the data retrieved from the database:\n\`\`\`json\n${queryResults}\n\`\`\`\n\nUse this data to answer the user's question accurately.`;
+    } else {
+      prompt += `\n\nNo database query was needed for this question.`;
+    }
+
+    return prompt;
+  }
+
+  private loadBaseSystemPrompt(): string {
+    const promptPath = join(__dirname, '../../config/system_prompt.md');
+    return readFileSync(promptPath, 'utf-8');
+  }
+
+  async chat(request: ChatRequestDto): Promise<ChatResponseDto> {
+    // Step 1: Get active prompt from database
+    const activePrompt = await this.promptService.findActive();
+    if (!activePrompt) {
+      throw new NoActivePromptError('No active prompt configured');
+    }
+
+    // Step 2: Validate model
+    const modelInfo = SUPPORTED_MODELS[activePrompt.model];
+    if (!modelInfo) {
+      throw new UnsupportedModelError(activePrompt.model);
+    }
+
+    let queryResults = '';
+
+    // Step 3: Try to initialize MCP and query database
+    try {
+      await this.ensureMcpInitialized();
+      const schemaInfo = await this.getSchemaInfo();
+
+      // Step 3a: Ask LLM to generate SQL
+      const sqlPrompt = this.buildSqlGenerationPrompt(schemaInfo, request.question);
+      const sqlResponse = await this.bedrockService.invoke(
+        sqlPrompt,
+        request.question,
+        activePrompt.model
+      );
+
+      // Step 3b: Extract and validate SQL
+      const sql = this.extractSqlFromResponse(sqlResponse.text);
+
+      if (sql) {
+        if (!this.isSelectQuery(sql)) {
+          console.warn('Generated SQL was not a SELECT query, skipping execution');
+        } else {
+          // Step 3c: Execute the generated SQL
+          const results = await this.mcpClient.executeQuery(sql);
+          queryResults = JSON.stringify(results, null, 2);
+        }
+      }
+    } catch (error) {
+      // Log MCP errors but continue without database data
+      console.error('MCP error (continuing without data):', error instanceof Error ? error.message : error);
+    }
+
+    // Step 4: Build final prompt with data (if available)
+    const finalPrompt = this.buildAnswerPrompt(
+      this.baseSystemPrompt,
+      activePrompt.content,
+      queryResults
+    );
+
+    // Step 5: Invoke Bedrock to answer the question
+    const response = await this.bedrockService.invoke(
+      finalPrompt,
+      request.question,
+      activePrompt.model
+    );
+
+    // Step 6: Return response
+    return {
+      answer: response.text,
+      confidence: response.confidence,
+      usage: response.usage,
+      modelId: activePrompt.model,
+      modelName: modelInfo.name,
+      promptId: activePrompt.id,
+    };
+  }
+
+  getAvailableModels(): ModelListDto[] {
+    return Object.entries(SUPPORTED_MODELS).map(([id, info]) => ({
+      id,
+      name: info.name,
+      tier: info.tier,
+      description: info.description,
+    }));
+  }
+}
