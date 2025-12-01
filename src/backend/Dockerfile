@@ -27,6 +27,9 @@ RUN sed -i 's|"extends": "../../tsconfig.base.json"|"extends": "./tsconfig.base.
 # Build TypeScript
 RUN npm run build
 
+# Copy non-TS config files to dist (TypeScript doesn't copy .md files)
+RUN cp -r src/config dist/
+
 EXPOSE 8887
 
 CMD ["node", "dist/index.js"]
