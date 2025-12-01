@@ -6,6 +6,12 @@ export interface BedrockResponse {
   usage: { inputTokens: number; outputTokens: number };
 }
 
+export interface StreamCallbacks {
+  onChunk: (chunk: string) => void;
+  onComplete: (usage: { inputTokens: number; outputTokens: number }) => void;
+  onError: (error: Error) => void;
+}
+
 export interface IBedrockService {
   invoke(
     systemPrompt: string,
@@ -13,4 +19,12 @@ export interface IBedrockService {
     modelId: string,
     maxTokens?: number
   ): Promise<BedrockResponse>;
+
+  invokeStream(
+    systemPrompt: string,
+    userQuestion: string,
+    modelId: string,
+    callbacks: StreamCallbacks,
+    maxTokens?: number
+  ): Promise<void>;
 }

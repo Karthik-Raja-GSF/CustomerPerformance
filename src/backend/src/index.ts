@@ -36,8 +36,22 @@ class Server {
       })
     );
 
-    // Compression middleware
-    this.app.use(compression());
+    // Compression middleware (disabled for SSE endpoints)
+    this.app.use(
+      compression({
+        filter: (req, res) => {
+          // Disable compression for SSE endpoints
+          if (req.headers.accept === 'text/event-stream') {
+            return false;
+          }
+          if (req.path.includes('/chat/stream')) {
+            return false;
+          }
+          // Default filter
+          return compression.filter(req, res);
+        },
+      })
+    );
 
     // Body parsing middleware
     this.app.use(express.json());

@@ -3,9 +3,10 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
   InvokeModelCommandOutput,
+  InvokeModelWithResponseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime';
 import { config } from '@/config/index';
-import { IBedrockService, BedrockResponse } from '@/services/IBedrockService';
+import { IBedrockService, BedrockResponse, StreamCallbacks } from '@/services/IBedrockService';
 import { UnsupportedModelError, BedrockInvocationError } from '@/utils/errors/assistant-errors';
 
 @injectable()
@@ -119,5 +120,70 @@ export class BedrockService implements IBedrockService {
     if (questionCount > 2) confidence -= 15;
 
     return Math.max(0, Math.min(100, confidence));
+  }
+
+  async invokeStream(
+    systemPrompt: string,
+    userQuestion: string,
+    modelId: string,
+    callbacks: StreamCallbacks,
+    maxTokens = 2000
+  ): Promise<void> {
+    try {
+      const payload = this.buildPayload(modelId, systemPrompt, userQuestion, maxTokens);
+
+      const command = new InvokeModelWithResponseStreamCommand({
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+        modelId,
+      });
+
+      const response = await this.client.send(command);
+
+      if (!response.body) {
+        throw new BedrockInvocationError('No response body from Bedrock stream');
+      }
+
+      let inputTokens = 0;
+      let outputTokens = 0;
+
+      for await (const event of response.body) {
+        if (event.chunk?.bytes) {
+          const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
+
+          // Handle Anthropic Claude models
+          if (modelId.startsWith('anthropic.')) {
+            if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+              callbacks.onChunk(chunk.delta.text);
+            } else if (chunk.type === 'message_delta' && chunk.usage) {
+              outputTokens = chunk.usage.output_tokens;
+            } else if (chunk.type === 'message_start' && chunk.message?.usage) {
+              inputTokens = chunk.message.usage.input_tokens;
+            }
+          }
+          // Handle Amazon Nova models
+          else if (modelId.startsWith('amazon.nova')) {
+            if (chunk.contentBlockDelta?.delta?.text) {
+              callbacks.onChunk(chunk.contentBlockDelta.delta.text);
+            } else if (chunk.metadata?.usage) {
+              inputTokens = chunk.metadata.usage.inputTokens;
+              outputTokens = chunk.metadata.usage.outputTokens;
+            }
+          }
+        }
+      }
+
+      callbacks.onComplete({ inputTokens, outputTokens });
+    } catch (error) {
+      if (error instanceof UnsupportedModelError || error instanceof BedrockInvocationError) {
+        callbacks.onError(error);
+        return;
+      }
+      callbacks.onError(
+        new BedrockInvocationError(
+          `Failed to stream from Bedrock: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      );
+    }
   }
 }

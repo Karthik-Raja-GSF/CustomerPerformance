@@ -85,6 +85,80 @@ router.post(
 );
 
 /**
+ * POST /assistant/chat/stream
+ * Send a question to the AI assistant with streaming response (SSE)
+ */
+router.post(
+  '/chat/stream',
+  authenticate,
+  validateRequest(chatRequestSchema, 'body'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders(); // Important: flush headers immediately
+
+    // Send initial connection event to keep client alive during processing
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+    // Track if connection is still alive
+    let isConnectionAlive = true;
+
+    // Handle client disconnect - use res.on('close') not req.on('close')
+    // req.on('close') fires when request body is fully read, not when client disconnects
+    res.on('close', () => {
+      isConnectionAlive = false;
+    });
+
+    // Keep-alive interval to prevent timeout during long operations
+    const keepAliveInterval = setInterval(() => {
+      if (isConnectionAlive) {
+        res.write(`: keep-alive\n\n`);
+      }
+    }, 15000); // Send keep-alive every 15 seconds
+
+    try {
+      const assistantService = container.resolve<IAssistantService>(ASSISTANT_SERVICE_TOKEN);
+
+      // Send processing started event
+      res.write(`data: ${JSON.stringify({ type: 'processing' })}\n\n`);
+
+      await assistantService.chatStream(req.body, {
+        onChunk: (chunk: string) => {
+          if (isConnectionAlive) {
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+          }
+        },
+        onComplete: (metadata) => {
+          clearInterval(keepAliveInterval);
+          if (isConnectionAlive) {
+            res.write(`data: ${JSON.stringify({ type: 'complete', metadata })}\n\n`);
+            res.end();
+          }
+        },
+        onError: (error: Error) => {
+          clearInterval(keepAliveInterval);
+          if (isConnectionAlive) {
+            console.error('[Stream] Error:', error.message);
+            res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+            res.end();
+          }
+        },
+      });
+    } catch (error) {
+      clearInterval(keepAliveInterval);
+      console.error('[Stream] Error:', error);
+      if (isConnectionAlive) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
+        res.end();
+      }
+    }
+  }
+);
+
+/**
  * GET /assistant/models
  * Get list of available AI models
  */

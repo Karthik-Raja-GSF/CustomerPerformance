@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { IAssistantService } from '@/services/IAssistantService';
+import { IAssistantService, StreamChatCallbacks } from '@/services/IAssistantService';
 import { IBedrockService, BEDROCK_SERVICE_TOKEN } from '@/services/IBedrockService';
 import { IPromptService, PROMPT_SERVICE_TOKEN } from '@/services/IPromptService';
 import { IMcpClientService, MCP_CLIENT_SERVICE_TOKEN } from '@/services/IMcpClientService';
@@ -121,9 +121,22 @@ Generate the SQL query:`;
     let prompt = `${base}\n\n## Additional Context\n\n${dbPrompt}`;
 
     if (queryResults) {
-      prompt += `\n\n## Database Query Results\n\nHere is the data retrieved from the database:\n\`\`\`json\n${queryResults}\n\`\`\`\n\nUse this data to answer the user's question accurately.`;
+      prompt += `\n\n## Database Query Results
+
+**IMPORTANT: The SQL query has already been executed automatically. DO NOT show SQL code to the user.**
+
+Here is the data retrieved from the database:
+\`\`\`json
+${queryResults}
+\`\`\`
+
+**Instructions for your response:**
+1. NEVER show SQL queries or code blocks with SQL
+2. Use the data above to answer the user's question directly
+3. Format the response as clean, readable text with tables if appropriate
+4. Focus on insights and actionable information`;
     } else {
-      prompt += `\n\nNo database query was needed for this question.`;
+      prompt += `\n\nNo database query was needed for this question. Answer directly without mentioning SQL or databases.`;
     }
 
     return prompt;
@@ -202,6 +215,79 @@ Generate the SQL query:`;
       modelName: modelInfo.name,
       promptId: activePrompt.id,
     };
+  }
+
+  async chatStream(request: ChatRequestDto, callbacks: StreamChatCallbacks): Promise<void> {
+    // Step 1: Get active prompt from database
+    const activePrompt = await this.promptService.findActive();
+    if (!activePrompt) {
+      callbacks.onError(new NoActivePromptError('No active prompt configured'));
+      return;
+    }
+
+    // Step 2: Validate model
+    const modelInfo = SUPPORTED_MODELS[activePrompt.model];
+    if (!modelInfo) {
+      callbacks.onError(new UnsupportedModelError(activePrompt.model));
+      return;
+    }
+
+    let queryResults = '';
+
+    // Step 3: Try to initialize MCP and query database
+    try {
+      await this.ensureMcpInitialized();
+      const schemaInfo = await this.getSchemaInfo();
+
+      // Step 3a: Ask LLM to generate SQL (non-streaming for SQL generation)
+      const sqlPrompt = this.buildSqlGenerationPrompt(schemaInfo, request.question);
+      const sqlResponse = await this.bedrockService.invoke(
+        sqlPrompt,
+        request.question,
+        activePrompt.model
+      );
+
+      // Step 3b: Extract and validate SQL
+      const sql = this.extractSqlFromResponse(sqlResponse.text);
+
+      if (sql) {
+        if (!this.isSelectQuery(sql)) {
+          console.warn('Generated SQL was not a SELECT query, skipping execution');
+        } else {
+          // Step 3c: Execute the generated SQL
+          const results = await this.mcpClient.executeQuery(sql);
+          queryResults = JSON.stringify(results, null, 2);
+        }
+      }
+    } catch (error) {
+      // Log MCP errors but continue without database data
+      console.error('MCP error (continuing without data):', error instanceof Error ? error.message : error);
+    }
+
+    // Step 4: Build final prompt with data (if available)
+    const finalPrompt = this.buildAnswerPrompt(
+      this.baseSystemPrompt,
+      activePrompt.content,
+      queryResults
+    );
+
+    // Step 5: Stream response from Bedrock
+    await this.bedrockService.invokeStream(
+      finalPrompt,
+      request.question,
+      activePrompt.model,
+      {
+        onChunk: callbacks.onChunk,
+        onComplete: (usage) => {
+          callbacks.onComplete({
+            modelName: modelInfo.name,
+            promptId: activePrompt.id,
+            usage,
+          });
+        },
+        onError: callbacks.onError,
+      }
+    );
   }
 
   getAvailableModels(): ModelListDto[] {
