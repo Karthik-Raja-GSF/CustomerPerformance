@@ -92,7 +92,7 @@ router.post(
   '/chat/stream',
   authenticate,
   validateRequest(chatRequestSchema, 'body'),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
