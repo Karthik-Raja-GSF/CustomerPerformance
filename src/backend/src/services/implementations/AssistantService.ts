@@ -117,6 +117,36 @@ Generate the SQL query:`;
     );
   }
 
+  private truncateResults(results: unknown): string {
+    const MAX_ROWS = 50;
+    const MAX_CHARS = 10000;
+
+    let truncatedResults = results;
+    let totalRows = 0;
+    let wasTruncated = false;
+
+    if (Array.isArray(results)) {
+      totalRows = results.length;
+      if (results.length > MAX_ROWS) {
+        truncatedResults = results.slice(0, MAX_ROWS);
+        wasTruncated = true;
+      }
+    }
+
+    let jsonString = JSON.stringify(truncatedResults, null, 2);
+
+    if (jsonString.length > MAX_CHARS) {
+      jsonString = jsonString.slice(0, MAX_CHARS) + '\n... (truncated due to size)';
+      wasTruncated = true;
+    }
+
+    if (wasTruncated && totalRows > MAX_ROWS) {
+      jsonString += `\n\n[Note: Showing ${MAX_ROWS} of ${totalRows} total records]`;
+    }
+
+    return jsonString;
+  }
+
   private buildAnswerPrompt(base: string, dbPrompt: string, queryResults: string): string {
     let prompt = `${base}\n\n## Additional Context\n\n${dbPrompt}`;
 
@@ -184,7 +214,7 @@ ${queryResults}
         } else {
           // Step 3c: Execute the generated SQL
           const results = await this.mcpClient.executeQuery(sql);
-          queryResults = JSON.stringify(results, null, 2);
+          queryResults = this.truncateResults(results);
         }
       }
     } catch (error) {
@@ -256,7 +286,7 @@ ${queryResults}
         } else {
           // Step 3c: Execute the generated SQL
           const results = await this.mcpClient.executeQuery(sql);
-          queryResults = JSON.stringify(results, null, 2);
+          queryResults = this.truncateResults(results);
         }
       }
     } catch (error) {
