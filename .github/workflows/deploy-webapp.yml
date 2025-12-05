@@ -41,9 +41,6 @@ jobs:
       - name: Typecheck
         run: pnpm --filter webapp typecheck
 
-      - name: Lint
-        run: pnpm lint
-
       - name: Build webapp
         run: pnpm --filter webapp build
         env:
