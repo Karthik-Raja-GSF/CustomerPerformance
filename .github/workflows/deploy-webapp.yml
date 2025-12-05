@@ -36,7 +36,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --filter webapp...
 
       - name: Typecheck
         run: pnpm --filter webapp typecheck
