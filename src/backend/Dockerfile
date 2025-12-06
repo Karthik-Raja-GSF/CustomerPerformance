@@ -1,7 +1,7 @@
 FROM node:20-slim
 
-# Install OpenSSL for Prisma (Debian slim already has compatible version)
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL for Prisma and curl for health checks
+RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
