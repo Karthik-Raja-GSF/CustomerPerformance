@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm run --filter './src/*' test",
-    "typecheck": "pnpm run --filter './src/*' typecheck"
+    "typecheck": "pnpm run --filter './src/*' typecheck",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
@@ -23,9 +24,20 @@
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.12.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.4.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx,json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
   },
   "packageManager": "pnpm@10.20.0",
   "engines": {

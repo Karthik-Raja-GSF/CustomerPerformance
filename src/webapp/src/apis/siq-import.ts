@@ -4,15 +4,16 @@
  * Handles file upload and import history for SIQ Forecast Analysis data
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8887';
-const TOKEN_KEY = 'id_token';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8887";
+const TOKEN_KEY = "id_token";
 
 /**
  * Progress update during import
  */
 export interface ImportProgress {
-  type: 'validation' | 'progress' | 'complete' | 'error';
-  phase: 'validating' | 'processing' | 'complete';
+  type: "validation" | "progress" | "complete" | "error";
+  phase: "validating" | "processing" | "complete";
   current: number;
   total: number;
   percentage: number;
@@ -38,7 +39,7 @@ export interface ImportStats {
 
 export interface ImportResult {
   importId: string;
-  status: 'COMPLETED' | 'FAILED';
+  status: "COMPLETED" | "FAILED";
   stats: ImportStats;
   errors?: string[];
   completedAt: string;
@@ -48,7 +49,7 @@ export interface ImportLog {
   id: string;
   fileName: string;
   importDate: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   rowsProcessed: number | null;
   rowsCreated: number | null;
   rowsUpdated: number | null;
@@ -59,7 +60,7 @@ export interface ImportLog {
 }
 
 interface ApiResponse<T> {
-  status: 'success' | 'error';
+  status: "success" | "error";
   data?: T;
   message?: string;
 }
@@ -77,22 +78,22 @@ export async function uploadSiqFile(
   importDate?: Date
 ): Promise<ImportResult> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   if (importDate) {
-    formData.append('importDate', importDate.toISOString());
+    formData.append("importDate", importDate.toISOString());
   }
 
   const response = await fetch(`${API_BASE_URL}/siq-import/upload`, {
-    method: 'POST',
+    method: "POST",
     headers: getAuthHeaders(),
     body: formData,
   });
 
   const result: ApiResponse<ImportResult> = await response.json();
 
-  if (!response.ok || result.status === 'error') {
-    throw new Error(result.message || 'Failed to upload file');
+  if (!response.ok || result.status === "error") {
+    throw new Error(result.message || "Failed to upload file");
   }
 
   return result.data!;
@@ -101,19 +102,24 @@ export async function uploadSiqFile(
 /**
  * Get import history
  */
-export async function getImportHistory(limit: number = 50): Promise<ImportLog[]> {
-  const response = await fetch(`${API_BASE_URL}/siq-import/history?limit=${limit}`, {
-    method: 'GET',
-    headers: {
-      ...getAuthHeaders(),
-      'Content-Type': 'application/json',
-    },
-  });
+export async function getImportHistory(
+  limit: number = 50
+): Promise<ImportLog[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/siq-import/history?limit=${limit}`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+    }
+  );
 
   const result: ApiResponse<ImportLog[]> = await response.json();
 
-  if (!response.ok || result.status === 'error') {
-    throw new Error(result.message || 'Failed to fetch import history');
+  if (!response.ok || result.status === "error") {
+    throw new Error(result.message || "Failed to fetch import history");
   }
 
   return result.data!;
@@ -124,10 +130,10 @@ export async function getImportHistory(limit: number = 50): Promise<ImportLog[]>
  */
 export async function getImportById(id: string): Promise<ImportLog | null> {
   const response = await fetch(`${API_BASE_URL}/siq-import/${id}`, {
-    method: 'GET',
+    method: "GET",
     headers: {
       ...getAuthHeaders(),
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
@@ -137,8 +143,8 @@ export async function getImportById(id: string): Promise<ImportLog | null> {
 
   const result: ApiResponse<ImportLog> = await response.json();
 
-  if (!response.ok || result.status === 'error') {
-    throw new Error(result.message || 'Failed to fetch import');
+  if (!response.ok || result.status === "error") {
+    throw new Error(result.message || "Failed to fetch import");
   }
 
   return result.data!;
@@ -153,29 +159,29 @@ export async function uploadSiqFileWithProgress(
   onProgress: (progress: ImportProgress) => void
 ): Promise<ImportResult> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   if (importDate) {
-    formData.append('importDate', importDate.toISOString());
+    formData.append("importDate", importDate.toISOString());
   }
 
   const response = await fetch(`${API_BASE_URL}/siq-import/upload-stream`, {
-    method: 'POST',
+    method: "POST",
     headers: getAuthHeaders(),
     body: formData,
   });
 
   if (!response.ok) {
-    throw new Error('Failed to start upload');
+    throw new Error("Failed to start upload");
   }
 
   if (!response.body) {
-    throw new Error('No response body');
+    throw new Error("No response body");
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
   let finalResult: ImportResult | null = null;
 
   while (true) {
@@ -186,29 +192,29 @@ export async function uploadSiqFileWithProgress(
     buffer += decoder.decode(value, { stream: true });
 
     // Process complete SSE messages
-    const lines = buffer.split('\n\n');
-    buffer = lines.pop() || '';
+    const lines = buffer.split("\n\n");
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
+      if (line.startsWith("data: ")) {
         const data = line.slice(6);
         try {
           const progress: ImportProgress = JSON.parse(data);
           onProgress(progress);
 
           // Store final result if this is the complete event
-          if (progress.type === 'complete' && progress.result) {
+          if (progress.type === "complete" && progress.result) {
             finalResult = progress.result;
           }
-        } catch (e) {
-          console.warn('Failed to parse SSE data:', data);
+        } catch {
+          console.warn("Failed to parse SSE data:", data);
         }
       }
     }
   }
 
   if (!finalResult) {
-    throw new Error('Import did not return a result');
+    throw new Error("Import did not return a result");
   }
 
   return finalResult;

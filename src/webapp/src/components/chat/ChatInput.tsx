@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect, KeyboardEvent } from "react"
-import { Send, Loader2 } from "lucide-react"
-import { Button } from "@/shadcn/components/button"
-import { Textarea } from "@/shadcn/components/textarea"
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { Send, Loader2 } from "lucide-react";
+import { Button } from "@/shadcn/components/button";
+import { Textarea } from "@/shadcn/components/textarea";
 
 interface ChatInputProps {
-  onSend: (message: string) => void
-  isStreaming: boolean
-  placeholder?: string
+  onSend: (message: string) => void;
+  isStreaming: boolean;
+  placeholder?: string;
 }
 
 export function ChatInput({
@@ -14,30 +14,30 @@ export function ChatInput({
   isStreaming,
   placeholder = "Ask StarQ anything...",
 }: ChatInputProps) {
-  const [value, setValue] = useState("")
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [value, setValue] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
-    const textarea = textareaRef.current
+    const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = "auto"
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
-  }, [value])
+  }, [value]);
 
   const handleSend = () => {
-    if (!value.trim() || isStreaming) return
-    onSend(value.trim())
-    setValue("")
-  }
+    if (!value.trim() || isStreaming) return;
+    onSend(value.trim());
+    setValue("");
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   return (
     <div className="border-t bg-background p-4">
@@ -46,7 +46,9 @@ export function ChatInput({
           <Textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={isStreaming}
@@ -71,5 +73,5 @@ export function ChatInput({
         </p>
       </div>
     </div>
-  )
+  );
 }

@@ -1,26 +1,32 @@
-import { useState } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Bot, User, Copy, Check } from "lucide-react"
-import { Button } from "@/shadcn/components/button"
-import { cn } from "@/shadcn/lib/utils"
-import type { ChatMessage as ChatMessageType } from "@/hooks/use-chat"
+import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Bot, User, Copy, Check } from "lucide-react";
+import { Button } from "@/shadcn/components/button";
+import { cn } from "@/shadcn/lib/utils";
+import type { ChatMessage as ChatMessageType } from "@/hooks/use-chat";
 
 interface ChatMessageProps {
-  message: ChatMessageType
-  isStreaming?: boolean
-  onCopy: (messageId: string) => void
+  message: ChatMessageType;
+  isStreaming?: boolean;
+  onCopy: (messageId: string) => void;
 }
 
-export function ChatMessage({ message, isStreaming, onCopy }: ChatMessageProps) {
-  const [copied, setCopied] = useState(false)
-  const isUser = message.role === "user"
+export function ChatMessage({
+  message,
+  isStreaming,
+  onCopy,
+}: ChatMessageProps) {
+  const [copied, setCopied] = useState(false);
+  const isUser = message.role === "user";
 
   const handleCopy = () => {
-    onCopy(message.id)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    onCopy(message.id);
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
 
   return (
     <div
@@ -72,7 +78,8 @@ export function ChatMessage({ message, isStreaming, onCopy }: ChatMessageProps) 
             <span>{message.metadata.modelName}</span>
             <span>•</span>
             <span>
-              {message.metadata.usage.inputTokens} → {message.metadata.usage.outputTokens} tokens
+              {message.metadata.usage.inputTokens} →{" "}
+              {message.metadata.usage.outputTokens} tokens
             </span>
           </div>
         )}
@@ -94,5 +101,5 @@ export function ChatMessage({ message, isStreaming, onCopy }: ChatMessageProps) 
         </Button>
       )}
     </div>
-  )
+  );
 }

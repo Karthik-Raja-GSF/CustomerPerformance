@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,9 +9,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/shadcn/components/alert-dialog';
-import { useAuth, getAccessToken } from '@/contexts/auth-context';
-import { jwtDecode } from 'jwt-decode';
+} from "@/shadcn/components/alert-dialog";
+import { useAuth, getAccessToken } from "@/contexts/auth-context";
+import { jwtDecode } from "jwt-decode";
 
 const WARNING_THRESHOLD = 2 * 60 * 1000; // Show warning 2 minutes before expiry
 
@@ -39,7 +39,7 @@ export function SessionTimeoutWarning() {
           setShowWarning(false);
         }
       } catch (error) {
-        console.error('Failed to decode token:', error);
+        console.error("Failed to decode token:", error);
       }
     };
 
@@ -47,7 +47,9 @@ export function SessionTimeoutWarning() {
     const interval = setInterval(checkTokenExpiry, 30000);
     checkTokenExpiry(); // Check immediately
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   // Update remaining time every second when warning is shown
@@ -65,7 +67,9 @@ export function SessionTimeoutWarning() {
       });
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [showWarning]);
 
   const handleExtendSession = async () => {
@@ -73,7 +77,7 @@ export function SessionTimeoutWarning() {
       await extendSession();
       setShowWarning(false);
     } catch (error) {
-      console.error('Failed to extend session:', error);
+      console.error("Failed to extend session:", error);
       handleLogout();
     }
   };
@@ -81,13 +85,13 @@ export function SessionTimeoutWarning() {
   const handleLogout = () => {
     setShowWarning(false);
     logout();
-    navigate('/login');
+    void navigate("/login");
   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -96,8 +100,9 @@ export function SessionTimeoutWarning() {
         <AlertDialogHeader>
           <AlertDialogTitle>Session Expiring Soon</AlertDialogTitle>
           <AlertDialogDescription>
-            Your session will expire in <strong>{formatTime(remainingTime)}</strong>.
-            Would you like to extend your session?
+            Your session will expire in{" "}
+            <strong>{formatTime(remainingTime)}</strong>. Would you like to
+            extend your session?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

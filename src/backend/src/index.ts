@@ -1,16 +1,16 @@
-import 'reflect-metadata'; // Must be first import for DI to work
-import express, { Application } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import morgan from 'morgan';
-import { PrismaClient } from '@prisma/client';
-import { config } from './config';
-import { setupContainer } from './config/container';
-import { errorHandler } from './middleware/error-handler';
-import promptsRouter from './routes/prompts';
-import siqImportRouter from './routes/siq-import';
-import assistantRouter from './routes/assistant';
+import "reflect-metadata"; // Must be first import for DI to work
+import express, { Application } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import morgan from "morgan";
+import { PrismaClient } from "@prisma/client";
+import { config } from "./config";
+import { setupContainer } from "./config/container";
+import { errorHandler } from "./middleware/error-handler";
+import promptsRouter from "./routes/prompts";
+import siqImportRouter from "./routes/siq-import";
+import assistantRouter from "./routes/assistant";
 
 class Server {
   private app: Application;
@@ -41,10 +41,10 @@ class Server {
       compression({
         filter: (req, res) => {
           // Disable compression for SSE endpoints
-          if (req.headers.accept === 'text/event-stream') {
+          if (req.headers.accept === "text/event-stream") {
             return false;
           }
-          if (req.path.includes('/chat/stream')) {
+          if (req.path.includes("/chat/stream")) {
             return false;
           }
           // Default filter
@@ -58,24 +58,24 @@ class Server {
     this.app.use(express.urlencoded({ extended: true }));
 
     // Logging middleware
-    if (config.nodeEnv === 'development') {
-      this.app.use(morgan('dev'));
+    if (config.nodeEnv === "development") {
+      this.app.use(morgan("dev"));
     }
   }
 
   private initializeRoutes(): void {
     // Health check endpoint
-    this.app.get('/health', (_req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    this.app.get("/health", (_req, res) => {
+      res.json({ status: "ok", timestamp: new Date().toISOString() });
     });
 
     // Setup DI container with application dependencies
     setupContainer(this.prisma);
 
     // Register routes
-    this.app.use('/prompts', promptsRouter);
-    this.app.use('/siq-import', siqImportRouter);
-    this.app.use('/assistant', assistantRouter);
+    this.app.use("/prompts", promptsRouter);
+    this.app.use("/siq-import", siqImportRouter);
+    this.app.use("/assistant", assistantRouter);
   }
 
   private initializeErrorHandling(): void {
@@ -86,15 +86,15 @@ class Server {
     try {
       // Connect to database
       await this.prisma.$connect();
-      console.log('Database connected successfully');
+      console.log("Database connected successfully");
 
       // Start server
       this.app.listen(config.port, () => {
-        console.log(`Server is running on port ${config.port}`);
-        console.log(`Environment: ${config.nodeEnv}`);
+        console.log(`Server is running on port ${String(config.port)}`);
+        console.log(`Environment: ${String(config.nodeEnv)}`);
       });
     } catch (error) {
-      console.error('Failed to start server:', error);
+      console.error("Failed to start server:", error);
       await this.prisma.$disconnect();
       process.exit(1);
     }
@@ -102,23 +102,21 @@ class Server {
 
   public async stop(): Promise<void> {
     await this.prisma.$disconnect();
-    console.log('Server stopped');
+    console.log("Server stopped");
   }
 }
 
 // Start the server
 const server = new Server();
-server.start();
+void server.start();
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Received SIGINT, shutting down gracefully...');
-  await server.stop();
-  process.exit(0);
+process.on("SIGINT", () => {
+  console.log("Received SIGINT, shutting down gracefully...");
+  void server.stop().then(() => process.exit(0));
 });
 
-process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM, shutting down gracefully...');
-  await server.stop();
-  process.exit(0);
+process.on("SIGTERM", () => {
+  console.log("Received SIGTERM, shutting down gracefully...");
+  void server.stop().then(() => process.exit(0));
 });

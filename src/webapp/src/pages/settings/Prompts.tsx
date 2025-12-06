@@ -1,12 +1,12 @@
-import { useEffect } from "react"
-import { toast } from "sonner"
-import { PromptList } from "@/components/prompt-tuning/PromptList"
-import { TestChat } from "@/components/prompt-tuning/TestChat"
-import { PromptModal } from "@/components/prompt-tuning/PromptModal"
-import { usePromptsApi } from "@/hooks/use-prompts-api"
-import { usePromptModal } from "@/hooks/use-prompt-modal"
-import { useTestChat } from "@/hooks/use-test-chat"
-import type { CreatePromptInput } from "@/types/prompts"
+import { useEffect } from "react";
+import { toast } from "sonner";
+import { PromptList } from "@/components/prompt-tuning/PromptList";
+import { TestChat } from "@/components/prompt-tuning/TestChat";
+import { PromptModal } from "@/components/prompt-tuning/PromptModal";
+import { usePromptsApi } from "@/hooks/use-prompts-api";
+import { usePromptModal } from "@/hooks/use-prompt-modal";
+import { useTestChat } from "@/hooks/use-test-chat";
+import type { CreatePromptInput } from "@/types/prompts";
 
 export default function Prompts() {
   const {
@@ -18,49 +18,55 @@ export default function Prompts() {
     createPrompt,
     deletePrompt,
     activatePrompt,
-  } = usePromptsApi()
+  } = usePromptsApi();
 
-  const { messages, isLoading: isChatLoading, lastResponseMeta, sendMessage, clearChat } = useTestChat()
-  const modal = usePromptModal()
+  const {
+    messages,
+    isLoading: isChatLoading,
+    lastResponseMeta,
+    sendMessage,
+    clearChat,
+  } = useTestChat();
+  const modal = usePromptModal();
 
   // Fetch prompts on mount
   useEffect(() => {
-    fetchPrompts()
-  }, [fetchPrompts])
+    void fetchPrompts();
+  }, [fetchPrompts]);
 
   // Show error toast when error occurs
   useEffect(() => {
     if (error) {
-      toast.error(error)
+      toast.error(error);
     }
-  }, [error])
+  }, [error]);
 
   const handleCreate = async (input: CreatePromptInput) => {
     try {
-      await createPrompt(input)
-      toast.success("Prompt created successfully")
+      await createPrompt(input);
+      toast.success("Prompt created successfully");
     } catch {
       // Error is already handled in the hook
     }
-  }
+  };
 
   const handleDelete = async (id: string) => {
     try {
-      await deletePrompt(id)
-      toast.success("Prompt deleted successfully")
+      await deletePrompt(id);
+      toast.success("Prompt deleted successfully");
     } catch {
       // Error is already handled in the hook
     }
-  }
+  };
 
   const handleActivate = async (id: string) => {
     try {
-      await activatePrompt(id)
-      toast.success("Prompt activated successfully")
+      await activatePrompt(id);
+      toast.success("Prompt activated successfully");
     } catch {
       // Error is already handled in the hook
     }
-  }
+  };
 
   return (
     <div className="flex flex-1 gap-6 min-h-0">
@@ -94,5 +100,5 @@ export default function Prompts() {
         onSave={handleCreate}
       />
     </div>
-  )
+  );
 }

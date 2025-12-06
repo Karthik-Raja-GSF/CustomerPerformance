@@ -1,26 +1,32 @@
-import { useState, useRef, useEffect } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Button } from "@/shadcn/components/button"
-import { Input } from "@/shadcn/components/input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/shadcn/components/card"
-import { ScrollArea } from "@/shadcn/components/scroll-area"
-import { Badge } from "@/shadcn/components/badge"
-import { Send, Trash2, Bot, User, Loader2 } from "lucide-react"
-import type { ChatMessage, Prompt, ChatResponseMeta } from "@/types/prompts"
-import { cn } from "@/shadcn/lib/utils"
+import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Button } from "@/shadcn/components/button";
+import { Input } from "@/shadcn/components/input";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/shadcn/components/card";
+import { ScrollArea } from "@/shadcn/components/scroll-area";
+import { Badge } from "@/shadcn/components/badge";
+import { Send, Trash2, Bot, User, Loader2 } from "lucide-react";
+import type { ChatMessage, Prompt, ChatResponseMeta } from "@/types/prompts";
+import { cn } from "@/shadcn/lib/utils";
 
 interface TestChatProps {
-  messages: ChatMessage[]
-  activePrompt: Prompt | undefined
-  isLoading?: boolean
-  lastResponseMeta?: ChatResponseMeta | null
-  onSendMessage: (message: string) => void
-  onClearChat: () => void
+  messages: ChatMessage[];
+  activePrompt: Prompt | undefined;
+  isLoading?: boolean;
+  lastResponseMeta?: ChatResponseMeta | null;
+  onSendMessage: (message: string) => void;
+  onClearChat: () => void;
 }
 
 function ChatMessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === "user"
+  const isUser = message.role === "user";
 
   return (
     <div className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
@@ -43,7 +49,9 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
           <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-table:my-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
           </div>
         )}
         <span
@@ -59,7 +67,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
         </span>
       </div>
     </div>
-  )
+  );
 }
 
 export function TestChat({
@@ -70,26 +78,26 @@ export function TestChat({
   onSendMessage,
   onClearChat,
 }: TestChatProps) {
-  const [inputValue, setInputValue] = useState("")
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [inputValue, setInputValue] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = () => {
-    if (!inputValue.trim()) return
-    onSendMessage(inputValue.trim())
-    setInputValue("")
-  }
+    if (!inputValue.trim()) return;
+    onSendMessage(inputValue.trim());
+    setInputValue("");
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   return (
     <Card className="flex flex-1 flex-col h-full overflow-hidden">
@@ -105,7 +113,9 @@ export function TestChat({
                 </Badge>
               </>
             ) : (
-              <span className="text-xs text-amber-600">No active prompt selected</span>
+              <span className="text-xs text-amber-600">
+                No active prompt selected
+              </span>
             )}
             {lastResponseMeta && (
               <>
@@ -117,7 +127,8 @@ export function TestChat({
                   {lastResponseMeta.confidence}% confident
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {lastResponseMeta.usage.inputTokens}→{lastResponseMeta.usage.outputTokens} tokens
+                  {lastResponseMeta.usage.inputTokens}→
+                  {lastResponseMeta.usage.outputTokens} tokens
                 </span>
               </>
             )}
@@ -125,7 +136,12 @@ export function TestChat({
         </div>
 
         {messages.length > 0 && (
-          <Button variant="outline" size="sm" onClick={onClearChat} className="gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearChat}
+            className="gap-1"
+          >
             <Trash2 className="h-3.5 w-3.5" />
             Clear
           </Button>
@@ -159,12 +175,18 @@ export function TestChat({
         <div className="flex w-full gap-2">
           <Input
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Type a message to test..."
             className="flex-1"
           />
-          <Button onClick={handleSend} disabled={!inputValue.trim() || isLoading} className="gap-2">
+          <Button
+            onClick={handleSend}
+            disabled={!inputValue.trim() || isLoading}
+            className="gap-2"
+          >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -175,5 +197,5 @@ export function TestChat({
         </div>
       </CardFooter>
     </Card>
-  )
+  );
 }

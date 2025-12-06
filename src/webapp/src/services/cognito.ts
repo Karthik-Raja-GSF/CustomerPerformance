@@ -4,8 +4,8 @@ import {
   AuthenticationDetails,
   CognitoUserSession,
   CognitoIdToken,
-} from 'amazon-cognito-identity-js';
-import { cognitoConfig } from '@/config/cognito';
+} from "amazon-cognito-identity-js";
+import { cognitoConfig } from "@/config/cognito";
 
 /**
  * Cognito Authentication Error
@@ -16,7 +16,7 @@ export class CognitoAuthError extends Error {
 
   constructor(message: string, code: string, originalError?: Error) {
     super(message);
-    this.name = 'CognitoAuthError';
+    this.name = "CognitoAuthError";
     this.code = code;
     this.originalError = originalError;
   }
@@ -71,8 +71,8 @@ function getUserPool(): CognitoUserPool {
   if (!userPool) {
     if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
       throw new CognitoAuthError(
-        'Cognito is not configured. Set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID.',
-        'ConfigurationError'
+        "Cognito is not configured. Set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID.",
+        "ConfigurationError"
       );
     }
     userPool = new CognitoUserPool({
@@ -91,9 +91,16 @@ function extractUserFromIdToken(idToken: CognitoIdToken): CognitoUserInfo {
 
   return {
     userId: payload.sub as string,
-    email: (payload.email as string) || (payload['custom:email'] as string) || '',
-    firstName: (payload.given_name as string) || (payload['custom:firstName'] as string) || '',
-    lastName: (payload.family_name as string) || (payload['custom:lastName'] as string) || '',
+    email:
+      (payload.email as string) || (payload["custom:email"] as string) || "",
+    firstName:
+      (payload.given_name as string) ||
+      (payload["custom:firstName"] as string) ||
+      "",
+    lastName:
+      (payload.family_name as string) ||
+      (payload["custom:lastName"] as string) ||
+      "",
   };
 }
 
@@ -109,7 +116,10 @@ function getExpiresIn(session: CognitoUserSession): number {
 /**
  * Sign in with email and password
  */
-export function signIn(email: string, password: string): Promise<CognitoAuthResult> {
+export function signIn(
+  email: string,
+  password: string
+): Promise<CognitoAuthResult> {
   return new Promise((resolve, reject) => {
     try {
       const pool = getUserPool();
@@ -139,29 +149,31 @@ export function signIn(email: string, password: string): Promise<CognitoAuthResu
         },
         onFailure: (err: Error) => {
           const error = err as Error & { code?: string };
-          let message = 'Authentication failed';
+          let message = "Authentication failed";
 
           switch (error.code) {
-            case 'UserNotFoundException':
-              message = 'User not found';
+            case "UserNotFoundException":
+              message = "User not found";
               break;
-            case 'NotAuthorizedException':
-              message = 'Incorrect email or password';
+            case "NotAuthorizedException":
+              message = "Incorrect email or password";
               break;
-            case 'UserNotConfirmedException':
-              message = 'User not confirmed';
+            case "UserNotConfirmedException":
+              message = "User not confirmed";
               break;
-            case 'PasswordResetRequiredException':
-              message = 'Password reset required';
+            case "PasswordResetRequiredException":
+              message = "Password reset required";
               break;
-            case 'InvalidParameterException':
-              message = 'Invalid parameters';
+            case "InvalidParameterException":
+              message = "Invalid parameters";
               break;
             default:
-              message = error.message || 'Authentication error';
+              message = error.message || "Authentication error";
           }
 
-          reject(new CognitoAuthError(message, error.code || 'UnknownError', err));
+          reject(
+            new CognitoAuthError(message, error.code || "UnknownError", err)
+          );
         },
         newPasswordRequired: (userAttributes) => {
           // Store the challenge context for later use
@@ -170,11 +182,13 @@ export function signIn(email: string, password: string): Promise<CognitoAuthResu
             userAttributes,
             email,
           };
-          reject(new CognitoAuthError(
-            'New password required',
-            'NewPasswordRequired',
-            new Error(JSON.stringify(userAttributes))
-          ));
+          reject(
+            new CognitoAuthError(
+              "New password required",
+              "NewPasswordRequired",
+              new Error(JSON.stringify(userAttributes))
+            )
+          );
         },
       });
     } catch (error) {
@@ -193,43 +207,52 @@ export function refreshSession(): Promise<CognitoAuthResult> {
       const cognitoUser = pool.getCurrentUser();
 
       if (!cognitoUser) {
-        reject(new CognitoAuthError('No session found', 'NoCurrentUser'));
+        reject(new CognitoAuthError("No session found", "NoCurrentUser"));
         return;
       }
 
-      cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
-        if (err || !session) {
-          reject(new CognitoAuthError(
-            'Failed to get session',
-            'SessionError',
-            err || undefined
-          ));
-          return;
-        }
-
-        // Always force refresh to get new tokens
-        cognitoUser.refreshSession(session.getRefreshToken(), (refreshErr, newSession) => {
-          if (refreshErr || !newSession) {
-            reject(new CognitoAuthError(
-              'Failed to refresh token',
-              'TokenRefreshFailed',
-              refreshErr
-            ));
+      cognitoUser.getSession(
+        (err: Error | null, session: CognitoUserSession | null) => {
+          if (err || !session) {
+            reject(
+              new CognitoAuthError(
+                "Failed to get session",
+                "SessionError",
+                err || undefined
+              )
+            );
             return;
           }
 
-          const idToken = newSession.getIdToken();
-          const user = extractUserFromIdToken(idToken);
+          // Always force refresh to get new tokens
+          cognitoUser.refreshSession(
+            session.getRefreshToken(),
+            (refreshErr, newSession) => {
+              if (refreshErr || !newSession) {
+                reject(
+                  new CognitoAuthError(
+                    "Failed to refresh token",
+                    "TokenRefreshFailed",
+                    refreshErr
+                  )
+                );
+                return;
+              }
 
-          resolve({
-            idToken: idToken.getJwtToken(),
-            accessToken: newSession.getAccessToken().getJwtToken(),
-            refreshToken: newSession.getRefreshToken().getToken(),
-            expiresIn: getExpiresIn(newSession),
-            user,
-          });
-        });
-      });
+              const idToken = newSession.getIdToken();
+              const user = extractUserFromIdToken(idToken);
+
+              resolve({
+                idToken: idToken.getJwtToken(),
+                accessToken: newSession.getAccessToken().getJwtToken(),
+                refreshToken: newSession.getRefreshToken().getToken(),
+                expiresIn: getExpiresIn(newSession),
+                user,
+              });
+            }
+          );
+        }
+      );
     } catch (error) {
       reject(error);
     }
@@ -250,23 +273,25 @@ export function getCurrentSession(): Promise<CognitoAuthResult | null> {
         return;
       }
 
-      cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
-        if (err || !session || !session.isValid()) {
-          resolve(null);
-          return;
+      cognitoUser.getSession(
+        (err: Error | null, session: CognitoUserSession | null) => {
+          if (err || !session || !session.isValid()) {
+            resolve(null);
+            return;
+          }
+
+          const idToken = session.getIdToken();
+          const user = extractUserFromIdToken(idToken);
+
+          resolve({
+            idToken: idToken.getJwtToken(),
+            accessToken: session.getAccessToken().getJwtToken(),
+            refreshToken: session.getRefreshToken().getToken(),
+            expiresIn: getExpiresIn(session),
+            user,
+          });
         }
-
-        const idToken = session.getIdToken();
-        const user = extractUserFromIdToken(idToken);
-
-        resolve({
-          idToken: idToken.getJwtToken(),
-          accessToken: session.getAccessToken().getJwtToken(),
-          refreshToken: session.getRefreshToken().getToken(),
-          expiresIn: getExpiresIn(session),
-          user,
-        });
-      });
+      );
     } catch {
       // Config not set, no session
       resolve(null);
@@ -303,27 +328,33 @@ export function globalSignOut(): Promise<void> {
         return;
       }
 
-      cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
-        if (err || !session) {
-          // Even if we can't get session, try to sign out locally
-          cognitoUser.signOut();
-          resolve();
-          return;
-        }
-
-        cognitoUser.globalSignOut({
-          onSuccess: () => resolve(),
-          onFailure: (signOutErr) => {
-            // Sign out locally even if global sign out fails
+      cognitoUser.getSession(
+        (err: Error | null, session: CognitoUserSession | null) => {
+          if (err || !session) {
+            // Even if we can't get session, try to sign out locally
             cognitoUser.signOut();
-            reject(new CognitoAuthError(
-              'Global sign out error',
-              'GlobalSignOutFailed',
-              signOutErr
-            ));
-          },
-        });
-      });
+            resolve();
+            return;
+          }
+
+          cognitoUser.globalSignOut({
+            onSuccess: () => {
+              resolve();
+            },
+            onFailure: (signOutErr) => {
+              // Sign out locally even if global sign out fails
+              cognitoUser.signOut();
+              reject(
+                new CognitoAuthError(
+                  "Global sign out error",
+                  "GlobalSignOutFailed",
+                  signOutErr
+                )
+              );
+            },
+          });
+        }
+      );
     } catch (error) {
       reject(error);
     }
@@ -333,13 +364,17 @@ export function globalSignOut(): Promise<void> {
 /**
  * Complete new password challenge for first-time users
  */
-export function completeNewPasswordChallenge(newPassword: string): Promise<CognitoAuthResult> {
+export function completeNewPasswordChallenge(
+  newPassword: string
+): Promise<CognitoAuthResult> {
   return new Promise((resolve, reject) => {
     if (!pendingPasswordChallenge) {
-      reject(new CognitoAuthError(
-        'No pending password change request',
-        'NoPendingChallenge'
-      ));
+      reject(
+        new CognitoAuthError(
+          "No pending password change request",
+          "NoPendingChallenge"
+        )
+      );
       return;
     }
 
@@ -347,7 +382,7 @@ export function completeNewPasswordChallenge(newPassword: string): Promise<Cogni
 
     // Remove attributes that Cognito doesn't allow to be sent back
     const filteredAttributes: Record<string, string> = {};
-    const allowedAttributes = ['given_name', 'family_name', 'name'];
+    const allowedAttributes = ["given_name", "family_name", "name"];
 
     for (const key of allowedAttributes) {
       if (userAttributes[key]) {
@@ -357,10 +392,10 @@ export function completeNewPasswordChallenge(newPassword: string): Promise<Cogni
 
     // Ensure required attributes have values (use email prefix as fallback for names)
     if (!filteredAttributes.given_name) {
-      filteredAttributes.given_name = email.split('@')[0] || 'User';
+      filteredAttributes.given_name = email.split("@")[0] || "User";
     }
     if (!filteredAttributes.family_name) {
-      filteredAttributes.family_name = email.split('@')[0] || 'User';
+      filteredAttributes.family_name = email.split("@")[0] || "User";
     }
 
     cognitoUser.completeNewPasswordChallenge(newPassword, filteredAttributes, {
@@ -381,20 +416,22 @@ export function completeNewPasswordChallenge(newPassword: string): Promise<Cogni
       },
       onFailure: (err: Error) => {
         const error = err as Error & { code?: string };
-        let message = 'Failed to change password';
+        let message = "Failed to change password";
 
         switch (error.code) {
-          case 'InvalidPasswordException':
-            message = 'Password does not meet security requirements';
+          case "InvalidPasswordException":
+            message = "Password does not meet security requirements";
             break;
-          case 'InvalidParameterException':
-            message = 'Invalid parameters';
+          case "InvalidParameterException":
+            message = "Invalid parameters";
             break;
           default:
-            message = error.message || 'Password change error';
+            message = error.message || "Password change error";
         }
 
-        reject(new CognitoAuthError(message, error.code || 'UnknownError', err));
+        reject(
+          new CognitoAuthError(message, error.code || "UnknownError", err)
+        );
       },
     });
   });
@@ -403,73 +440,96 @@ export function completeNewPasswordChallenge(newPassword: string): Promise<Cogni
 /**
  * Change password for currently authenticated user
  */
-export function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+export function changePassword(
+  oldPassword: string,
+  newPassword: string
+): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
       const pool = getUserPool();
       const cognitoUser = pool.getCurrentUser();
 
       if (!cognitoUser) {
-        reject(new CognitoAuthError('No session found', 'NoCurrentUser'));
+        reject(new CognitoAuthError("No session found", "NoCurrentUser"));
         return;
       }
 
-      cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
-        if (err || !session) {
-          reject(new CognitoAuthError(
-            'Failed to get session',
-            'SessionError',
-            err || undefined
-          ));
-          return;
-        }
+      cognitoUser.getSession(
+        (err: Error | null, session: CognitoUserSession | null) => {
+          if (err || !session) {
+            reject(
+              new CognitoAuthError(
+                "Failed to get session",
+                "SessionError",
+                err || undefined
+              )
+            );
+            return;
+          }
 
-        // Helper function to perform the password change
-        const performPasswordChange = () => {
-          cognitoUser.changePassword(oldPassword, newPassword, (changeErr) => {
-            if (changeErr) {
-              const error = changeErr as Error & { code?: string };
-              let message = 'Failed to change password';
+          // Helper function to perform the password change
+          const performPasswordChange = () => {
+            cognitoUser.changePassword(
+              oldPassword,
+              newPassword,
+              (changeErr) => {
+                if (changeErr) {
+                  const error = changeErr as Error & { code?: string };
+                  let message = "Failed to change password";
 
-              switch (error.code) {
-                case 'InvalidPasswordException':
-                  message = 'New password does not meet security requirements';
-                  break;
-                case 'NotAuthorizedException':
-                  message = 'Incorrect current password';
-                  break;
-                case 'LimitExceededException':
-                  message = 'Too many attempts. Please try again later';
-                  break;
-                default:
-                  message = error.message || 'Password change error';
+                  switch (error.code) {
+                    case "InvalidPasswordException":
+                      message =
+                        "New password does not meet security requirements";
+                      break;
+                    case "NotAuthorizedException":
+                      message = "Incorrect current password";
+                      break;
+                    case "LimitExceededException":
+                      message = "Too many attempts. Please try again later";
+                      break;
+                    default:
+                      message = error.message || "Password change error";
+                  }
+
+                  reject(
+                    new CognitoAuthError(
+                      message,
+                      error.code || "UnknownError",
+                      changeErr
+                    )
+                  );
+                  return;
+                }
+
+                resolve();
               }
+            );
+          };
 
-              reject(new CognitoAuthError(message, error.code || 'UnknownError', changeErr));
-              return;
-            }
-
-            resolve();
-          });
-        };
-
-        // Check if session is valid, refresh if needed
-        if (!session.isValid()) {
-          cognitoUser.refreshSession(session.getRefreshToken(), (refreshErr, newSession) => {
-            if (refreshErr || !newSession) {
-              reject(new CognitoAuthError(
-                'Session expired. Please log in again',
-                'SessionExpired',
-                refreshErr
-              ));
-              return;
-            }
+          // Check if session is valid, refresh if needed
+          if (!session.isValid()) {
+            cognitoUser.refreshSession(
+              session.getRefreshToken(),
+              (refreshErr, newSession) => {
+                if (refreshErr || !newSession) {
+                  reject(
+                    new CognitoAuthError(
+                      "Session expired. Please log in again",
+                      "SessionExpired",
+                      refreshErr
+                    )
+                  );
+                  return;
+                }
+                performPasswordChange();
+              }
+            );
+          } else {
             performPasswordChange();
-          });
-        } else {
-          performPasswordChange();
+          }
         }
-      });
+      );
     } catch (error) {
       reject(error);
     }

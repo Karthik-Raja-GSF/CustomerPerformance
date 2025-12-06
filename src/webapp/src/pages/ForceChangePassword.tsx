@@ -1,17 +1,26 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/auth-context';
-import { Button } from '@/shadcn/components/button';
-import { Input } from '@/shadcn/components/input';
-import { Label } from '@/shadcn/components/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shadcn/components/card';
-import { completeNewPasswordChallenge, getPendingPasswordChallenge } from '@/services/cognito';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/auth-context";
+import { Button } from "@/shadcn/components/button";
+import { Input } from "@/shadcn/components/input";
+import { Label } from "@/shadcn/components/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shadcn/components/card";
+import {
+  completeNewPasswordChallenge,
+  getPendingPasswordChallenge,
+} from "@/services/cognito";
 
 export default function ForceChangePassword() {
   const navigate = useNavigate();
   const { setAuthFromCognitoResult } = useAuth();
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,12 +31,12 @@ export default function ForceChangePassword() {
     setError(null);
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError("Password must be at least 8 characters");
       return;
     }
 
@@ -36,12 +45,12 @@ export default function ForceChangePassword() {
     try {
       const result = await completeNewPasswordChallenge(newPassword);
       setAuthFromCognitoResult(result);
-      navigate('/');
+      void navigate("/");
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('An unexpected error occurred');
+        setError("An unexpected error occurred");
       }
     } finally {
       setIsLoading(false);
@@ -54,13 +63,15 @@ export default function ForceChangePassword() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Session Expired</CardTitle>
+            <CardTitle className="text-2xl font-bold">
+              Session Expired
+            </CardTitle>
             <CardDescription>
               Your password change session has expired. Please log in again.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/login')} className="w-full">
+            <Button onClick={() => navigate("/login")} className="w-full">
               Go to Login
             </Button>
           </CardContent>
@@ -93,7 +104,9 @@ export default function ForceChangePassword() {
                 type="password"
                 placeholder="Enter new password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                }}
                 required
                 disabled={isLoading}
               />
@@ -106,7 +119,9 @@ export default function ForceChangePassword() {
                 type="password"
                 placeholder="Confirm new password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                }}
                 required
                 disabled={isLoading}
               />
@@ -123,7 +138,7 @@ export default function ForceChangePassword() {
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Setting password...' : 'Set Password'}
+              {isLoading ? "Setting password..." : "Set Password"}
             </Button>
           </form>
         </CardContent>

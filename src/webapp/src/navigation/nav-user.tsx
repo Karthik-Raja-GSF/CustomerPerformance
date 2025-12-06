@@ -1,14 +1,14 @@
-import { useState } from "react"
-import { ChevronsUpDown, KeyRound, LogOut } from "lucide-react"
-import { toast } from "sonner"
+import { useState } from "react";
+import { ChevronsUpDown, KeyRound, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
-import { useAuth } from "@/contexts/auth-context"
+import { useAuth } from "@/contexts/auth-context";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@/shadcn/components/avatar"
-import { Button } from "@/shadcn/components/button"
+} from "@/shadcn/components/avatar";
+import { Button } from "@/shadcn/components/button";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/shadcn/components/dialog"
+} from "@/shadcn/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,64 +25,67 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/shadcn/components/dropdown-menu"
-import { Input } from "@/shadcn/components/input"
-import { Label } from "@/shadcn/components/label"
+} from "@/shadcn/components/dropdown-menu";
+import { Input } from "@/shadcn/components/input";
+import { Label } from "@/shadcn/components/label";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/shadcn/components/sidebar"
+} from "@/shadcn/components/sidebar";
 
 export function NavUser() {
-  const { isMobile } = useSidebar()
-  const { user, logout, changePassword } = useAuth()
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { isMobile } = useSidebar();
+  const { user, logout, changePassword } = useAuth();
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!user) {
-    return null
+    return null;
   }
 
-  const fullName = `${user.firstName} ${user.lastName}`
-  const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+  const fullName = `${user.firstName} ${user.lastName}`;
+  const initials =
+    `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
-      toast.error("New passwords do not match")
-      return
+      toast.error("New passwords do not match");
+      return;
     }
 
     if (newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters")
-      return
+      toast.error("Password must be at least 8 characters");
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      await changePassword(currentPassword, newPassword)
-      toast.success("Password changed successfully")
-      setIsPasswordDialogOpen(false)
-      setCurrentPassword("")
-      setNewPassword("")
-      setConfirmPassword("")
+      await changePassword(currentPassword, newPassword);
+      toast.success("Password changed successfully");
+      setIsPasswordDialogOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to change password")
+      toast.error(
+        error instanceof Error ? error.message : "Failed to change password"
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleDialogClose = () => {
-    setIsPasswordDialogOpen(false)
-    setCurrentPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
-  }
+    setIsPasswordDialogOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
 
   return (
     <>
@@ -96,7 +99,9 @@ export function NavUser() {
               >
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src="" alt={fullName} />
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{fullName}</span>
@@ -115,7 +120,9 @@ export function NavUser() {
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src="" alt={fullName} />
-                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                    <AvatarFallback className="rounded-lg">
+                      {initials}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{fullName}</span>
@@ -125,7 +132,11 @@ export function NavUser() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onSelect={() => setIsPasswordDialogOpen(true)}>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setIsPasswordDialogOpen(true);
+                  }}
+                >
                   <KeyRound />
                   Change Password
                 </DropdownMenuItem>
@@ -155,7 +166,9 @@ export function NavUser() {
                 id="current-password"
                 type="password"
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
+                onChange={(e) => {
+                  setCurrentPassword(e.target.value);
+                }}
               />
             </div>
             <div className="grid gap-2">
@@ -164,7 +177,9 @@ export function NavUser() {
                 id="new-password"
                 type="password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                }}
               />
             </div>
             <div className="grid gap-2">
@@ -173,7 +188,9 @@ export function NavUser() {
                 id="confirm-password"
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                }}
               />
             </div>
           </div>
@@ -188,5 +205,5 @@ export function NavUser() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

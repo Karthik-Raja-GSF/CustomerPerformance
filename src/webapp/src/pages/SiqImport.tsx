@@ -1,12 +1,25 @@
-import { useState, useEffect, useCallback, useRef } from "react"
-import { toast } from "sonner"
-import * as XLSX from "xlsx"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shadcn/components/card"
-import { Button } from "@/shadcn/components/button"
-import { Badge } from "@/shadcn/components/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shadcn/components/table"
-import { ScrollArea } from "@/shadcn/components/scroll-area"
-import { Progress } from "@/shadcn/components/progress"
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shadcn/components/card";
+import { Button } from "@/shadcn/components/button";
+import { Badge } from "@/shadcn/components/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shadcn/components/table";
+import { ScrollArea } from "@/shadcn/components/scroll-area";
+import { Progress } from "@/shadcn/components/progress";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +27,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/shadcn/components/dialog"
-import { uploadSiqFileWithProgress, getImportHistory, type ImportLog, type ImportResult, type ImportProgress } from "@/apis/siq-import"
+} from "@/shadcn/components/dialog";
+import {
+  uploadSiqFileWithProgress,
+  getImportHistory,
+  type ImportLog,
+  type ImportResult,
+  type ImportProgress,
+} from "@/apis/siq-import";
 
 /**
  * Required columns for SIQ Import validation
@@ -70,13 +89,13 @@ const REQUIRED_COLUMNS = [
   "Column1.Total Customers",
   "Column1.Top 5 Customer Ship-To's",
   "Column1.Buyer",
-]
+];
 
 interface ValidationResult {
-  valid: boolean
-  rowCount: number
-  foundColumns: string[]
-  missingColumns: string[]
+  valid: boolean;
+  rowCount: number;
+  foundColumns: string[];
+  missingColumns: string[];
 }
 
 /**
@@ -84,207 +103,222 @@ interface ValidationResult {
  */
 async function validateExcelFile(file: File): Promise<ValidationResult> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = e.target?.result
-        const workbook = XLSX.read(data, { type: "array" })
-        const sheetName = workbook.SheetNames[0]
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
         if (!sheetName) {
-          reject(new Error("Excel file contains no sheets"))
-          return
+          reject(new Error("Excel file contains no sheets"));
+          return;
         }
-        const sheet = workbook.Sheets[sheetName]
+        const sheet = workbook.Sheets[sheetName];
         if (!sheet) {
-          reject(new Error("Failed to read sheet from Excel file"))
-          return
+          reject(new Error("Failed to read sheet from Excel file"));
+          return;
         }
 
         // Get all rows to count and extract headers
-        const rows = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[]
-        const firstRow = rows[0]
-        const headers = firstRow ? Object.keys(firstRow) : []
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        const firstRow = rows[0];
+        const headers = firstRow ? Object.keys(firstRow) : [];
 
-        const missingColumns = REQUIRED_COLUMNS.filter(col => !headers.includes(col))
+        const missingColumns = REQUIRED_COLUMNS.filter(
+          (col) => !headers.includes(col)
+        );
 
         resolve({
           valid: missingColumns.length === 0,
           rowCount: rows.length,
           foundColumns: headers,
           missingColumns,
-        })
-      } catch (err) {
-        reject(err)
+        });
+      } catch {
+        reject(new Error("Failed to parse Excel file"));
       }
-    }
-    reader.onerror = () => reject(new Error("Failed to read file"))
-    reader.readAsArrayBuffer(file)
-  })
+    };
+    reader.onerror = () => {
+      reject(new Error("Failed to read file"));
+    };
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 export default function SiqImport() {
-  const [history, setHistory] = useState<ImportLog[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [lastResult, setLastResult] = useState<ImportResult | null>(null)
-  const [dragActive, setDragActive] = useState(false)
-  const [progress, setProgress] = useState<ImportProgress | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [history, setHistory] = useState<ImportLog[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [lastResult, setLastResult] = useState<ImportResult | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Confirmation modal state
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
-  const [isValidating, setIsValidating] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [validationResult, setValidationResult] =
+    useState<ValidationResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   const fetchHistory = useCallback(async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const data = await getImportHistory(20)
-      setHistory(data)
+      const data = await getImportHistory(20);
+      setHistory(data);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to fetch history")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to fetch history"
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    fetchHistory()
-  }, [fetchHistory])
+    void fetchHistory();
+  }, [fetchHistory]);
 
   /**
    * Validate file and show confirmation modal
    */
   const handleFileValidate = async (file: File) => {
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-      toast.error("Please upload an Excel file (.xlsx or .xls)")
-      return
+      toast.error("Please upload an Excel file (.xlsx or .xls)");
+      return;
     }
 
-    setIsValidating(true)
-    setPendingFile(file)
-    setValidationResult(null)
+    setIsValidating(true);
+    setPendingFile(file);
+    setValidationResult(null);
 
     try {
-      const result = await validateExcelFile(file)
-      setValidationResult(result)
-      setShowConfirmModal(true)
+      const result = await validateExcelFile(file);
+      setValidationResult(result);
+      setShowConfirmModal(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to validate file")
-      setPendingFile(null)
+      toast.error(
+        err instanceof Error ? err.message : "Failed to validate file"
+      );
+      setPendingFile(null);
     } finally {
-      setIsValidating(false)
+      setIsValidating(false);
     }
-  }
+  };
 
   /**
    * Confirm and start the upload
    */
   const handleConfirmUpload = async () => {
-    if (!pendingFile) return
+    if (!pendingFile) return;
 
-    setShowConfirmModal(false)
-    setIsUploading(true)
-    setLastResult(null)
+    setShowConfirmModal(false);
+    setIsUploading(true);
+    setLastResult(null);
     // Set initial progress immediately to show feedback before SSE events arrive
     setProgress({
-      type: 'validation',
-      phase: 'validating',
+      type: "validation",
+      phase: "validating",
       current: 0,
       total: 100,
       percentage: 0,
-      message: 'Starting upload...',
-    })
+      message: "Starting upload...",
+    });
 
     try {
-      const result = await uploadSiqFileWithProgress(pendingFile, undefined, (progressUpdate) => {
-        setProgress(progressUpdate)
+      const result = await uploadSiqFileWithProgress(
+        pendingFile,
+        undefined,
+        (progressUpdate) => {
+          setProgress(progressUpdate);
 
-        // Handle validation errors immediately
-        if (progressUpdate.type === 'error' && progressUpdate.message) {
-          toast.error(progressUpdate.message)
+          // Handle validation errors immediately
+          if (progressUpdate.type === "error" && progressUpdate.message) {
+            toast.error(progressUpdate.message);
+          }
         }
-      })
+      );
 
-      setLastResult(result)
-      setProgress(null)
+      setLastResult(result);
+      setProgress(null);
 
       if (result.status === "COMPLETED") {
-        toast.success(`Import completed! ${result.stats.rowsProcessed} rows processed.`)
+        toast.success(
+          `Import completed! ${result.stats.rowsProcessed} rows processed.`
+        );
       } else {
-        toast.error("Import failed. Check the details below.")
+        toast.error("Import failed. Check the details below.");
       }
 
-      await fetchHistory()
+      await fetchHistory();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed")
-      setProgress(null)
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+      setProgress(null);
     } finally {
-      setIsUploading(false)
-      setPendingFile(null)
-      setValidationResult(null)
+      setIsUploading(false);
+      setPendingFile(null);
+      setValidationResult(null);
     }
-  }
+  };
 
   /**
    * Cancel the upload
    */
   const handleCancelUpload = () => {
-    setShowConfirmModal(false)
-    setPendingFile(null)
-    setValidationResult(null)
-  }
+    setShowConfirmModal(false);
+    setPendingFile(null);
+    setValidationResult(null);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      handleFileValidate(file)
+      void handleFileValidate(file);
     }
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
+      setDragActive(true);
     } else if (e.type === "dragleave") {
-      setDragActive(false)
+      setDragActive(false);
     }
-  }
+  };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
 
-    const file = e.dataTransfer.files?.[0]
+    const file = e.dataTransfer.files?.[0];
     if (file) {
-      handleFileValidate(file)
+      void handleFileValidate(file);
     }
-  }
+  };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString()
-  }
+    return new Date(dateStr).toLocaleString();
+  };
 
   const getStatusBadge = (status: ImportLog["status"]) => {
     switch (status) {
       case "COMPLETED":
-        return <Badge variant="default">Completed</Badge>
+        return <Badge variant="default">Completed</Badge>;
       case "FAILED":
-        return <Badge variant="destructive">Failed</Badge>
+        return <Badge variant="destructive">Failed</Badge>;
       case "IN_PROGRESS":
-        return <Badge variant="secondary">In Progress</Badge>
+        return <Badge variant="secondary">In Progress</Badge>;
       case "PENDING":
-        return <Badge variant="outline">Pending</Badge>
+        return <Badge variant="outline">Pending</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <Badge variant="outline">{status}</Badge>;
     }
-  }
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6 min-h-0 overflow-hidden">
@@ -305,7 +339,9 @@ export default function SiqImport() {
             <CardContent>
               <div
                 className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                  dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                  dragActive
+                    ? "border-primary bg-primary/5"
+                    : "border-muted-foreground/25"
                 } ${isUploading || isValidating ? "opacity-50 pointer-events-none" : ""}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
@@ -335,11 +371,15 @@ export default function SiqImport() {
                         <Progress value={progress.percentage} className="h-2" />
                       </div>
                       <p className="text-sm font-medium">
-                        {progress.phase === 'validating' && 'Validating columns...'}
-                        {progress.phase === 'processing' && `Processing: ${progress.percentage}%`}
+                        {progress.phase === "validating" &&
+                          "Validating columns..."}
+                        {progress.phase === "processing" &&
+                          `Processing: ${progress.percentage}%`}
                       </p>
                       {progress.message && (
-                        <p className="text-xs text-muted-foreground">{progress.message}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {progress.message}
+                        </p>
                       )}
                       <p className="text-xs text-muted-foreground">
                         {progress.current} of {progress.total} rows
@@ -361,7 +401,8 @@ export default function SiqImport() {
                         />
                       </svg>
                       <p className="text-sm text-muted-foreground">
-                        <span className="font-semibold">Click to upload</span> or drag and drop
+                        <span className="font-semibold">Click to upload</span>{" "}
+                        or drag and drop
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Excel files up to 50MB
@@ -389,38 +430,49 @@ export default function SiqImport() {
               <CardContent>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>Rows Processed:</div>
-                  <div className="font-medium">{lastResult.stats.rowsProcessed}</div>
+                  <div className="font-medium">
+                    {lastResult.stats.rowsProcessed}
+                  </div>
 
                   <div>Sites:</div>
                   <div className="font-medium">
-                    {lastResult.stats.sitesCreated} created, {lastResult.stats.sitesUpdated} updated
+                    {lastResult.stats.sitesCreated} created,{" "}
+                    {lastResult.stats.sitesUpdated} updated
                   </div>
 
                   <div>Suppliers:</div>
                   <div className="font-medium">
-                    {lastResult.stats.suppliersCreated} created, {lastResult.stats.suppliersUpdated} updated
+                    {lastResult.stats.suppliersCreated} created,{" "}
+                    {lastResult.stats.suppliersUpdated} updated
                   </div>
 
                   <div>Items:</div>
                   <div className="font-medium">
-                    {lastResult.stats.itemsCreated} created, {lastResult.stats.itemsUpdated} updated
+                    {lastResult.stats.itemsCreated} created,{" "}
+                    {lastResult.stats.itemsUpdated} updated
                   </div>
 
                   <div>Inventory Snapshots:</div>
-                  <div className="font-medium">{lastResult.stats.inventorySnapshotsCreated} created</div>
+                  <div className="font-medium">
+                    {lastResult.stats.inventorySnapshotsCreated} created
+                  </div>
 
                   <div>Sales Actuals:</div>
                   <div className="font-medium">
-                    {lastResult.stats.salesActualsCreated} created, {lastResult.stats.salesActualsUpdated} updated
+                    {lastResult.stats.salesActualsCreated} created,{" "}
+                    {lastResult.stats.salesActualsUpdated} updated
                   </div>
 
                   <div>Forecasts:</div>
                   <div className="font-medium">
-                    {lastResult.stats.forecastsCreated} created, {lastResult.stats.forecastsUpdated} updated
+                    {lastResult.stats.forecastsCreated} created,{" "}
+                    {lastResult.stats.forecastsUpdated} updated
                   </div>
 
                   <div>Customer Metrics:</div>
-                  <div className="font-medium">{lastResult.stats.customerMetricsCreated} created</div>
+                  <div className="font-medium">
+                    {lastResult.stats.customerMetricsCreated} created
+                  </div>
                 </div>
 
                 {lastResult.errors && lastResult.errors.length > 0 && (
@@ -450,7 +502,12 @@ export default function SiqImport() {
                 <CardTitle>Import History</CardTitle>
                 <CardDescription>Recent data imports</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={fetchHistory} disabled={isLoading}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchHistory}
+                disabled={isLoading}
+              >
                 Refresh
               </Button>
             </CardHeader>
@@ -468,13 +525,19 @@ export default function SiqImport() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-muted-foreground"
+                        >
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : history.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-muted-foreground"
+                        >
                           No import history yet
                         </TableCell>
                       </TableRow>
@@ -520,19 +583,35 @@ export default function SiqImport() {
                   <div className="text-muted-foreground">File:</div>
                   <div className="font-medium truncate">{pendingFile.name}</div>
                   <div className="text-muted-foreground">Size:</div>
-                  <div className="font-medium">{(pendingFile.size / 1024 / 1024).toFixed(2)} MB</div>
+                  <div className="font-medium">
+                    {(pendingFile.size / 1024 / 1024).toFixed(2)} MB
+                  </div>
                   <div className="text-muted-foreground">Rows:</div>
-                  <div className="font-medium">{validationResult.rowCount.toLocaleString()}</div>
+                  <div className="font-medium">
+                    {validationResult.rowCount.toLocaleString()}
+                  </div>
                   <div className="text-muted-foreground">Columns:</div>
-                  <div className="font-medium">{validationResult.foundColumns.length}</div>
+                  <div className="font-medium">
+                    {validationResult.foundColumns.length}
+                  </div>
                 </div>
               </div>
 
               {/* Validation Status */}
               {validationResult.valid ? (
                 <div className="flex items-center gap-2 rounded-lg border p-3 bg-green-50 border-green-200">
-                  <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-5 w-5 text-green-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                   <span className="text-sm font-medium text-green-800">
                     All {REQUIRED_COLUMNS.length} required columns found
@@ -541,11 +620,22 @@ export default function SiqImport() {
               ) : (
                 <div className="flex flex-col gap-2 rounded-lg border p-3 bg-yellow-50 border-yellow-200">
                   <div className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    <svg
+                      className="h-5 w-5 text-yellow-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
                     </svg>
                     <span className="text-sm font-medium text-yellow-800">
-                      {validationResult.missingColumns.length} missing column{validationResult.missingColumns.length !== 1 ? 's' : ''}
+                      {validationResult.missingColumns.length} missing column
+                      {validationResult.missingColumns.length !== 1 ? "s" : ""}
                     </span>
                   </div>
                   <ScrollArea className="h-24">
@@ -567,12 +657,10 @@ export default function SiqImport() {
             <Button variant="outline" onClick={handleCancelUpload}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmUpload}>
-              Import
-            </Button>
+            <Button onClick={handleConfirmUpload}>Import</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

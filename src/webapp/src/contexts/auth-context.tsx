@@ -1,6 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { AuthResponse, LoginCredentials, AuthUser } from '@/types/auth.types';
-import { apiClient } from '@/apis/client';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { AuthResponse, LoginCredentials, AuthUser } from "@/types/auth.types";
+import { apiClient } from "@/apis/client";
 import {
   signIn as cognitoSignIn,
   signOut as cognitoSignOut,
@@ -9,7 +16,7 @@ import {
   changePassword as cognitoChangePassword,
   CognitoAuthError,
   CognitoAuthResult,
-} from '@/services/cognito';
+} from "@/services/cognito";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -26,8 +33,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 // Token storage keys
-const TOKEN_KEY = 'access_token';
-const ID_TOKEN_KEY = 'id_token';
+const TOKEN_KEY = "access_token";
+const ID_TOKEN_KEY = "id_token";
 const REFRESH_THRESHOLD = 5 * 60 * 1000; // Refresh 5 minutes before expiry
 
 interface AuthProviderProps {
@@ -55,7 +62,12 @@ function toAuthResponse(result: CognitoAuthResult): AuthResponse {
   };
 }
 
-export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthProviderProps) {
+export function AuthProvider({
+  children,
+  onLogin,
+  onRefresh,
+  onLogout,
+}: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<number | null>(null);
@@ -87,13 +99,15 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
     }
 
     // Calculate when to refresh (5 minutes before expiry)
-    const refreshIn = Math.max((expiresIn * 1000) - REFRESH_THRESHOLD, 0);
+    const refreshIn = Math.max(expiresIn * 1000 - REFRESH_THRESHOLD, 0);
 
-    console.log(`Token refresh scheduled in ${Math.round(refreshIn / 1000 / 60)} minutes`);
+    console.log(
+      `Token refresh scheduled in ${Math.round(refreshIn / 1000 / 60)} minutes`
+    );
 
     refreshTimerRef.current = window.setTimeout(() => {
       // Use ref to call the latest version of refreshToken
-      refreshTokenRef.current?.();
+      void refreshTokenRef.current?.();
     }, refreshIn);
   }, []); // No dependency on refreshToken - uses ref instead
 
@@ -118,13 +132,16 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
         setIsLoading(true);
 
         // Call Cognito directly
-        const result = await cognitoSignIn(credentials.email, credentials.password);
+        const result = await cognitoSignIn(
+          credentials.email,
+          credentials.password
+        );
         const authResponse = toAuthResponse(result);
 
         setAuthData(authResponse);
         onLogin?.(authResponse);
       } catch (error) {
-        console.error('Login error:', error);
+        console.error("Login error:", error);
         if (error instanceof CognitoAuthError) {
           throw new Error(error.message);
         }
@@ -147,7 +164,7 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
       setAuthData(authResponse);
       onRefresh?.(authResponse);
     } catch (error) {
-      console.error('Token refresh error:', error);
+      console.error("Token refresh error:", error);
       logout();
       throw error;
     }
@@ -182,16 +199,19 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
   /**
    * Change password for authenticated user
    */
-  const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
-    try {
-      await cognitoChangePassword(oldPassword, newPassword);
-    } catch (error) {
-      if (error instanceof CognitoAuthError) {
-        throw new Error(error.message);
+  const changePassword = useCallback(
+    async (oldPassword: string, newPassword: string) => {
+      try {
+        await cognitoChangePassword(oldPassword, newPassword);
+      } catch (error) {
+        if (error instanceof CognitoAuthError) {
+          throw new Error(error.message);
+        }
+        throw error;
       }
-      throw error;
-    }
-  }, []);
+    },
+    []
+  );
 
   /**
    * Logout user
@@ -236,7 +256,7 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
           setAuthData(authResponse);
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error("Auth initialization error:", error);
         // Clear any stale tokens
         clearTokens();
       } finally {
@@ -244,7 +264,7 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
       }
     };
 
-    initAuth();
+    void initAuth();
 
     // Cleanup timer on unmount
     return () => {
@@ -275,7 +295,7 @@ export function AuthProvider({ children, onLogin, onRefresh, onLogout }: AuthPro
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }

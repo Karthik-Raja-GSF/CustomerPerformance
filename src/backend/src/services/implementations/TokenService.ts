@@ -1,11 +1,11 @@
-import { injectable } from 'tsyringe';
-import { CognitoJwtVerifier } from 'aws-jwt-verify';
-import { ITokenService } from '@/services/ITokenService';
-import { TokenPayload } from '@/contracts/models/token-payload.model';
+import { injectable } from "tsyringe";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+import { ITokenService } from "@/services/ITokenService";
+import { TokenPayload } from "@/contracts/models/token-payload.model";
 import {
   TokenExpiredError,
   InvalidTokenError,
-} from '@/utils/errors/auth-errors';
+} from "@/utils/errors/auth-errors";
 
 /**
  * Token Service Implementation
@@ -14,7 +14,9 @@ import {
  */
 @injectable()
 export class TokenService implements ITokenService {
-  private readonly cognitoVerifier: ReturnType<typeof CognitoJwtVerifier.create>;
+  private readonly cognitoVerifier: ReturnType<
+    typeof CognitoJwtVerifier.create
+  >;
 
   constructor() {
     const userPoolId = process.env.AWS_COGNITO_USER_POOL_ID;
@@ -22,13 +24,13 @@ export class TokenService implements ITokenService {
 
     if (!userPoolId || !clientId) {
       throw new Error(
-        'AWS_COGNITO_USER_POOL_ID and AWS_COGNITO_CLIENT_ID must be set'
+        "AWS_COGNITO_USER_POOL_ID and AWS_COGNITO_CLIENT_ID must be set"
       );
     }
 
     this.cognitoVerifier = CognitoJwtVerifier.create({
       userPoolId,
-      tokenUse: 'id',
+      tokenUse: "id",
       clientId,
     });
   }
@@ -41,10 +43,10 @@ export class TokenService implements ITokenService {
       const payload = await this.cognitoVerifier.verify(token);
       return this.parseCognitoPayload(payload);
     } catch (error: unknown) {
-      const err = error as Error & { name?: string; message?: string };
+      const err = error as Error;
 
-      if (err.name === 'JwtExpiredError' || err.message?.includes('expired')) {
-        throw new TokenExpiredError('Cognito token has expired');
+      if (err.name === "JwtExpiredError" || err.message?.includes("expired")) {
+        throw new TokenExpiredError("Cognito token has expired");
       }
 
       throw new InvalidTokenError(`Invalid Cognito token: ${err.message}`);
@@ -54,16 +56,20 @@ export class TokenService implements ITokenService {
   /**
    * Parse Cognito JWT payload to TokenPayload
    */
-  private parseCognitoPayload(cognitoPayload: Record<string, unknown>): TokenPayload {
+  private parseCognitoPayload(
+    cognitoPayload: Record<string, unknown>
+  ): TokenPayload {
     const userId = cognitoPayload.sub as string;
     const email = cognitoPayload.email as string;
-    const firstName = (cognitoPayload.given_name as string) || '';
-    const lastName = (cognitoPayload.family_name as string) || '';
+    const firstName = (cognitoPayload.given_name as string) || "";
+    const lastName = (cognitoPayload.family_name as string) || "";
     const iat = cognitoPayload.iat as number;
     const exp = cognitoPayload.exp as number;
 
     if (!userId || !email) {
-      throw new InvalidTokenError('Cognito token missing required claims (sub, email)');
+      throw new InvalidTokenError(
+        "Cognito token missing required claims (sub, email)"
+      );
     }
 
     return {

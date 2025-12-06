@@ -1,13 +1,21 @@
-import { Package, TrendingUp, Users, FileText, Search, BarChart3, Info } from "lucide-react"
-import { Card, CardContent } from "@/shadcn/components/card"
-import type { LucideIcon } from "lucide-react"
+import {
+  Package,
+  TrendingUp,
+  Users,
+  FileText,
+  Search,
+  BarChart3,
+  Info,
+} from "lucide-react";
+import { Card, CardContent } from "@/shadcn/components/card";
+import type { LucideIcon } from "lucide-react";
 
 interface SuggestedPrompt {
-  id: string
-  title: string
-  description: string
-  prompt: string
-  icon: LucideIcon
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  icon: LucideIcon;
 }
 
 const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
@@ -15,14 +23,16 @@ const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
     id: "1",
     title: "Inventory Status",
     description: "Check current stock levels",
-    prompt: "What products do we have in stock and what are their current inventory levels?",
+    prompt:
+      "What products do we have in stock and what are their current inventory levels?",
     icon: Package,
   },
   {
     id: "2",
     title: "Sales Analysis",
     description: "View recent sales data",
-    prompt: "Show me the sales data for the last month. Which products sold the most?",
+    prompt:
+      "Show me the sales data for the last month. Which products sold the most?",
     icon: TrendingUp,
   },
   {
@@ -53,10 +63,10 @@ const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
     prompt: "Create a summary report of our top performing products",
     icon: FileText,
   },
-]
+];
 
 interface WelcomeScreenProps {
-  onPromptSelect: (prompt: string) => void
+  onPromptSelect: (prompt: string) => void;
 }
 
 export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
@@ -71,7 +81,7 @@ export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
               alt="StarQ"
               className="h-12 w-12"
               onError={(e) => {
-                e.currentTarget.style.display = "none"
+                e.currentTarget.style.display = "none";
               }}
             />
             <h1 className="text-3xl font-bold">StarQ</h1>
@@ -85,8 +95,8 @@ export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
         <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground flex items-start gap-2">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
-            <strong>Note:</strong> Each question is processed independently.
-            The AI does not see previous messages in this conversation.
+            <strong>Note:</strong> Each question is processed independently. The
+            AI does not see previous messages in this conversation.
           </span>
         </div>
 
@@ -98,7 +108,9 @@ export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
               <Card
                 key={item.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => onPromptSelect(item.prompt)}
+                onClick={() => {
+                  onPromptSelect(item.prompt);
+                }}
               >
                 <CardContent className="p-4 flex items-start gap-3">
                   <div className="rounded-lg bg-primary/10 p-2">
@@ -117,5 +129,5 @@ export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

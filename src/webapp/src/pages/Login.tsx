@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/auth-context';
-import { Button } from '@/shadcn/components/button';
-import { Input } from '@/shadcn/components/input';
-import { Label } from '@/shadcn/components/label';
-import { CognitoAuthError } from '@/services/cognito';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/auth-context";
+import { Button } from "@/shadcn/components/button";
+import { Input } from "@/shadcn/components/input";
+import { Label } from "@/shadcn/components/label";
+import { CognitoAuthError } from "@/services/cognito";
 
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,18 +21,21 @@ export default function Login() {
 
     try {
       await login({ email, password });
-      navigate('/');
+      void navigate("/");
     } catch (err) {
       if (err instanceof Error) {
         // Check for new password required
-        if (err.message === 'New password required' ||
-            (err instanceof CognitoAuthError && err.code === 'NewPasswordRequired')) {
-          navigate('/force-change-password');
+        if (
+          err.message === "New password required" ||
+          (err instanceof CognitoAuthError &&
+            err.code === "NewPasswordRequired")
+        ) {
+          void navigate("/force-change-password");
           return;
         }
         setError(err.message);
       } else {
-        setError('An unexpected error occurred');
+        setError("An unexpected error occurred");
       }
     } finally {
       setIsLoading(false);
@@ -45,9 +48,9 @@ export default function Login() {
       <div
         className="w-[70%] hidden md:block relative"
         style={{
-          backgroundImage: 'url(/gs-foods-hero.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundImage: "url(/gs-foods-hero.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       >
         {/* Glass overlay with logo */}
@@ -61,11 +64,14 @@ export default function Login() {
       </div>
 
       {/* Right side - Sign In Form (30%) */}
-      <div className="w-[30%] flex items-center justify-center p-8" style={{ backgroundColor: '#fff' }}>
+      <div
+        className="w-[30%] flex items-center justify-center p-8"
+        style={{ backgroundColor: "#fff" }}
+      >
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-2 text-center">
             <h1 className="text-2xl font-bold">Sign In</h1>
-            <p className="text-sm" style={{ color: '#6b7280' }}>
+            <p className="text-sm" style={{ color: "#6b7280" }}>
               Enter your credentials to access your account
             </p>
           </div>
@@ -84,7 +90,9 @@ export default function Login() {
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                }}
                 required
                 disabled={isLoading}
               />
@@ -97,7 +105,9 @@ export default function Login() {
                 type="password"
                 placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                }}
                 required
                 disabled={isLoading}
               />
@@ -107,9 +117,9 @@ export default function Login() {
               type="submit"
               className="w-full"
               disabled={isLoading}
-              style={{ backgroundColor: '#539D4C', borderColor: '#539D4C' }}
+              style={{ backgroundColor: "#539D4C", borderColor: "#539D4C" }}
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
         </div>
