@@ -31,5 +31,6 @@ coverage
 # TypeScript cache
 *.tsbuildinfo
 *.playwright-mcp
-
+CLAUDE.md
+*/.claude/**
 .mcp.json

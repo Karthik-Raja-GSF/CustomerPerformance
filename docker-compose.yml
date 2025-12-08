@@ -1,0 +1,48 @@
+services:
+  # MS SQL Server (for restoring NAV .bak files)
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    user: root
+    container_name: nav-mssql
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: NavImport123!
+    ports:
+      - '1433:1433'
+    volumes:
+      - ./nav-backups:/var/opt/mssql/backup
+      - mssql_data:/var/opt/mssql/data
+      - /Users/bbotirov/Workspace/gsf/baks:/backup
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "NavImport123!" -C -Q "SELECT 1" || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: admin-blueprint-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: admin_blueprint
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  mssql_data:
+    driver: local
