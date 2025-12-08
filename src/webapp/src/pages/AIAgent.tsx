@@ -20,7 +20,20 @@ export default function AIAgent() {
   const hasMessages = messages.length > 0
 
   return (
-    <div className="flex flex-1 flex-col h-full overflow-hidden">
+    <div className="flex flex-1 flex-col h-full overflow-hidden relative">
+      {/* Background watermark */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: "url('/starq-q-icon.svg')",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center center",
+          backgroundSize: "70%",
+          opacity: 0.05,
+          zIndex: 0,
+        }}
+      />
+
       {/* Header with actions */}
       {hasMessages && (
         <>

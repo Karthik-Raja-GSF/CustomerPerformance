@@ -75,16 +75,15 @@ export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
       <div className="max-w-2xl text-center space-y-6">
         {/* Logo and Title */}
         <div className="space-y-2">
-          <div className="flex items-center justify-center gap-3">
-            <img
-              src="/starq-logo.png"
-              alt="StarQ"
-              className="h-12 w-12"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-            <h1 className="text-3xl font-bold">StarQ</h1>
+          <div className="flex items-center justify-center">
+            <h1 className="text-3xl font-bold flex items-center">
+              Star
+              <img
+                src="/starq-q-icon.svg"
+                alt="Q"
+                className="h-7 w-7 ml-1"
+              />
+            </h1>
           </div>
           <p className="text-muted-foreground">
             Your AI-powered assistant for demand planning and procurement
