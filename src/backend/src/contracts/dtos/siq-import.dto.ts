@@ -9,7 +9,7 @@ export interface ImportLogDto {
   fileName: string;
   /** ISO8601 UTC timestamp */
   importDate: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   rowsProcessed: number | null;
   rowsCreated: number | null;
   rowsUpdated: number | null;
@@ -29,17 +29,22 @@ export interface ImportStatsDto {
   suppliersUpdated: number;
   itemsCreated: number;
   itemsUpdated: number;
+  itemsSkipped: number;
   inventorySnapshotsCreated: number;
+  inventorySnapshotsSkipped: number;
   salesActualsCreated: number;
   salesActualsUpdated: number;
+  salesActualsSkipped: number;
   forecastsCreated: number;
   forecastsUpdated: number;
+  forecastsSkipped: number;
   customerMetricsCreated: number;
+  customerMetricsSkipped: number;
 }
 
 export interface ImportResultDto {
   importId: string;
-  status: 'COMPLETED' | 'FAILED';
+  status: "COMPLETED" | "FAILED";
   stats: ImportStatsDto;
   errors?: string[];
   /** ISO8601 UTC timestamp */

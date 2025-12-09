@@ -29,12 +29,17 @@ export interface ImportStats {
   suppliersUpdated: number;
   itemsCreated: number;
   itemsUpdated: number;
+  itemsSkipped: number;
   inventorySnapshotsCreated: number;
+  inventorySnapshotsSkipped: number;
   salesActualsCreated: number;
   salesActualsUpdated: number;
+  salesActualsSkipped: number;
   forecastsCreated: number;
   forecastsUpdated: number;
+  forecastsSkipped: number;
   customerMetricsCreated: number;
+  customerMetricsSkipped: number;
 }
 
 export interface ImportResult {

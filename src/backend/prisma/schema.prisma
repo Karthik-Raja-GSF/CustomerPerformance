@@ -124,7 +124,7 @@ model InventorySnapshot {
   targetStock  Int?     @map("target_stock")
   preferredMax Int?     @map("preferred_max")
   maxStock     Int?     @map("max_stock")
-  weeksSupply  Decimal? @map("weeks_supply") @db.Decimal(6, 2)
+  weeksSupply  Decimal? @map("weeks_supply") @db.Decimal(10, 2)
 
   nextPoDate   DateTime? @map("next_po_date")
   nextPoQty    Int?      @map("next_po_qty")
@@ -170,7 +170,7 @@ model Forecast {
 
   forecastMonth  DateTime @map("forecast_month")
   predictedQty   Int      @map("predicted_qty")
-  variancePct    Decimal? @map("variance_pct") @db.Decimal(6, 2)
+  variancePct    Decimal? @map("variance_pct") @db.Decimal(10, 2)
   supplyVariance Int?     @map("supply_variance")
 
   createdAt DateTime @default(now()) @map("created_at")

@@ -119,10 +119,14 @@ async function validateExcelFile(file: File): Promise<ValidationResult> {
           return;
         }
 
-        // Get all rows to count and extract headers
+        // Get headers directly from the first row of the sheet (not from parsed data)
+        const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+          header: 1,
+        });
+        const headers = allRows[0] || [];
+
+        // Get data rows (excluding header) to count
         const rows = XLSX.utils.sheet_to_json(sheet);
-        const firstRow = rows[0];
-        const headers = firstRow ? Object.keys(firstRow) : [];
 
         const missingColumns = REQUIRED_COLUMNS.filter(
           (col) => !headers.includes(col)
@@ -449,29 +453,34 @@ export default function SiqImport() {
                   <div>Items:</div>
                   <div className="font-medium">
                     {lastResult.stats.itemsCreated} created,{" "}
-                    {lastResult.stats.itemsUpdated} updated
+                    {lastResult.stats.itemsUpdated} updated,{" "}
+                    {lastResult.stats.itemsSkipped} skipped
                   </div>
 
                   <div>Inventory Snapshots:</div>
                   <div className="font-medium">
-                    {lastResult.stats.inventorySnapshotsCreated} created
+                    {lastResult.stats.inventorySnapshotsCreated} created,{" "}
+                    {lastResult.stats.inventorySnapshotsSkipped} skipped
                   </div>
 
                   <div>Sales Actuals:</div>
                   <div className="font-medium">
                     {lastResult.stats.salesActualsCreated} created,{" "}
-                    {lastResult.stats.salesActualsUpdated} updated
+                    {lastResult.stats.salesActualsUpdated} updated,{" "}
+                    {lastResult.stats.salesActualsSkipped} skipped
                   </div>
 
                   <div>Forecasts:</div>
                   <div className="font-medium">
                     {lastResult.stats.forecastsCreated} created,{" "}
-                    {lastResult.stats.forecastsUpdated} updated
+                    {lastResult.stats.forecastsUpdated} updated,{" "}
+                    {lastResult.stats.forecastsSkipped} skipped
                   </div>
 
                   <div>Customer Metrics:</div>
                   <div className="font-medium">
-                    {lastResult.stats.customerMetricsCreated} created
+                    {lastResult.stats.customerMetricsCreated} created,{" "}
+                    {lastResult.stats.customerMetricsSkipped} skipped
                   </div>
                 </div>
 

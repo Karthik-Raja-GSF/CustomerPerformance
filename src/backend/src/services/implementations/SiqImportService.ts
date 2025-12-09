@@ -1,69 +1,76 @@
-import { injectable, inject } from 'tsyringe';
-import { PrismaClient, ImportStatus } from '@prisma/client';
-import * as XLSX from 'xlsx';
-import { subMonths, addMonths, startOfMonth, format } from 'date-fns';
-import { ISiqImportService, type ImportProgressCallback } from '@/services/ISiqImportService';
-import { ImportLogModel } from '@/contracts/models/siq-import.model';
-import { ImportLogDto, ImportResultDto, ImportStatsDto } from '@/contracts/dtos/siq-import.dto';
+import { injectable, inject } from "tsyringe";
+import { PrismaClient, ImportStatus } from "@prisma/client";
+import * as XLSX from "xlsx";
+import { subMonths, addMonths, startOfMonth, format } from "date-fns";
+import {
+  ISiqImportService,
+  type ImportProgressCallback,
+} from "@/services/ISiqImportService";
+import { ImportLogModel } from "@/contracts/models/siq-import.model";
+import {
+  ImportLogDto,
+  ImportResultDto,
+  ImportStatsDto,
+} from "@/contracts/dtos/siq-import.dto";
 
 /**
  * Column mapping from SIQ Excel to our normalized schema
  */
 const COLUMN_MAP = {
   // Site
-  siteCode: 'Column1.SiteCode',
-  company: 'Column1.Company',
+  siteCode: "Column1.SiteCode",
+  company: "Column1.Company",
 
   // Supplier
-  supplierCode: 'Column1.PrimarySupplierCode',
-  supplierName: 'Column1.PrimarySupplierName',
+  supplierCode: "Column1.PrimarySupplierCode",
+  supplierName: "Column1.PrimarySupplierName",
 
   // Item
-  itemCode: 'Column1.ItemCode',
-  itemDescription: 'Column1.ItemDescription',
-  categoryClass: 'Column1.Category Class',
-  zone: 'Column1.Zone',
-  erpStatus: 'Column1.Erp Item Status',
-  abcClass: 'Column1.ABC Class',
-  shelfLife: 'Column1.Shelf Life',
-  leadTime: 'Column1.Active Planning LT',
-  conditionalStatus: 'Column1.Conditional Status',
-  challengeStatus: 'Column1.Challange Status', // Note: typo in source data
+  itemCode: "Column1.ItemCode",
+  itemDescription: "Column1.ItemDescription",
+  categoryClass: "Column1.Category Class",
+  zone: "Column1.Zone",
+  erpStatus: "Column1.Erp Item Status",
+  abcClass: "Column1.ABC Class",
+  shelfLife: "Column1.Shelf Life",
+  leadTime: "Column1.Active Planning LT",
+  conditionalStatus: "Column1.Conditional Status",
+  challengeStatus: "Column1.Challange Status", // Note: typo in source data
 
   // Inventory
-  onHandQty: 'Column1.On Hand Quantity',
-  safetyStock: 'Column1.Safety Stock',
-  onOrder: 'Column1.On Order',
-  openSales: 'Column1.Open Sales',
-  openEstimates: 'Column1.Open Estimates',
-  targetStock: 'Column1.Target Stock',
-  preferredMax: 'Column1.Preferred Max',
-  maxStock: 'Column1.Max Stock',
-  weeksSupply: 'Column1.Weeks Supply Onhand',
-  nextPoDate: 'Column1.Next PO Date',
-  nextPoQty: 'Column1.Next PO Quantity',
+  onHandQty: "Column1.On Hand Quantity",
+  safetyStock: "Column1.Safety Stock",
+  onOrder: "Column1.On Order",
+  openSales: "Column1.Open Sales",
+  openEstimates: "Column1.Open Estimates",
+  targetStock: "Column1.Target Stock",
+  preferredMax: "Column1.Preferred Max",
+  maxStock: "Column1.Max Stock",
+  weeksSupply: "Column1.Weeks Supply Onhand",
+  nextPoDate: "Column1.Next PO Date",
+  nextPoQty: "Column1.Next PO Quantity",
 
   // Sales Actuals
-  monthMinus3: 'Column1.Month -3 Actuals',
-  monthMinus2: 'Column1.Month -2 Actuals',
-  lastMonth: 'Column1.Last Month Actuals',
-  currentMonthSales: 'Column1.Current Month Sales',
-  lastSyActuals: 'Column1.Last SY Actuals (Aug - May)',
-  currentSyActuals: 'Column1.Current SY Actuals (Aug - May)',
+  monthMinus3: "Column1.Month -3 Actuals",
+  monthMinus2: "Column1.Month -2 Actuals",
+  lastMonth: "Column1.Last Month Actuals",
+  currentMonthSales: "Column1.Current Month Sales",
+  lastSyActuals: "Column1.Last SY Actuals (Aug - May)",
+  currentSyActuals: "Column1.Current SY Actuals (Aug - May)",
 
   // Forecasts
-  currentMonthForecast: 'Column1.Current Month Forecast',
-  monthPlus1: 'Column1.Month +1 Forecast',
-  monthPlus2: 'Column1.Month +2 Forecast',
-  monthPlus3: 'Column1.Month +3 Forecast',
-  monthPlus4: 'Column1.Month +4 Forecast',
-  forecastVariance: 'Column1.Forecast Variance MTD',
-  supplyVariance: 'Column1.Supply Variance',
+  currentMonthForecast: "Column1.Current Month Forecast",
+  monthPlus1: "Column1.Month +1 Forecast",
+  monthPlus2: "Column1.Month +2 Forecast",
+  monthPlus3: "Column1.Month +3 Forecast",
+  monthPlus4: "Column1.Month +4 Forecast",
+  forecastVariance: "Column1.Forecast Variance MTD",
+  supplyVariance: "Column1.Supply Variance",
 
   // Customer Metrics
-  totalCustomers: 'Column1.Total Customers',
+  totalCustomers: "Column1.Total Customers",
   topCustomers: "Column1.Top 5 Customer Ship-To's",
-  buyer: 'Column1.Buyer',
+  buyer: "Column1.Buyer",
 } as const;
 
 /**
@@ -128,9 +135,7 @@ interface SiqRow {
 
 @injectable()
 export class SiqImportService implements ISiqImportService {
-  constructor(
-    @inject('PrismaClient') private readonly prisma: PrismaClient
-  ) {}
+  constructor(@inject("PrismaClient") private readonly prisma: PrismaClient) {}
 
   private toImportLogDto(model: ImportLogModel): ImportLogDto {
     return {
@@ -151,8 +156,11 @@ export class SiqImportService implements ISiqImportService {
   /**
    * Validate that all required columns are present in the Excel file
    */
-  private validateColumns(headers: string[]): { valid: boolean; missing: string[] } {
-    const missing = REQUIRED_COLUMNS.filter(col => !headers.includes(col));
+  private validateColumns(headers: string[]): {
+    valid: boolean;
+    missing: string[];
+  } {
+    const missing = REQUIRED_COLUMNS.filter((col) => !headers.includes(col));
     return {
       valid: missing.length === 0,
       missing,
@@ -181,39 +189,45 @@ export class SiqImportService implements ISiqImportService {
       suppliersUpdated: 0,
       itemsCreated: 0,
       itemsUpdated: 0,
+      itemsSkipped: 0,
       inventorySnapshotsCreated: 0,
+      inventorySnapshotsSkipped: 0,
       salesActualsCreated: 0,
       salesActualsUpdated: 0,
+      salesActualsSkipped: 0,
       forecastsCreated: 0,
       forecastsUpdated: 0,
+      forecastsSkipped: 0,
       customerMetricsCreated: 0,
+      customerMetricsSkipped: 0,
     };
     const errors: string[] = [];
 
     try {
       // Parse Excel file
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const workbook = XLSX.read(buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
-        throw new Error('Excel file contains no sheets');
+        throw new Error("Excel file contains no sheets");
       }
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
-        throw new Error('Failed to read sheet from Excel file');
+        throw new Error("Failed to read sheet from Excel file");
       }
-      const rows: SiqRow[] = XLSX.utils.sheet_to_json(sheet);
+      // Get headers directly from the first row of the sheet (not from parsed data)
+      const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
+      const headers = allRows[0] || [];
 
       // Validate required columns
-      if (rows.length > 0) {
-        const firstRow = rows[0];
-        if (firstRow) {
-          const headers = Object.keys(firstRow);
-          const validation = this.validateColumns(headers);
-          if (!validation.valid) {
-            throw new Error(`Missing required columns: ${validation.missing.join(', ')}`);
-          }
-        }
+      const validation = this.validateColumns(headers);
+      if (!validation.valid) {
+        throw new Error(
+          `Missing required columns: ${validation.missing.join(", ")}`
+        );
       }
+
+      // Get data rows for processing
+      const rows: SiqRow[] = XLSX.utils.sheet_to_json(sheet);
 
       // Cache for sites and suppliers to avoid repeated lookups
       const siteCache = new Map<string, string>(); // code -> id
@@ -226,7 +240,13 @@ export class SiqImportService implements ISiqImportService {
 
         for (const row of batch) {
           try {
-            await this.processRow(row, importDate, stats, siteCache, supplierCache);
+            await this.processRow(
+              row,
+              importDate,
+              stats,
+              siteCache,
+              supplierCache
+            );
             stats.rowsProcessed++;
           } catch (err) {
             const errorMsg = err instanceof Error ? err.message : String(err);
@@ -256,14 +276,14 @@ export class SiqImportService implements ISiqImportService {
             stats.salesActualsUpdated +
             stats.forecastsUpdated,
           rowsFailed: errors.length,
-          errorLog: errors.length > 0 ? errors.slice(0, 100).join('\n') : null,
+          errorLog: errors.length > 0 ? errors.slice(0, 100).join("\n") : null,
           completedAt: new Date(),
         },
       });
 
       return {
         importId: importLog.id,
-        status: 'COMPLETED',
+        status: "COMPLETED",
         stats,
         errors: errors.length > 0 ? errors.slice(0, 100) : undefined,
         completedAt: new Date().toISOString(),
@@ -284,7 +304,7 @@ export class SiqImportService implements ISiqImportService {
 
       return {
         importId: importLog.id,
-        status: 'FAILED',
+        status: "FAILED",
         stats,
         errors: [errorMsg],
         completedAt: new Date().toISOString(),
@@ -299,12 +319,12 @@ export class SiqImportService implements ISiqImportService {
     siteCache: Map<string, string>,
     supplierCache: Map<string, string>
   ): Promise<void> {
-    const siteCode = String(row[COLUMN_MAP.siteCode] ?? '').trim();
-    const company = String(row[COLUMN_MAP.company] ?? '').trim();
-    const itemCode = String(row[COLUMN_MAP.itemCode] ?? '').trim();
+    const siteCode = String(row[COLUMN_MAP.siteCode] ?? "").trim();
+    const company = String(row[COLUMN_MAP.company] ?? "").trim();
+    const itemCode = String(row[COLUMN_MAP.itemCode] ?? "").trim();
 
     if (!siteCode || !itemCode) {
-      throw new Error('Missing required fields: siteCode or itemCode');
+      throw new Error("Missing required fields: siteCode or itemCode");
     }
 
     // 1. Upsert Site
@@ -327,11 +347,11 @@ export class SiqImportService implements ISiqImportService {
 
     // 2. Upsert Supplier (if present)
     let supplierId: string | null = null;
-    const supplierCode = String(row[COLUMN_MAP.supplierCode] ?? '').trim();
+    const supplierCode = String(row[COLUMN_MAP.supplierCode] ?? "").trim();
     if (supplierCode) {
       supplierId = supplierCache.get(supplierCode) ?? null;
       if (!supplierId) {
-        const supplierName = String(row[COLUMN_MAP.supplierName] ?? '').trim();
+        const supplierName = String(row[COLUMN_MAP.supplierName] ?? "").trim();
         const supplier = await this.prisma.supplier.upsert({
           where: { code: supplierCode },
           update: { name: supplierName || supplierCode },
@@ -348,82 +368,133 @@ export class SiqImportService implements ISiqImportService {
       }
     }
 
-    // 3. Upsert Item
-    const item = await this.prisma.item.upsert({
+    // 3. Upsert Item (with delta check - skip if unchanged)
+    const newItemData = {
+      description: String(row[COLUMN_MAP.itemDescription] ?? ""),
+      categoryClass: this.toStringOrNull(row[COLUMN_MAP.categoryClass]),
+      zone: this.toStringOrNull(row[COLUMN_MAP.zone]),
+      erpStatus: this.toStringOrNull(row[COLUMN_MAP.erpStatus]),
+      abcClass: this.toStringOrNull(row[COLUMN_MAP.abcClass]),
+      shelfLifeDays: this.toIntOrNull(row[COLUMN_MAP.shelfLife]),
+      leadTimeDays: this.toIntOrNull(row[COLUMN_MAP.leadTime]),
+      conditionalStatus: this.toStringOrNull(row[COLUMN_MAP.conditionalStatus]),
+      challengeStatus: this.toStringOrNull(row[COLUMN_MAP.challengeStatus]),
+      supplierId,
+    };
+
+    // Check if item exists and has same data
+    let item = await this.prisma.item.findUnique({
       where: { siteId_code: { siteId, code: itemCode } },
-      update: {
-        description: String(row[COLUMN_MAP.itemDescription] ?? ''),
-        categoryClass: this.toStringOrNull(row[COLUMN_MAP.categoryClass]),
-        zone: this.toStringOrNull(row[COLUMN_MAP.zone]),
-        erpStatus: this.toStringOrNull(row[COLUMN_MAP.erpStatus]),
-        abcClass: this.toStringOrNull(row[COLUMN_MAP.abcClass]),
-        shelfLifeDays: this.toIntOrNull(row[COLUMN_MAP.shelfLife]),
-        leadTimeDays: this.toIntOrNull(row[COLUMN_MAP.leadTime]),
-        conditionalStatus: this.toStringOrNull(row[COLUMN_MAP.conditionalStatus]),
-        challengeStatus: this.toStringOrNull(row[COLUMN_MAP.challengeStatus]),
-        supplierId,
-      },
-      create: {
-        code: itemCode,
-        description: String(row[COLUMN_MAP.itemDescription] ?? ''),
-        categoryClass: this.toStringOrNull(row[COLUMN_MAP.categoryClass]),
-        zone: this.toStringOrNull(row[COLUMN_MAP.zone]),
-        erpStatus: this.toStringOrNull(row[COLUMN_MAP.erpStatus]),
-        abcClass: this.toStringOrNull(row[COLUMN_MAP.abcClass]),
-        shelfLifeDays: this.toIntOrNull(row[COLUMN_MAP.shelfLife]),
-        leadTimeDays: this.toIntOrNull(row[COLUMN_MAP.leadTime]),
-        conditionalStatus: this.toStringOrNull(row[COLUMN_MAP.conditionalStatus]),
-        challengeStatus: this.toStringOrNull(row[COLUMN_MAP.challengeStatus]),
-        siteId,
-        supplierId,
-      },
     });
 
-    if (item.createdAt.getTime() === item.updatedAt.getTime()) {
-      stats.itemsCreated++;
-    } else {
-      stats.itemsUpdated++;
-    }
+    if (item) {
+      // Check if any field changed
+      const hasChanges =
+        item.description !== newItemData.description ||
+        item.categoryClass !== newItemData.categoryClass ||
+        item.zone !== newItemData.zone ||
+        item.erpStatus !== newItemData.erpStatus ||
+        item.abcClass !== newItemData.abcClass ||
+        item.shelfLifeDays !== newItemData.shelfLifeDays ||
+        item.leadTimeDays !== newItemData.leadTimeDays ||
+        item.conditionalStatus !== newItemData.conditionalStatus ||
+        item.challengeStatus !== newItemData.challengeStatus ||
+        item.supplierId !== newItemData.supplierId;
 
-    // 4. Create Inventory Snapshot
-    const onHandQty = this.toIntOrNull(row[COLUMN_MAP.onHandQty]);
-    if (onHandQty !== null) {
-      await this.prisma.inventorySnapshot.create({
+      if (hasChanges) {
+        item = await this.prisma.item.update({
+          where: { id: item.id },
+          data: newItemData,
+        });
+        stats.itemsUpdated++;
+      } else {
+        stats.itemsSkipped++;
+      }
+    } else {
+      // Create new item
+      item = await this.prisma.item.create({
         data: {
-          itemId: item.id,
+          code: itemCode,
           siteId,
-          onHandQty,
-          safetyStock: this.toIntOrNull(row[COLUMN_MAP.safetyStock]),
-          onOrder: this.toIntOrNull(row[COLUMN_MAP.onOrder]),
-          openSales: this.toIntOrNull(row[COLUMN_MAP.openSales]),
-          openEstimates: this.toIntOrNull(row[COLUMN_MAP.openEstimates]),
-          targetStock: this.toIntOrNull(row[COLUMN_MAP.targetStock]),
-          preferredMax: this.toIntOrNull(row[COLUMN_MAP.preferredMax]),
-          maxStock: this.toIntOrNull(row[COLUMN_MAP.maxStock]),
-          weeksSupply: this.toDecimalOrNull(row[COLUMN_MAP.weeksSupply]),
-          nextPoDate: this.toDateOrNull(row[COLUMN_MAP.nextPoDate]),
-          nextPoQty: this.toIntOrNull(row[COLUMN_MAP.nextPoQty]),
-          snapshotDate: importDate,
+          ...newItemData,
         },
       });
-      stats.inventorySnapshotsCreated++;
+      stats.itemsCreated++;
     }
 
-    // 5. Create/Update Sales Actuals
+    // 4. Create Inventory Snapshot (with delta check - skip if unchanged from last snapshot)
+    const onHandQty = this.toIntOrNull(row[COLUMN_MAP.onHandQty]);
+    if (onHandQty !== null) {
+      const newSnapshotData = {
+        onHandQty,
+        safetyStock: this.toIntOrNull(row[COLUMN_MAP.safetyStock]),
+        onOrder: this.toIntOrNull(row[COLUMN_MAP.onOrder]),
+        openSales: this.toIntOrNull(row[COLUMN_MAP.openSales]),
+        openEstimates: this.toIntOrNull(row[COLUMN_MAP.openEstimates]),
+        targetStock: this.toIntOrNull(row[COLUMN_MAP.targetStock]),
+        preferredMax: this.toIntOrNull(row[COLUMN_MAP.preferredMax]),
+        maxStock: this.toIntOrNull(row[COLUMN_MAP.maxStock]),
+        weeksSupply: this.toDecimalOrNull(row[COLUMN_MAP.weeksSupply]),
+        nextPoDate: this.toDateOrNull(row[COLUMN_MAP.nextPoDate]),
+        nextPoQty: this.toIntOrNull(row[COLUMN_MAP.nextPoQty]),
+      };
+
+      // Get the latest snapshot for this item/site
+      const lastSnapshot = await this.prisma.inventorySnapshot.findFirst({
+        where: { itemId: item.id, siteId },
+        orderBy: { snapshotDate: "desc" },
+      });
+
+      // Check if values changed from last snapshot
+      const hasSnapshotChanges =
+        !lastSnapshot ||
+        lastSnapshot.onHandQty !== newSnapshotData.onHandQty ||
+        lastSnapshot.safetyStock !== newSnapshotData.safetyStock ||
+        lastSnapshot.onOrder !== newSnapshotData.onOrder ||
+        lastSnapshot.openSales !== newSnapshotData.openSales ||
+        lastSnapshot.openEstimates !== newSnapshotData.openEstimates ||
+        lastSnapshot.targetStock !== newSnapshotData.targetStock ||
+        lastSnapshot.preferredMax !== newSnapshotData.preferredMax ||
+        lastSnapshot.maxStock !== newSnapshotData.maxStock ||
+        (lastSnapshot.weeksSupply?.toNumber() ?? null) !==
+          newSnapshotData.weeksSupply ||
+        lastSnapshot.nextPoDate?.getTime() !==
+          newSnapshotData.nextPoDate?.getTime() ||
+        lastSnapshot.nextPoQty !== newSnapshotData.nextPoQty;
+
+      if (hasSnapshotChanges) {
+        await this.prisma.inventorySnapshot.create({
+          data: {
+            itemId: item.id,
+            siteId,
+            ...newSnapshotData,
+            snapshotDate: importDate,
+          },
+        });
+        stats.inventorySnapshotsCreated++;
+      } else {
+        stats.inventorySnapshotsSkipped++;
+      }
+    }
+
+    // 5. Create/Update Sales Actuals (with delta check - skip if quantity unchanged)
     const salesPeriods = [
-      { value: row[COLUMN_MAP.monthMinus3], offset: -3, type: 'MONTH' },
-      { value: row[COLUMN_MAP.monthMinus2], offset: -2, type: 'MONTH' },
-      { value: row[COLUMN_MAP.lastMonth], offset: -1, type: 'MONTH' },
-      { value: row[COLUMN_MAP.currentMonthSales], offset: 0, type: 'MONTH' },
+      { value: row[COLUMN_MAP.monthMinus3], offset: -3, type: "MONTH" },
+      { value: row[COLUMN_MAP.monthMinus2], offset: -2, type: "MONTH" },
+      { value: row[COLUMN_MAP.lastMonth], offset: -1, type: "MONTH" },
+      { value: row[COLUMN_MAP.currentMonthSales], offset: 0, type: "MONTH" },
     ];
 
     for (const period of salesPeriods) {
       const qty = this.toIntOrNull(period.value);
       if (qty !== null) {
-        const periodDate = startOfMonth(subMonths(importDate, Math.abs(period.offset)));
-        const periodLabel = format(periodDate, 'yyyy-MM');
+        const periodDate = startOfMonth(
+          subMonths(importDate, Math.abs(period.offset))
+        );
+        const periodLabel = format(periodDate, "yyyy-MM");
 
-        const salesResult = await this.prisma.salesActual.upsert({
+        // Check if existing record has same quantity
+        const existingSales = await this.prisma.salesActual.findUnique({
           where: {
             itemId_siteId_periodType_periodLabel: {
               itemId: item.id,
@@ -432,26 +503,37 @@ export class SiqImportService implements ISiqImportService {
               periodLabel,
             },
           },
-          update: { quantity: qty, periodDate },
-          create: {
-            itemId: item.id,
-            siteId,
-            periodType: period.type,
-            periodLabel,
-            periodDate,
-            quantity: qty,
-          },
         });
 
-        if (salesResult.createdAt.getTime() === salesResult.createdAt.getTime()) {
-          stats.salesActualsCreated++;
+        if (existingSales) {
+          // Only update if quantity changed
+          if (existingSales.quantity !== qty) {
+            await this.prisma.salesActual.update({
+              where: { id: existingSales.id },
+              data: { quantity: qty, periodDate },
+            });
+            stats.salesActualsUpdated++;
+          } else {
+            stats.salesActualsSkipped++;
+          }
         } else {
-          stats.salesActualsUpdated++;
+          // Create new record
+          await this.prisma.salesActual.create({
+            data: {
+              itemId: item.id,
+              siteId,
+              periodType: period.type,
+              periodLabel,
+              periodDate,
+              quantity: qty,
+            },
+          });
+          stats.salesActualsCreated++;
         }
       }
     }
 
-    // 6. Create/Update Forecasts
+    // 6. Create/Update Forecasts (with delta check - skip if values unchanged)
     const forecastPeriods = [
       { value: row[COLUMN_MAP.currentMonthForecast], offset: 0 },
       { value: row[COLUMN_MAP.monthPlus1], offset: 1 },
@@ -467,9 +549,14 @@ export class SiqImportService implements ISiqImportService {
     for (const period of forecastPeriods) {
       const qty = this.toIntOrNull(period.value);
       if (qty !== null) {
-        const forecastMonth = startOfMonth(addMonths(importDate, period.offset));
+        const forecastMonth = startOfMonth(
+          addMonths(importDate, period.offset)
+        );
+        const newVariancePct = period.offset === 0 ? variancePct : null;
+        const newSupplyVariance = period.offset === 0 ? supplyVariance : null;
 
-        const forecastResult = await this.prisma.forecast.upsert({
+        // Check if existing record has same values
+        const existingForecast = await this.prisma.forecast.findUnique({
           where: {
             itemId_siteId_forecastMonth: {
               itemId: item.id,
@@ -477,80 +564,114 @@ export class SiqImportService implements ISiqImportService {
               forecastMonth,
             },
           },
-          update: {
-            predictedQty: qty,
-            variancePct: period.offset === 0 ? variancePct : null,
-            supplyVariance: period.offset === 0 ? supplyVariance : null,
-          },
-          create: {
-            itemId: item.id,
-            siteId,
-            forecastMonth,
-            predictedQty: qty,
-            variancePct: period.offset === 0 ? variancePct : null,
-            supplyVariance: period.offset === 0 ? supplyVariance : null,
-          },
         });
 
-        if (forecastResult.createdAt.getTime() === forecastResult.createdAt.getTime()) {
-          stats.forecastsCreated++;
+        if (existingForecast) {
+          // Only update if values changed
+          const hasChanges =
+            existingForecast.predictedQty !== qty ||
+            (existingForecast.variancePct?.toNumber() ?? null) !==
+              newVariancePct ||
+            existingForecast.supplyVariance !== newSupplyVariance;
+
+          if (hasChanges) {
+            await this.prisma.forecast.update({
+              where: { id: existingForecast.id },
+              data: {
+                predictedQty: qty,
+                variancePct: newVariancePct,
+                supplyVariance: newSupplyVariance,
+              },
+            });
+            stats.forecastsUpdated++;
+          } else {
+            stats.forecastsSkipped++;
+          }
         } else {
-          stats.forecastsUpdated++;
+          // Create new record
+          await this.prisma.forecast.create({
+            data: {
+              itemId: item.id,
+              siteId,
+              forecastMonth,
+              predictedQty: qty,
+              variancePct: newVariancePct,
+              supplyVariance: newSupplyVariance,
+            },
+          });
+          stats.forecastsCreated++;
         }
       }
     }
 
-    // 7. Create Customer Metric
+    // 7. Create Customer Metric (with delta check - skip if unchanged from last snapshot)
     const totalCustomers = this.toIntOrNull(row[COLUMN_MAP.totalCustomers]);
     const topCustomers = this.toStringOrNull(row[COLUMN_MAP.topCustomers]);
     const buyer = this.toStringOrNull(row[COLUMN_MAP.buyer]);
 
     if (totalCustomers !== null || topCustomers || buyer) {
-      await this.prisma.customerMetric.create({
-        data: {
-          itemId: item.id,
-          totalCustomers,
-          topCustomers,
-          buyer,
-          snapshotDate: importDate,
-        },
+      // Get the latest customer metric for this item
+      const lastMetric = await this.prisma.customerMetric.findFirst({
+        where: { itemId: item.id },
+        orderBy: { snapshotDate: "desc" },
       });
-      stats.customerMetricsCreated++;
+
+      // Check if values changed from last metric
+      const hasMetricChanges =
+        !lastMetric ||
+        lastMetric.totalCustomers !== totalCustomers ||
+        lastMetric.topCustomers !== topCustomers ||
+        lastMetric.buyer !== buyer;
+
+      if (hasMetricChanges) {
+        await this.prisma.customerMetric.create({
+          data: {
+            itemId: item.id,
+            totalCustomers,
+            topCustomers,
+            buyer,
+            snapshotDate: importDate,
+          },
+        });
+        stats.customerMetricsCreated++;
+      } else {
+        stats.customerMetricsSkipped++;
+      }
     }
   }
 
   // Helper methods for type conversion
   private toStringOrNull(value: unknown): string | null {
-    if (value === null || value === undefined || value === '') return null;
+    if (value === null || value === undefined || value === "") return null;
     const str = String(value).trim();
-    return str === '' ? null : str;
+    return str === "" ? null : str;
   }
 
   private toIntOrNull(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') return null;
+    if (value === null || value === undefined || value === "") return null;
     const num = Number(value);
     return isNaN(num) ? null : Math.round(num);
   }
 
   private toDecimalOrNull(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') return null;
+    if (value === null || value === undefined || value === "") return null;
     const num = Number(value);
     return isNaN(num) ? null : num;
   }
 
   private toDateOrNull(value: unknown): Date | null {
-    if (value === null || value === undefined || value === '') return null;
+    if (value === null || value === undefined || value === "") return null;
 
     // Handle Excel date serial number
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       // Excel date serial number conversion
       const date = new Date((value - 25569) * 86400 * 1000);
       return isNaN(date.getTime()) ? null : date;
     }
 
     // Handle string date (e.g., "2025/11/23")
-    if (typeof value === 'string') {
-      const date = new Date(value.replace(/\//g, '-'));
+    if (typeof value === "string") {
+      const date = new Date(value.replace(/\//g, "-"));
       return isNaN(date.getTime()) ? null : date;
     }
 
@@ -558,15 +679,15 @@ export class SiqImportService implements ISiqImportService {
   }
 
   private parseVariance(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') return null;
-    const str = String(value).replace('%', '').trim();
+    if (value === null || value === undefined || value === "") return null;
+    const str = String(value).replace("%", "").trim();
     const num = Number(str);
     return isNaN(num) ? null : num;
   }
 
   async getImportHistory(limit = 50): Promise<ImportLogDto[]> {
     const logs = await this.prisma.importLog.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
     });
 
@@ -607,62 +728,68 @@ export class SiqImportService implements ISiqImportService {
       suppliersUpdated: 0,
       itemsCreated: 0,
       itemsUpdated: 0,
+      itemsSkipped: 0,
       inventorySnapshotsCreated: 0,
+      inventorySnapshotsSkipped: 0,
       salesActualsCreated: 0,
       salesActualsUpdated: 0,
+      salesActualsSkipped: 0,
       forecastsCreated: 0,
       forecastsUpdated: 0,
+      forecastsSkipped: 0,
       customerMetricsCreated: 0,
+      customerMetricsSkipped: 0,
     };
     const errors: string[] = [];
 
     try {
       // Send validation phase progress
       onProgress({
-        type: 'validation',
-        phase: 'validating',
+        type: "validation",
+        phase: "validating",
         current: 0,
         total: 100,
         percentage: 0,
-        message: 'Parsing Excel file...',
+        message: "Parsing Excel file...",
       });
 
       // Parse Excel file
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const workbook = XLSX.read(buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
-        throw new Error('Excel file contains no sheets');
+        throw new Error("Excel file contains no sheets");
       }
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
-        throw new Error('Failed to read sheet from Excel file');
+        throw new Error("Failed to read sheet from Excel file");
       }
-      const rows: SiqRow[] = XLSX.utils.sheet_to_json(sheet);
+      // Get headers directly from the first row of the sheet (not from parsed data)
+      const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
+      const headers = allRows[0] || [];
 
       // Validate required columns
       onProgress({
-        type: 'validation',
-        phase: 'validating',
+        type: "validation",
+        phase: "validating",
         current: 50,
         total: 100,
         percentage: 50,
-        message: 'Validating columns...',
+        message: "Validating columns...",
       });
 
-      if (rows.length > 0) {
-        const firstRow = rows[0];
-        if (firstRow) {
-          const headers = Object.keys(firstRow);
-          const validation = this.validateColumns(headers);
-          if (!validation.valid) {
-            throw new Error(`Missing required columns: ${validation.missing.join(', ')}`);
-          }
-        }
+      const validation = this.validateColumns(headers);
+      if (!validation.valid) {
+        throw new Error(
+          `Missing required columns: ${validation.missing.join(", ")}`
+        );
       }
 
+      // Get data rows for processing
+      const rows: SiqRow[] = XLSX.utils.sheet_to_json(sheet);
+
       onProgress({
-        type: 'validation',
-        phase: 'validating',
+        type: "validation",
+        phase: "validating",
         current: 100,
         total: 100,
         percentage: 100,
@@ -676,20 +803,29 @@ export class SiqImportService implements ISiqImportService {
       // Process rows with frequent progress updates
       const totalRows = rows.length;
       // Update progress every ~50 rows or at least 20 times for small files
-      const progressInterval = Math.max(1, Math.min(50, Math.floor(totalRows / 20)));
+      const progressInterval = Math.max(
+        1,
+        Math.min(50, Math.floor(totalRows / 20))
+      );
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         if (!row) continue;
         try {
-          await this.processRow(row, importDate, stats, siteCache, supplierCache);
+          await this.processRow(
+            row,
+            importDate,
+            stats,
+            siteCache,
+            supplierCache
+          );
           stats.rowsProcessed++;
 
           // Send progress update at intervals
           if (i % progressInterval === 0 || i === totalRows - 1) {
             onProgress({
-              type: 'progress',
-              phase: 'processing',
+              type: "progress",
+              phase: "processing",
               current: i + 1,
               total: totalRows,
               percentage: Math.round(((i + 1) / totalRows) * 100),
@@ -704,8 +840,8 @@ export class SiqImportService implements ISiqImportService {
 
       // Send completion progress
       onProgress({
-        type: 'progress',
-        phase: 'processing',
+        type: "progress",
+        phase: "processing",
         current: totalRows,
         total: totalRows,
         percentage: 100,
@@ -733,14 +869,14 @@ export class SiqImportService implements ISiqImportService {
             stats.salesActualsUpdated +
             stats.forecastsUpdated,
           rowsFailed: errors.length,
-          errorLog: errors.length > 0 ? errors.slice(0, 100).join('\n') : null,
+          errorLog: errors.length > 0 ? errors.slice(0, 100).join("\n") : null,
           completedAt: new Date(),
         },
       });
 
       return {
         importId: importLog.id,
-        status: 'COMPLETED',
+        status: "COMPLETED",
         stats,
         errors: errors.length > 0 ? errors.slice(0, 100) : undefined,
         completedAt: new Date().toISOString(),
@@ -750,8 +886,8 @@ export class SiqImportService implements ISiqImportService {
 
       // Send error progress
       onProgress({
-        type: 'error',
-        phase: 'complete',
+        type: "error",
+        phase: "complete",
         current: 0,
         total: 0,
         percentage: 0,
@@ -771,7 +907,7 @@ export class SiqImportService implements ISiqImportService {
 
       return {
         importId: importLog.id,
-        status: 'FAILED',
+        status: "FAILED",
         stats,
         errors: [errorMsg],
         completedAt: new Date().toISOString(),
