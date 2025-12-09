@@ -1,9 +1,10 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, User, Copy, Check } from "lucide-react";
+import { User, Copy, Check } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { cn } from "@/shadcn/lib/utils";
+import { markdownComponents } from "@/components/chat/markdown/MarkdownComponents";
 import type { ChatMessage as ChatMessageType } from "@/hooks/use-chat";
 
 interface ChatMessageProps {
@@ -42,7 +43,11 @@ export function ChatMessage({
           isUser ? "bg-primary text-primary-foreground" : "bg-primary/10"
         )}
       >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        {isUser ? (
+          <User className="h-4 w-4" />
+        ) : (
+          <img src="/starq-q-icon.svg" alt="StarQ" className="h-5 w-5" />
+        )}
       </div>
 
       {/* Content */}
@@ -62,8 +67,11 @@ export function ChatMessage({
         {isUser ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:bg-muted prose-pre:border prose-code:text-sm prose-table:border prose-table:border-border prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-2 prose-th:bg-muted prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <div className="max-w-none text-sm">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents}
+            >
               {message.content || (isStreaming ? "..." : "")}
             </ReactMarkdown>
             {isStreaming && message.content && (

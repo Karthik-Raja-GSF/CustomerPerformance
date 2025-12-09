@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/shadcn/components/button";
 import { Input } from "@/shadcn/components/input";
+import { markdownComponents } from "@/components/chat/markdown/MarkdownComponents";
 import {
   Card,
   CardContent,
@@ -48,8 +49,11 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
         {isUser ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-table:my-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <div className="text-sm max-w-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents}
+            >
               {message.content}
             </ReactMarkdown>
           </div>
