@@ -48,7 +48,7 @@ importers:
   src/backend:
     dependencies:
       '@aws-sdk/client-bedrock-runtime':
-        specifier: ^3.721.0
+        specifier: ^3.947.0
         version: 3.947.0
       '@prisma/client':
         specifier: ^5.8.1
