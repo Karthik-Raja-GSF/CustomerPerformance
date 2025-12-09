@@ -1,12 +1,16 @@
-import { injectable, inject } from 'tsyringe';
-import { PrismaClient, PromptStatus } from '@prisma/client';
-import { IPromptService } from '@/services/IPromptService';
-import { PromptModel } from '@/contracts/models/prompt.model';
-import { PromptDto, CreatePromptDto } from '@/contracts/dtos/prompt.dto';
+import { injectable, inject } from "tsyringe";
+import { PrismaClient, PromptStatus } from "@prisma/client";
+import { IPromptService } from "@/services/IPromptService";
+import { PromptModel } from "@/contracts/models/prompt.model";
+import {
+  PromptDto,
+  CreatePromptDto,
+  UpdatePromptDto,
+} from "@/contracts/dtos/prompt.dto";
 import {
   PromptNotFoundError,
   CannotDeleteActivePromptError,
-} from '@/utils/errors/prompt-errors';
+} from "@/utils/errors/prompt-errors";
 
 /**
  * Prompt Service Implementation
@@ -16,9 +20,7 @@ import {
  */
 @injectable()
 export class PromptService implements IPromptService {
-  constructor(
-    @inject('PrismaClient') private readonly prisma: PrismaClient
-  ) {}
+  constructor(@inject("PrismaClient") private readonly prisma: PrismaClient) {}
 
   /**
    * Map internal model to DTO for API response.
@@ -68,7 +70,7 @@ export class PromptService implements IPromptService {
    */
   async findAll(): Promise<PromptDto[]> {
     const prompts = await this.prisma.prompt.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     return prompts.map((prompt) => this.toDto(prompt));
@@ -90,7 +92,7 @@ export class PromptService implements IPromptService {
 
     if (prompt.status === PromptStatus.ACTIVE) {
       throw new CannotDeleteActivePromptError(
-        'Cannot delete active prompt. Deactivate it first or activate another prompt.'
+        "Cannot delete active prompt. Deactivate it first or activate another prompt."
       );
     }
 
@@ -136,6 +138,31 @@ export class PromptService implements IPromptService {
         data: { status: PromptStatus.ACTIVE },
       }),
     ]);
+
+    return this.toDto(updatedPrompt);
+  }
+
+  /**
+   * Update an existing prompt
+   * @throws PromptNotFoundError if prompt doesn't exist
+   */
+  async update(id: string, data: UpdatePromptDto): Promise<PromptDto> {
+    const existingPrompt = await this.prisma.prompt.findUnique({
+      where: { id },
+    });
+
+    if (!existingPrompt) {
+      throw new PromptNotFoundError(`Prompt with id ${id} not found`);
+    }
+
+    const updatedPrompt = await this.prisma.prompt.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.content !== undefined && { content: data.content }),
+        ...(data.model !== undefined && { model: data.model }),
+      },
+    });
 
     return this.toDto(updatedPrompt);
   }

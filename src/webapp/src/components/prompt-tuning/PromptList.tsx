@@ -2,13 +2,26 @@ import { Button } from "@/shadcn/components/button";
 import { Badge } from "@/shadcn/components/badge";
 import { ScrollArea } from "@/shadcn/components/scroll-area";
 import { Card, CardContent } from "@/shadcn/components/card";
-import { Plus, Trash2, Check, Loader2 } from "lucide-react";
+import { Plus, Trash2, Check, Loader2, Sparkles } from "lucide-react";
 import type { Prompt } from "@/types/prompts";
+
+const MODEL_SHORT_NAMES: Record<string, string> = {
+  "amazon.nova-micro-v1:0": "Nova Micro",
+  "global.anthropic.claude-haiku-4-5-20251001-v1:0": "Haiku 4.5",
+  "amazon.nova-pro-v1:0": "Nova Pro",
+  "global.anthropic.claude-sonnet-4-5-20250929-v1:0": "Sonnet 4.5",
+  "global.anthropic.claude-opus-4-5-20251101-v1:0": "Opus 4.5",
+};
+
+function getModelShortName(modelId: string): string {
+  return MODEL_SHORT_NAMES[modelId] || modelId;
+}
 
 interface PromptListProps {
   prompts: Prompt[];
   isLoading?: boolean;
   onNewPrompt: () => void;
+  onEditPrompt: (prompt: Prompt) => void;
   onSetActive: (prompt: Prompt) => void;
   onDeletePrompt: (prompt: Prompt) => void;
 }
@@ -34,6 +47,7 @@ export function PromptList({
   prompts,
   isLoading,
   onNewPrompt,
+  onEditPrompt,
   onSetActive,
   onDeletePrompt,
 }: PromptListProps) {
@@ -66,18 +80,22 @@ export function PromptList({
             prompts.map((prompt) => (
               <Card
                 key={prompt.id}
-                className="transition-colors hover:bg-muted/50"
+                className="group transition-all hover:bg-muted/50 cursor-pointer shadow-sm border-l-3 border-l-primary/60"
+                onClick={() => onEditPrompt(prompt)}
               >
-                <CardContent className="p-3">
+                <CardContent className="px-4 pt-2 pb-1.5">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-col gap-1 min-w-0 flex-1">
-                        <span className="font-medium text-sm truncate">
-                          {prompt.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {prompt.content.slice(0, 50)}
-                          {prompt.content.length > 50 && "..."}
+                      <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="font-semibold text-base truncate">
+                            {prompt.name}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground/70 line-clamp-3">
+                          {prompt.content.slice(0, 200)}
+                          {prompt.content.length > 200 && "..."}
                         </span>
                       </div>
                       {prompt.status === "ACTIVE" && (
@@ -87,18 +105,27 @@ export function PromptList({
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">
-                        {formatTimeAgo(prompt.createdAt)}
-                      </span>
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {formatTimeAgo(prompt.createdAt)}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-1.5 py-0"
+                        >
+                          {getModelShortName(prompt.model)}
+                        </Badge>
+                      </div>
 
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                         {prompt.status !== "ACTIVE" && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onSetActive(prompt);
                             }}
                             title="Set as active"
@@ -111,7 +138,8 @@ export function PromptList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onDeletePrompt(prompt);
                             }}
                             title="Delete prompt"

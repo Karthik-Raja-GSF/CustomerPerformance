@@ -1,26 +1,43 @@
-import { Router, Request, Response, NextFunction, IRouter } from 'express';
-import { z } from 'zod';
-import { container } from 'tsyringe';
-import { IPromptService, PROMPT_SERVICE_TOKEN } from '@/services/IPromptService';
-import { authenticate } from '@/middleware/authenticate';
-import { validateRequest } from '@/middleware/validate-request';
+import { Router, Request, Response, NextFunction, IRouter } from "express";
+import { z } from "zod";
+import { container } from "tsyringe";
+import {
+  IPromptService,
+  PROMPT_SERVICE_TOKEN,
+} from "@/services/IPromptService";
+import { authenticate } from "@/middleware/authenticate";
+import { validateRequest } from "@/middleware/validate-request";
 import {
   PromptNotFoundError,
   CannotDeleteActivePromptError,
-} from '@/utils/errors/prompt-errors';
+} from "@/utils/errors/prompt-errors";
 
 const router: IRouter = Router();
 
 // Validation schemas
 const createPromptSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  content: z.string().min(1, 'Prompt content is required'),
-  model: z.string().min(1, 'Model is required'),
+  name: z.string().min(1, "Name is required"),
+  content: z.string().min(1, "Prompt content is required"),
+  model: z.string().min(1, "Model is required"),
 });
 
 const idParamSchema = z.object({
-  id: z.string().uuid('Invalid prompt ID format'),
+  id: z.string().uuid("Invalid prompt ID format"),
 });
+
+const updatePromptSchema = z
+  .object({
+    name: z.string().min(1, "Name is required").optional(),
+    content: z.string().min(1, "Prompt content is required").optional(),
+    model: z.string().min(1, "Model is required").optional(),
+  })
+  .refine(
+    (data) =>
+      data.name !== undefined ||
+      data.content !== undefined ||
+      data.model !== undefined,
+    { message: "At least one field must be provided for update" }
+  );
 
 // Type for validated params
 type IdParams = z.infer<typeof idParamSchema>;
@@ -35,7 +52,7 @@ function handlePromptError(
 ): void {
   if (error instanceof PromptNotFoundError) {
     res.status(error.statusCode).json({
-      status: 'error',
+      status: "error",
       message: error.message,
     });
     return;
@@ -43,7 +60,7 @@ function handlePromptError(
 
   if (error instanceof CannotDeleteActivePromptError) {
     res.status(error.statusCode).json({
-      status: 'error',
+      status: "error",
       message: error.message,
     });
     return;
@@ -57,16 +74,17 @@ function handlePromptError(
  * Create a new prompt (defaults to INACTIVE)
  */
 router.post(
-  '/',
+  "/",
   authenticate,
-  validateRequest(createPromptSchema, 'body'),
+  validateRequest(createPromptSchema, "body"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const promptService = container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
+      const promptService =
+        container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
       const prompt = await promptService.create(req.body);
 
       res.status(201).json({
-        status: 'success',
+        status: "success",
         data: prompt,
       });
     } catch (error) {
@@ -80,15 +98,16 @@ router.post(
  * List all prompts
  */
 router.get(
-  '/',
+  "/",
   authenticate,
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const promptService = container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
+      const promptService =
+        container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
       const prompts = await promptService.findAll();
 
       res.json({
-        status: 'success',
+        status: "success",
         data: prompts,
       });
     } catch (error) {
@@ -102,25 +121,26 @@ router.get(
  * Get a single prompt by ID
  */
 router.get(
-  '/:id',
+  "/:id",
   authenticate,
-  validateRequest(idParamSchema, 'params'),
+  validateRequest(idParamSchema, "params"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as IdParams;
-      const promptService = container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
+      const promptService =
+        container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
       const prompt = await promptService.findById(id);
 
       if (!prompt) {
         res.status(404).json({
-          status: 'error',
-          message: 'Prompt not found',
+          status: "error",
+          message: "Prompt not found",
         });
         return;
       }
 
       res.json({
-        status: 'success',
+        status: "success",
         data: prompt,
       });
     } catch (error) {
@@ -134,16 +154,43 @@ router.get(
  * Delete a prompt (fails if prompt is ACTIVE)
  */
 router.delete(
-  '/:id',
+  "/:id",
   authenticate,
-  validateRequest(idParamSchema, 'params'),
+  validateRequest(idParamSchema, "params"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as IdParams;
-      const promptService = container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
+      const promptService =
+        container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
       await promptService.delete(id);
 
       res.status(204).send();
+    } catch (error) {
+      handlePromptError(error, res, next);
+    }
+  }
+);
+
+/**
+ * PUT /prompts/:id
+ * Update an existing prompt
+ */
+router.put(
+  "/:id",
+  authenticate,
+  validateRequest(idParamSchema, "params"),
+  validateRequest(updatePromptSchema, "body"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params as IdParams;
+      const promptService =
+        container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
+      const prompt = await promptService.update(id, req.body);
+
+      res.json({
+        status: "success",
+        data: prompt,
+      });
     } catch (error) {
       handlePromptError(error, res, next);
     }
@@ -155,17 +202,18 @@ router.delete(
  * Set a prompt as active (deactivates all others)
  */
 router.patch(
-  '/:id/activate',
+  "/:id/activate",
   authenticate,
-  validateRequest(idParamSchema, 'params'),
+  validateRequest(idParamSchema, "params"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as IdParams;
-      const promptService = container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
+      const promptService =
+        container.resolve<IPromptService>(PROMPT_SERVICE_TOKEN);
       const prompt = await promptService.setActive(id);
 
       res.json({
-        status: 'success',
+        status: "success",
         data: prompt,
       });
     } catch (error) {

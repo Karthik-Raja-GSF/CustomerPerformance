@@ -12,7 +12,7 @@ export interface PromptDto {
   name: string;
   content: string;
   model: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: "ACTIVE" | "INACTIVE";
   /** ISO8601 UTC timestamp */
   createdAt: string;
   /** ISO8601 UTC timestamp */
@@ -26,4 +26,14 @@ export interface CreatePromptDto {
   name: string;
   content: string;
   model: string;
+}
+
+/**
+ * Request DTO for updating an existing prompt
+ * All fields are optional - only provided fields will be updated
+ */
+export interface UpdatePromptDto {
+  name?: string;
+  content?: string;
+  model?: string;
 }

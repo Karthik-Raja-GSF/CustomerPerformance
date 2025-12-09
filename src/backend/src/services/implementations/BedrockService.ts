@@ -1,13 +1,20 @@
-import { injectable } from 'tsyringe';
+import { injectable } from "tsyringe";
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
   InvokeModelCommandOutput,
   InvokeModelWithResponseStreamCommand,
-} from '@aws-sdk/client-bedrock-runtime';
-import { config } from '@/config/index';
-import { IBedrockService, BedrockResponse, StreamCallbacks } from '@/services/IBedrockService';
-import { UnsupportedModelError, BedrockInvocationError } from '@/utils/errors/assistant-errors';
+} from "@aws-sdk/client-bedrock-runtime";
+import { config } from "@/config/index";
+import {
+  IBedrockService,
+  BedrockResponse,
+  StreamCallbacks,
+} from "@/services/IBedrockService";
+import {
+  UnsupportedModelError,
+  BedrockInvocationError,
+} from "@/utils/errors/assistant-errors";
 
 @injectable()
 export class BedrockService implements IBedrockService {
@@ -24,10 +31,15 @@ export class BedrockService implements IBedrockService {
     maxTokens = 2000
   ): Promise<BedrockResponse> {
     try {
-      const payload = this.buildPayload(modelId, systemPrompt, userQuestion, maxTokens);
+      const payload = this.buildPayload(
+        modelId,
+        systemPrompt,
+        userQuestion,
+        maxTokens
+      );
 
       const command = new InvokeModelCommand({
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify(payload),
         modelId,
       });
@@ -39,7 +51,7 @@ export class BedrockService implements IBedrockService {
         throw error;
       }
       throw new BedrockInvocationError(
-        `Failed to invoke Bedrock model: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to invoke Bedrock model: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -50,39 +62,40 @@ export class BedrockService implements IBedrockService {
     user: string,
     maxTokens: number
   ): Record<string, unknown> {
-    if (modelId.startsWith('anthropic.')) {
+    if (modelId.includes("anthropic")) {
       return {
-        anthropic_version: 'bedrock-2023-05-31',
+        anthropic_version: "bedrock-2023-05-31",
         max_tokens: maxTokens,
         system,
-        messages: [{ role: 'user', content: user }],
+        messages: [{ role: "user", content: user }],
       };
     }
-    if (modelId.startsWith('amazon.nova')) {
+    if (modelId.includes("amazon.nova")) {
       return {
         system: [{ text: system }],
-        messages: [
-          { role: 'user', content: [{ text: user }] },
-        ],
+        messages: [{ role: "user", content: [{ text: user }] }],
         inferenceConfig: { max_new_tokens: maxTokens },
       };
     }
     throw new UnsupportedModelError(modelId);
   }
 
-  private parseResponse(modelId: string, response: InvokeModelCommandOutput): BedrockResponse {
+  private parseResponse(
+    modelId: string,
+    response: InvokeModelCommandOutput
+  ): BedrockResponse {
     const body = JSON.parse(new TextDecoder().decode(response.body));
 
     let text: string;
     let usage: { inputTokens: number; outputTokens: number };
 
-    if (modelId.startsWith('anthropic.')) {
+    if (modelId.includes("anthropic")) {
       text = body.content[0].text;
       usage = {
         inputTokens: body.usage.input_tokens,
         outputTokens: body.usage.output_tokens,
       };
-    } else if (modelId.startsWith('amazon.nova')) {
+    } else if (modelId.includes("amazon.nova")) {
       text = body.output.message.content[0].text;
       usage = {
         inputTokens: body.usage.inputTokens,
@@ -106,10 +119,10 @@ export class BedrockService implements IBedrockService {
     const penalties = [
       { phrase: "i'm not sure", penalty: 30 },
       { phrase: "i don't know", penalty: 40 },
-      { phrase: 'uncertain', penalty: 25 },
-      { phrase: 'might be', penalty: 15 },
-      { phrase: 'possibly', penalty: 10 },
-      { phrase: 'i think', penalty: 5 },
+      { phrase: "uncertain", penalty: 25 },
+      { phrase: "might be", penalty: 15 },
+      { phrase: "possibly", penalty: 10 },
+      { phrase: "i think", penalty: 5 },
     ];
 
     for (const { phrase, penalty } of penalties) {
@@ -130,10 +143,15 @@ export class BedrockService implements IBedrockService {
     maxTokens = 2000
   ): Promise<void> {
     try {
-      const payload = this.buildPayload(modelId, systemPrompt, userQuestion, maxTokens);
+      const payload = this.buildPayload(
+        modelId,
+        systemPrompt,
+        userQuestion,
+        maxTokens
+      );
 
       const command = new InvokeModelWithResponseStreamCommand({
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify(payload),
         modelId,
       });
@@ -141,7 +159,9 @@ export class BedrockService implements IBedrockService {
       const response = await this.client.send(command);
 
       if (!response.body) {
-        throw new BedrockInvocationError('No response body from Bedrock stream');
+        throw new BedrockInvocationError(
+          "No response body from Bedrock stream"
+        );
       }
 
       let inputTokens = 0;
@@ -152,17 +172,17 @@ export class BedrockService implements IBedrockService {
           const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
 
           // Handle Anthropic Claude models
-          if (modelId.startsWith('anthropic.')) {
-            if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+          if (modelId.includes("anthropic")) {
+            if (chunk.type === "content_block_delta" && chunk.delta?.text) {
               callbacks.onChunk(chunk.delta.text);
-            } else if (chunk.type === 'message_delta' && chunk.usage) {
+            } else if (chunk.type === "message_delta" && chunk.usage) {
               outputTokens = chunk.usage.output_tokens;
-            } else if (chunk.type === 'message_start' && chunk.message?.usage) {
+            } else if (chunk.type === "message_start" && chunk.message?.usage) {
               inputTokens = chunk.message.usage.input_tokens;
             }
           }
           // Handle Amazon Nova models
-          else if (modelId.startsWith('amazon.nova')) {
+          else if (modelId.includes("amazon.nova")) {
             if (chunk.contentBlockDelta?.delta?.text) {
               callbacks.onChunk(chunk.contentBlockDelta.delta.text);
             } else if (chunk.metadata?.usage) {
@@ -175,13 +195,16 @@ export class BedrockService implements IBedrockService {
 
       callbacks.onComplete({ inputTokens, outputTokens });
     } catch (error) {
-      if (error instanceof UnsupportedModelError || error instanceof BedrockInvocationError) {
+      if (
+        error instanceof UnsupportedModelError ||
+        error instanceof BedrockInvocationError
+      ) {
         callbacks.onError(error);
         return;
       }
       callbacks.onError(
         new BedrockInvocationError(
-          `Failed to stream from Bedrock: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Failed to stream from Bedrock: ${error instanceof Error ? error.message : "Unknown error"}`
         )
       );
     }

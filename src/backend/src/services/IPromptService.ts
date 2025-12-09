@@ -1,4 +1,8 @@
-import { PromptDto, CreatePromptDto } from '@/contracts/dtos/prompt.dto';
+import {
+  PromptDto,
+  CreatePromptDto,
+  UpdatePromptDto,
+} from "@/contracts/dtos/prompt.dto";
 
 /**
  * Prompt Service Interface
@@ -6,7 +10,7 @@ import { PromptDto, CreatePromptDto } from '@/contracts/dtos/prompt.dto';
  * Defines the contract for prompt management services.
  * Returns DTOs for API consumption.
  */
-export const PROMPT_SERVICE_TOKEN = Symbol.for('IPromptService');
+export const PROMPT_SERVICE_TOKEN = Symbol.for("IPromptService");
 
 export interface IPromptService {
   /**
@@ -48,4 +52,13 @@ export interface IPromptService {
    * @returns Promise resolving to the active prompt DTO or null if none active
    */
   findActive(): Promise<PromptDto | null>;
+
+  /**
+   * Update an existing prompt by ID
+   * @param id - The prompt UUID
+   * @param data - The fields to update
+   * @returns Promise resolving to the updated prompt DTO
+   * @throws PromptNotFoundError if prompt doesn't exist
+   */
+  update(id: string, data: UpdatePromptDto): Promise<PromptDto>;
 }

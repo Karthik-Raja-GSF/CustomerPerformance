@@ -10,30 +10,48 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shadcn/components/dialog";
-import { Save } from "lucide-react";
+import { Save, CopyPlus } from "lucide-react";
 import { ModelSelector } from "./ModelSelector";
-import type { CreatePromptInput } from "@/types/prompts";
+import type { CreatePromptInput, Prompt } from "@/types/prompts";
 
 interface PromptModalProps {
   isOpen: boolean;
+  mode: "create" | "edit";
+  prompt: Prompt | null;
   onClose: () => void;
   onSave: (input: CreatePromptInput) => void;
+  onCreateAsNewVersion?: (input: CreatePromptInput) => void;
 }
 
-export function PromptModal({ isOpen, onClose, onSave }: PromptModalProps) {
+export function PromptModal({
+  isOpen,
+  mode,
+  prompt,
+  onClose,
+  onSave,
+  onCreateAsNewVersion,
+}: PromptModalProps) {
   const [name, setName] = useState("");
   const [content, setContent] = useState("");
-  const [model, setModel] = useState("gpt-4o");
+  const [model, setModel] = useState("amazon.nova-micro-v1:0");
   const [isDark, setIsDark] = useState(false);
 
-  // Reset form when modal opens
+  // Initialize form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setName("");
-      setContent("");
-      setModel("gpt-4o");
+      if (mode === "edit" && prompt) {
+        // Pre-fill with existing prompt data
+        setName(prompt.name);
+        setContent(prompt.content);
+        setModel(prompt.model);
+      } else {
+        // Reset for create mode
+        setName("");
+        setContent("");
+        setModel("amazon.nova-micro-v1:0");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, mode, prompt]);
 
   // Watch for dark mode changes
   useEffect(() => {
@@ -65,11 +83,26 @@ export function PromptModal({ isOpen, onClose, onSave }: PromptModalProps) {
     onClose();
   };
 
+  const handleCreateAsNewVersion = () => {
+    if (!name.trim() || !onCreateAsNewVersion) return;
+
+    onCreateAsNewVersion({
+      name: name.trim(),
+      content,
+      model,
+    });
+
+    onClose();
+  };
+
+  const title = mode === "edit" ? "Edit Prompt" : "Create New Prompt";
+  const saveLabel = mode === "edit" ? "Update" : "Save";
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="w-[90vw] sm:max-w-[1400px] h-[85vh] flex flex-col p-6">
         <DialogHeader className="pb-4">
-          <DialogTitle className="text-xl">Create New Prompt</DialogTitle>
+          <DialogTitle className="text-xl">{title}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-6 flex-1 min-h-0">
@@ -123,13 +156,24 @@ export function PromptModal({ isOpen, onClose, onSave }: PromptModalProps) {
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
+            {mode === "edit" && onCreateAsNewVersion && (
+              <Button
+                variant="outline"
+                onClick={handleCreateAsNewVersion}
+                disabled={!name.trim()}
+                className="gap-2"
+              >
+                <CopyPlus className="h-4 w-4" />
+                Create as New Version
+              </Button>
+            )}
             <Button
               onClick={handleSave}
               disabled={!name.trim()}
               className="gap-2"
             >
               <Save className="h-4 w-4" />
-              Save
+              {saveLabel}
             </Button>
           </div>
         </DialogFooter>
