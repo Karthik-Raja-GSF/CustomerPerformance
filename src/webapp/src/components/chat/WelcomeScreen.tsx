@@ -2,10 +2,10 @@ import {
   Package,
   TrendingUp,
   Users,
-  FileText,
-  Search,
   BarChart3,
   Info,
+  ShoppingCart,
+  DollarSign,
 } from "lucide-react";
 import { Card, CardContent } from "@/shadcn/components/card";
 import type { LucideIcon } from "lucide-react";
@@ -21,47 +21,51 @@ interface SuggestedPrompt {
 const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
   {
     id: "1",
-    title: "Inventory Status",
-    description: "Check current stock levels",
+    title: "Inventory Analysis",
+    description: "Stock levels & reorder alerts",
     prompt:
-      "What products do we have in stock and what are their current inventory levels?",
+      "Which products are below their reorder point and need to be restocked? Show me items with low inventory levels.",
     icon: Package,
   },
   {
     id: "2",
-    title: "Sales Analysis",
-    description: "View recent sales data",
+    title: "Sales Trends",
+    description: "Top sellers & revenue drivers",
     prompt:
-      "Show me the sales data for the last month. Which products sold the most?",
+      "What are our top 10 best-selling products this quarter and how do they compare to last quarter's performance?",
     icon: TrendingUp,
   },
   {
     id: "3",
-    title: "Supplier Info",
-    description: "Find supplier contacts",
-    prompt: "List all our suppliers with their contact information",
-    icon: Users,
-  },
-  {
-    id: "4",
-    title: "Forecast Overview",
-    description: "View demand predictions",
-    prompt: "What are the demand forecasts for the next quarter?",
+    title: "Demand Forecast",
+    description: "Future demand predictions",
+    prompt:
+      "Based on historical data and trends, what is the projected demand for our top products over the next 3 months?",
     icon: BarChart3,
   },
   {
+    id: "4",
+    title: "Supplier Performance",
+    description: "Lead times & reliability",
+    prompt:
+      "Which suppliers have the best on-time delivery rates and shortest lead times? Are there any suppliers with recent delivery issues?",
+    icon: Users,
+  },
+  {
     id: "5",
-    title: "Product Search",
-    description: "Find specific items",
-    prompt: "Help me find information about our product catalog",
-    icon: Search,
+    title: "Buyer Workload",
+    description: "Open POs & pending orders",
+    prompt:
+      "Show me the current purchase orders by buyer. Which buyers have the most pending orders and what is their total order value?",
+    icon: ShoppingCart,
   },
   {
     id: "6",
-    title: "Generate Report",
-    description: "Create custom reports",
-    prompt: "Create a summary report of our top performing products",
-    icon: FileText,
+    title: "Cost Analysis",
+    description: "Pricing & spend insights",
+    prompt:
+      "What are our highest-spend product categories and how have unit costs changed compared to last year?",
+    icon: DollarSign,
   },
 ];
 
@@ -78,11 +82,7 @@ export function WelcomeScreen({ onPromptSelect }: WelcomeScreenProps) {
           <div className="flex items-center justify-center">
             <h1 className="text-3xl font-bold flex items-center">
               Star
-              <img
-                src="/starq-q-icon.svg"
-                alt="Q"
-                className="h-7 w-7 ml-1"
-              />
+              <img src="/starq-q-icon.svg" alt="Q" className="h-7 w-7 ml-1" />
             </h1>
           </div>
           <p className="text-muted-foreground">

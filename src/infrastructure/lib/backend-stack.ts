@@ -7,6 +7,7 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
 export class BackendStack extends cdk.Stack {
@@ -79,6 +80,22 @@ export class BackendStack extends cdk.Stack {
       memoryLimitMiB: 1024, // 1 GB
       family: "gsf-backend",
     });
+
+    // Grant Bedrock permissions to task role
+    taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ],
+        resources: [
+          // Allow all Bedrock models (use * for region as API returns regionless ARNs)
+          "arn:aws:bedrock:*::foundation-model/*",
+          "arn:aws:bedrock:*:*:inference-profile/*",
+        ],
+      })
+    );
 
     // CloudWatch Log Group
     const logGroup = new logs.LogGroup(this, "LogGroup", {
