@@ -15,6 +15,21 @@ import {
   UnsupportedModelError,
   BedrockInvocationError,
 } from "@/utils/errors/assistant-errors";
+import { createChildLogger } from "@/telemetry/logger";
+import {
+  withBedrockSpan,
+  addSpanAttributes,
+  addSpanEvent,
+} from "@/telemetry/tracer";
+import {
+  getBedrockInvocations,
+  getBedrockLatency,
+  getBedrockTokensInput,
+  getBedrockTokensOutput,
+  getBedrockErrors,
+} from "@/telemetry/metrics";
+
+const logger = createChildLogger("bedrock");
 
 @injectable()
 export class BedrockService implements IBedrockService {
@@ -30,30 +45,93 @@ export class BedrockService implements IBedrockService {
     modelId: string,
     maxTokens = 2000
   ): Promise<BedrockResponse> {
-    try {
-      const payload = this.buildPayload(
-        modelId,
-        systemPrompt,
-        userQuestion,
-        maxTokens
-      );
+    const startTime = Date.now();
 
-      const command = new InvokeModelCommand({
-        contentType: "application/json",
-        body: JSON.stringify(payload),
-        modelId,
-      });
+    return withBedrockSpan(modelId, "invoke", async () => {
+      try {
+        logger.info(
+          { event: "bedrock.invoke.start", modelId, maxTokens },
+          "Starting Bedrock invocation"
+        );
 
-      const response = await this.client.send(command);
-      return this.parseResponse(modelId, response);
-    } catch (error) {
-      if (error instanceof UnsupportedModelError) {
-        throw error;
+        const payload = this.buildPayload(
+          modelId,
+          systemPrompt,
+          userQuestion,
+          maxTokens
+        );
+
+        const command = new InvokeModelCommand({
+          contentType: "application/json",
+          body: JSON.stringify(payload),
+          modelId,
+        });
+
+        const response = await this.client.send(command);
+        const result = this.parseResponse(modelId, response);
+        const duration = Date.now() - startTime;
+
+        // Record metrics
+        getBedrockInvocations().add(1, { model: modelId, operation: "invoke" });
+        getBedrockLatency().record(duration, {
+          model: modelId,
+          operation: "invoke",
+        });
+        getBedrockTokensInput().add(result.usage.inputTokens, {
+          model: modelId,
+        });
+        getBedrockTokensOutput().add(result.usage.outputTokens, {
+          model: modelId,
+        });
+
+        // Add span attributes
+        addSpanAttributes({
+          "bedrock.input_tokens": result.usage.inputTokens,
+          "bedrock.output_tokens": result.usage.outputTokens,
+          "bedrock.confidence": result.confidence,
+          "bedrock.duration_ms": duration,
+        });
+
+        logger.info(
+          {
+            event: "bedrock.invoke.complete",
+            modelId,
+            duration,
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            confidence: result.confidence,
+          },
+          "Bedrock invocation completed"
+        );
+
+        return result;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        getBedrockErrors().add(1, { model: modelId, operation: "invoke" });
+        getBedrockLatency().record(duration, {
+          model: modelId,
+          operation: "invoke",
+          error: "true",
+        });
+
+        logger.error(
+          {
+            event: "bedrock.invoke.error",
+            modelId,
+            duration,
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
+          "Bedrock invocation failed"
+        );
+
+        if (error instanceof UnsupportedModelError) {
+          throw error;
+        }
+        throw new BedrockInvocationError(
+          `Failed to invoke Bedrock model: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
       }
-      throw new BedrockInvocationError(
-        `Failed to invoke Bedrock model: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-    }
+    });
   }
 
   private buildPayload(
@@ -142,71 +220,141 @@ export class BedrockService implements IBedrockService {
     callbacks: StreamCallbacks,
     maxTokens = 2000
   ): Promise<void> {
-    try {
-      const payload = this.buildPayload(
-        modelId,
-        systemPrompt,
-        userQuestion,
-        maxTokens
-      );
+    const startTime = Date.now();
 
-      const command = new InvokeModelWithResponseStreamCommand({
-        contentType: "application/json",
-        body: JSON.stringify(payload),
-        modelId,
-      });
-
-      const response = await this.client.send(command);
-
-      if (!response.body) {
-        throw new BedrockInvocationError(
-          "No response body from Bedrock stream"
+    return withBedrockSpan(modelId, "invokeStream", async () => {
+      try {
+        logger.info(
+          { event: "bedrock.stream.start", modelId, maxTokens },
+          "Starting Bedrock stream"
         );
-      }
 
-      let inputTokens = 0;
-      let outputTokens = 0;
+        const payload = this.buildPayload(
+          modelId,
+          systemPrompt,
+          userQuestion,
+          maxTokens
+        );
 
-      for await (const event of response.body) {
-        if (event.chunk?.bytes) {
-          const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
+        const command = new InvokeModelWithResponseStreamCommand({
+          contentType: "application/json",
+          body: JSON.stringify(payload),
+          modelId,
+        });
 
-          // Handle Anthropic Claude models
-          if (modelId.includes("anthropic")) {
-            if (chunk.type === "content_block_delta" && chunk.delta?.text) {
-              callbacks.onChunk(chunk.delta.text);
-            } else if (chunk.type === "message_delta" && chunk.usage) {
-              outputTokens = chunk.usage.output_tokens;
-            } else if (chunk.type === "message_start" && chunk.message?.usage) {
-              inputTokens = chunk.message.usage.input_tokens;
+        const response = await this.client.send(command);
+
+        if (!response.body) {
+          throw new BedrockInvocationError(
+            "No response body from Bedrock stream"
+          );
+        }
+
+        let inputTokens = 0;
+        let outputTokens = 0;
+        let chunkCount = 0;
+
+        addSpanEvent("stream.started");
+
+        for await (const event of response.body) {
+          if (event.chunk?.bytes) {
+            const chunk = JSON.parse(
+              new TextDecoder().decode(event.chunk.bytes)
+            );
+
+            // Handle Anthropic Claude models
+            if (modelId.includes("anthropic")) {
+              if (chunk.type === "content_block_delta" && chunk.delta?.text) {
+                callbacks.onChunk(chunk.delta.text);
+                chunkCount++;
+              } else if (chunk.type === "message_delta" && chunk.usage) {
+                outputTokens = chunk.usage.output_tokens;
+              } else if (
+                chunk.type === "message_start" &&
+                chunk.message?.usage
+              ) {
+                inputTokens = chunk.message.usage.input_tokens;
+              }
             }
-          }
-          // Handle Amazon Nova models
-          else if (modelId.includes("amazon.nova")) {
-            if (chunk.contentBlockDelta?.delta?.text) {
-              callbacks.onChunk(chunk.contentBlockDelta.delta.text);
-            } else if (chunk.metadata?.usage) {
-              inputTokens = chunk.metadata.usage.inputTokens;
-              outputTokens = chunk.metadata.usage.outputTokens;
+            // Handle Amazon Nova models
+            else if (modelId.includes("amazon.nova")) {
+              if (chunk.contentBlockDelta?.delta?.text) {
+                callbacks.onChunk(chunk.contentBlockDelta.delta.text);
+                chunkCount++;
+              } else if (chunk.metadata?.usage) {
+                inputTokens = chunk.metadata.usage.inputTokens;
+                outputTokens = chunk.metadata.usage.outputTokens;
+              }
             }
           }
         }
-      }
 
-      callbacks.onComplete({ inputTokens, outputTokens });
-    } catch (error) {
-      if (
-        error instanceof UnsupportedModelError ||
-        error instanceof BedrockInvocationError
-      ) {
-        callbacks.onError(error);
-        return;
+        const duration = Date.now() - startTime;
+
+        // Record metrics
+        getBedrockInvocations().add(1, { model: modelId, operation: "stream" });
+        getBedrockLatency().record(duration, {
+          model: modelId,
+          operation: "stream",
+        });
+        getBedrockTokensInput().add(inputTokens, { model: modelId });
+        getBedrockTokensOutput().add(outputTokens, { model: modelId });
+
+        // Add span attributes
+        addSpanAttributes({
+          "bedrock.input_tokens": inputTokens,
+          "bedrock.output_tokens": outputTokens,
+          "bedrock.chunk_count": chunkCount,
+          "bedrock.duration_ms": duration,
+        });
+
+        addSpanEvent("stream.completed", { chunkCount });
+
+        logger.info(
+          {
+            event: "bedrock.stream.complete",
+            modelId,
+            duration,
+            inputTokens,
+            outputTokens,
+            chunkCount,
+          },
+          "Bedrock stream completed"
+        );
+
+        callbacks.onComplete({ inputTokens, outputTokens });
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        getBedrockErrors().add(1, { model: modelId, operation: "stream" });
+        getBedrockLatency().record(duration, {
+          model: modelId,
+          operation: "stream",
+          error: "true",
+        });
+
+        logger.error(
+          {
+            event: "bedrock.stream.error",
+            modelId,
+            duration,
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
+          "Bedrock stream failed"
+        );
+
+        if (
+          error instanceof UnsupportedModelError ||
+          error instanceof BedrockInvocationError
+        ) {
+          callbacks.onError(error);
+          return;
+        }
+        callbacks.onError(
+          new BedrockInvocationError(
+            `Failed to stream from Bedrock: ${error instanceof Error ? error.message : "Unknown error"}`
+          )
+        );
       }
-      callbacks.onError(
-        new BedrockInvocationError(
-          `Failed to stream from Bedrock: ${error instanceof Error ? error.message : "Unknown error"}`
-        )
-      );
-    }
+    });
   }
 }

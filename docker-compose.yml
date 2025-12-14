@@ -10,7 +10,7 @@ services:
       ACCEPT_EULA: Y
       MSSQL_SA_PASSWORD: NavImport123!
     ports:
-      - '1433:1433'
+      - "1433:1433"
     volumes:
       - ./nav-backups:/var/opt/mssql/backup
       - mssql_data:/var/opt/mssql/data
@@ -32,14 +32,24 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: admin_blueprint
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  aspire_dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
+    restart: always
+    ports:
+      - 18888:18888
+      - 4317:18889
+    environment:
+      - Dashboard:ApplicationName=GSF
+      - Dashboard:Frontend:BrowserToken=password
 
 volumes:
   postgres_data:

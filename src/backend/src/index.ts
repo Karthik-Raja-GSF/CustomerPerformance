@@ -1,24 +1,37 @@
-import "reflect-metadata"; // Must be first import for DI to work
+// ADOT auto-instrumentation is loaded via --require flag in package.json scripts
+import { createChildLogger } from "./telemetry/logger";
+
+import "reflect-metadata"; // Must be imported for DI to work
 import express, { Application } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import morgan from "morgan";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import { config } from "./config";
 import { setupContainer } from "./config/container";
 import { errorHandler } from "./middleware/error-handler";
+import { telemetryMiddleware } from "./middleware/telemetry";
 import promptsRouter from "./routes/prompts";
 import siqImportRouter from "./routes/siq-import";
 import assistantRouter from "./routes/assistant";
 
+const serverLogger = createChildLogger("server");
+
+// Create Prisma client with pg adapter for Prisma v7
+const pool = new Pool({ connectionString: config.databaseUrl });
+const adapter = new PrismaPg(pool);
+
 class Server {
   private app: Application;
   private prisma: PrismaClient;
+  private pool: Pool;
 
   constructor() {
     this.app = express();
-    this.prisma = new PrismaClient();
+    this.pool = pool;
+    this.prisma = new PrismaClient({ adapter });
     this.initializeMiddleware();
     this.initializeRoutes();
     this.initializeErrorHandling();
@@ -57,10 +70,8 @@ class Server {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    // Logging middleware
-    if (config.nodeEnv === "development") {
-      this.app.use(morgan("dev"));
-    }
+    // Telemetry middleware (replaces morgan)
+    this.app.use(telemetryMiddleware);
   }
 
   private initializeRoutes(): void {
@@ -86,15 +97,27 @@ class Server {
     try {
       // Connect to database
       await this.prisma.$connect();
-      console.log("Database connected successfully");
+      serverLogger.info(
+        { event: "database.connected" },
+        "Database connected successfully"
+      );
 
       // Start server
       this.app.listen(config.port, () => {
-        console.log(`Server is running on port ${String(config.port)}`);
-        console.log(`Environment: ${String(config.nodeEnv)}`);
+        serverLogger.info(
+          {
+            event: "server.started",
+            port: config.port,
+            environment: config.nodeEnv,
+          },
+          `Server is running on port ${String(config.port)}`
+        );
       });
     } catch (error) {
-      console.error("Failed to start server:", error);
+      serverLogger.error(
+        { event: "server.start.failed", error },
+        "Failed to start server"
+      );
       await this.prisma.$disconnect();
       process.exit(1);
     }
@@ -102,7 +125,8 @@ class Server {
 
   public async stop(): Promise<void> {
     await this.prisma.$disconnect();
-    console.log("Server stopped");
+    await this.pool.end();
+    serverLogger.info({ event: "server.stopped" }, "Server stopped");
   }
 }
 
@@ -112,11 +136,17 @@ void server.start();
 
 // Graceful shutdown
 process.on("SIGINT", () => {
-  console.log("Received SIGINT, shutting down gracefully...");
+  serverLogger.info(
+    { event: "shutdown.signal", signal: "SIGINT" },
+    "Received SIGINT, shutting down gracefully..."
+  );
   void server.stop().then(() => process.exit(0));
 });
 
 process.on("SIGTERM", () => {
-  console.log("Received SIGTERM, shutting down gracefully...");
+  serverLogger.info(
+    { event: "shutdown.signal", signal: "SIGTERM" },
+    "Received SIGTERM, shutting down gracefully..."
+  );
   void server.stop().then(() => process.exit(0));
 });

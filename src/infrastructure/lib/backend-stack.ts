@@ -117,6 +117,15 @@ export class BackendStack extends cdk.Stack {
         NODE_ENV: "production",
         CORS_ORIGIN: "https://dev.tratin.com",
         AWS_REGION: "us-east-1",
+        OTEL_SERVICE_NAME: "admin-panel-backend",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+          "https://xray.us-east-1.amazonaws.com/v1/traces",
+        OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:
+          "https://logs.us-east-1.amazonaws.com/v1/logs",
+        OTEL_EXPORTER_OTLP_LOGS_HEADERS:
+          "x-aws-log-group=/app/admin-panel,x-aws-log-stream=backend",
+        OTEL_METRICS_EXPORTER: "none",
       },
       secrets: {
         DATABASE_URL: ecs.Secret.fromSecretsManager(secrets, "DATABASE_URL"),

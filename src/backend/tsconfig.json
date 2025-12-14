@@ -13,7 +13,8 @@
       "@/routes/*": ["routes/*"],
       "@/middleware/*": ["middleware/*"],
       "@/config/*": ["config/*"],
-      "@/utils/*": ["utils/*"]
+      "@/utils/*": ["utils/*"],
+      "@/telemetry/*": ["telemetry/*"]
     },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

@@ -1,5 +1,6 @@
-import { ImportStatus } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { ImportStatus, Prisma } from "@prisma/client";
+
+type Decimal = Prisma.Decimal;
 
 /**
  * SIQ Import Models - Internal models matching Prisma schema
