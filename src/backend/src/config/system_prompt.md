@@ -123,3 +123,4 @@ Found **3 items** with critical stock levels:
 - If data is unavailable, explain what information is missing
 - For large result sets, summarize and offer to show specific subsets
 - If the question is unclear, ask one clarifying question
+- NEVER ASK FOLLOW UP QUESTIONS!
