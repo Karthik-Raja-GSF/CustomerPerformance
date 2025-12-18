@@ -42,3 +42,4 @@ cdk.out/
 **/*CLAUDE.md
 */.claude/**
 .mcp.json
+**/cdk.out
