@@ -10,6 +10,11 @@ export default defineConfig({
   earlyAccess: true,
   schema: path.join(__dirname, "prisma", "schema.prisma"),
 
+  // Required for prisma migrate deploy
+  datasource: {
+    url: databaseUrl,
+  },
+
   migrate: {
     adapter: async () => {
       const { PrismaPg } = await import("@prisma/adapter-pg");
