@@ -9,6 +9,10 @@ build
 .env
 .env.local
 .env.*.local
+.env.production
+
+# CDK context (contains AWS account/resource IDs)
+cdk.context.json
 
 # IDE
 .idea
@@ -27,6 +31,10 @@ pnpm-debug.log*
 
 # Test coverage
 coverage
+
+# CDK output
+cdk.out/
+**/cdk.out/
 
 # TypeScript cache
 *.tsbuildinfo

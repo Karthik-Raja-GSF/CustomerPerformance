@@ -5,9 +5,9 @@ RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lis
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
-COPY prisma ./prisma/
+# Copy package files (from project root context)
+COPY src/backend/package.json ./
+COPY src/backend/prisma ./prisma/
 
 # Install dependencies using npm (no lockfile dependency issues)
 RUN npm install
@@ -15,11 +15,11 @@ RUN npm install
 # Generate Prisma client
 RUN npx prisma generate
 
-# Copy tsconfig.base.json to /app
+# Copy tsconfig.base.json from project root
 COPY tsconfig.base.json ./tsconfig.base.json
 
 # Copy source code
-COPY . .
+COPY src/backend/ .
 
 # Fix tsconfig.json extends path for Docker context (change ../../tsconfig.base.json to ./tsconfig.base.json)
 RUN sed -i 's|"extends": "../../tsconfig.base.json"|"extends": "./tsconfig.base.json"|g' tsconfig.json
@@ -32,4 +32,5 @@ RUN cp -r src/config dist/
 
 EXPOSE 8887
 
-CMD ["node", "dist/index.js"]
+# Run migrations and start the server
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

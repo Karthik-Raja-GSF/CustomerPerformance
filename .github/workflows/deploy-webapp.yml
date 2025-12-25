@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/webapp/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/deploy-webapp.yml'
+      - "src/webapp/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-webapp.yml"
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -106,6 +106,6 @@ jobs:
         run: |
           echo "## Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://dev.tratin.com" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://ait-dev.tratin.com" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "CloudFront cache invalidation initiated." >> $GITHUB_STEP_SUMMARY

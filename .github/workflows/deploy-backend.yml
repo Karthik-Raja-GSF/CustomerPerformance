@@ -15,9 +15,9 @@ concurrency:
 env:
   NODE_VERSION: "20"
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: gsf-backend-apis
-  ECS_CLUSTER: gsf-backend
-  ECS_SERVICE: gsf-backend
+  ECR_REPOSITORY: ait-dev-gbl-ecr-backend-01
+  ECS_CLUSTER: ait-dev-ue1-ecs-cluster-01
+  ECS_SERVICE: ait-dev-ue1-ecs-backend-01
 
 jobs:
   build:
@@ -65,14 +65,12 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Copy tsconfig.base.json to backend for Docker build
-          cp tsconfig.base.json src/backend/
-
-          # Build Docker image
+          # Build Docker image from project root (Dockerfile expects this context)
           docker build --platform linux/amd64 \
+            -f src/backend/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            src/backend
+            .
 
           # Push both tags
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -110,5 +108,5 @@ jobs:
         run: |
           echo "## Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://dev-be.tratin.com" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://ait-dev-be.tratin.com" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** ${{ needs.build.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
