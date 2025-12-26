@@ -110,8 +110,9 @@ export class AitStack extends cdk.Stack {
     // ===================
     // Backend Secret (create new one for AIT stack)
     // ===================
+    const backendSecretName = `ait-${envCode}-ue1-sm-backend-01`;
     const backendSecret = new secretsmanager.Secret(this, "BackendSecret", {
-      secretName: `ait-${envCode}-ue1-sm-backend-01`,
+      secretName: backendSecretName,
       description: "Backend secrets for AIT application",
       generateSecretString: {
         secretStringTemplate: JSON.stringify({
@@ -120,6 +121,7 @@ export class AitStack extends cdk.Stack {
         generateStringKey: "TEMP_KEY",
       },
     });
+    addStandardTags(backendSecret, naming.env, backendSecretName);
 
     // ===================
     // Backend (ECS Fargate + ALB)

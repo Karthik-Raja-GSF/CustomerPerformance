@@ -48,8 +48,16 @@ function getEnvironmentName(env: Environment): string {
  *
  * @example
  * addStandardTags(this, 'dev');
+ * addStandardTags(this, 'dev', 'ait-dev-ue1-vpc-main-01');
  */
-export function addStandardTags(construct: Construct, env: Environment): void {
+export function addStandardTags(
+  construct: Construct,
+  env: Environment,
+  name?: string
+): void {
+  if (name) {
+    Tags.of(construct).add("Name", name);
+  }
   Tags.of(construct).add("Company", TAG_VALUES.Company);
   Tags.of(construct).add("Project", TAG_VALUES.Project);
   Tags.of(construct).add("ProjectAbbr", TAG_VALUES.ProjectAbbr);

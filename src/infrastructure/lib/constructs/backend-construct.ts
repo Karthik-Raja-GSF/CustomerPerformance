@@ -29,7 +29,7 @@ export interface BackendConstructProps {
   frontendUrl: string;
   hostedZone: route53.IHostedZone;
   config: EcsConfig;
-  naming?: NamingConfig;
+  naming: NamingConfig;
 }
 
 export class BackendConstruct extends Construct {
@@ -42,7 +42,6 @@ export class BackendConstruct extends Construct {
     super(scope, id);
 
     const {
-      envName,
       vpc,
       ecrRepository,
       backendSecret,
@@ -55,36 +54,21 @@ export class BackendConstruct extends Construct {
       naming,
     } = props;
 
-    // Generate names based on naming config
-    const n = naming ? createNamingHelper(naming) : null;
-    const clusterName = n
-      ? n.name(ResourceTypes.ECS, "cluster", "01")
-      : `gsf-${envName}-backend`;
-    const serviceName = n
-      ? n.name(ResourceTypes.ECS, "backend", "01")
-      : `gsf-${envName}-backend`;
-    const taskFamily = n
-      ? n.name(ResourceTypes.ECS, "task", "01")
-      : `gsf-${envName}-backend`;
-    const containerName = n
-      ? n.name(ResourceTypes.ECS, "container", "01")
-      : `gsf-${envName}-backend`;
-    const logGroupName = n
-      ? n.logGroup("backend", "01")
-      : `/ecs/gsf-${envName}-backend`;
-    const otelServiceName = n
-      ? `ait-${naming!.env}-backend`
-      : `gsf-${envName}-backend`;
-    const albName = n ? n.name(ResourceTypes.ALB, "backend", "01") : undefined;
-    const tgName = n
-      ? n.name(ResourceTypes.TARGET_GROUP, "backend", "01")
-      : undefined;
-    const albSgName = n
-      ? n.name(ResourceTypes.SECURITY_GROUP, "alb", "01")
-      : undefined;
-    const ecsSgName = n
-      ? n.name(ResourceTypes.SECURITY_GROUP, "ecs", "01")
-      : undefined;
+    // Generate resource names
+    const n = createNamingHelper(naming);
+    const clusterName = n.name(ResourceTypes.ECS, "cluster", "01");
+    const serviceName = n.name(ResourceTypes.ECS, "backend", "01");
+    const taskFamily = n.name(ResourceTypes.ECS, "task", "01");
+    const containerName = n.name(ResourceTypes.ECS, "container", "01");
+    const logGroupName = n.logGroup("backend", "01");
+    const otelServiceName = `ait-${naming.env}-backend`;
+    const albName = n.name(ResourceTypes.ALB, "backend", "01");
+    const tgName = n.name(ResourceTypes.TARGET_GROUP, "backend", "01");
+    const albSgName = n.name(ResourceTypes.SECURITY_GROUP, "alb", "01");
+    const ecsSgName = n.name(ResourceTypes.SECURITY_GROUP, "ecs", "01");
+    const certName = n.name(ResourceTypes.ROUTE53, "cert-backend", "01");
+    const httpsListenerName = n.name(ResourceTypes.ALB, "https-listener", "01");
+    const httpListenerName = n.name(ResourceTypes.ALB, "http-listener", "01");
 
     // ECS Cluster
     this.cluster = new ecs.Cluster(this, "Cluster", {
@@ -217,14 +201,14 @@ export class BackendConstruct extends Construct {
     });
 
     // HTTPS Listener
-    this.loadBalancer.addListener("HTTPSListener", {
+    const httpsListener = this.loadBalancer.addListener("HTTPSListener", {
       port: 443,
       certificates: [this.certificate],
       defaultTargetGroups: [targetGroup],
     });
 
     // HTTP to HTTPS redirect
-    this.loadBalancer.addListener("HTTPListener", {
+    const httpListener = this.loadBalancer.addListener("HTTPListener", {
       port: 80,
       defaultAction: elbv2.ListenerAction.redirect({
         protocol: "HTTPS",
@@ -283,14 +267,17 @@ export class BackendConstruct extends Construct {
     });
 
     // Tags
-    if (naming) {
-      addStandardTags(this.cluster, naming.env);
-      addStandardTags(this.service, naming.env);
-      addStandardTags(this.loadBalancer, naming.env);
-    } else {
-      cdk.Tags.of(this.cluster).add("Environment", envName);
-      cdk.Tags.of(this.cluster).add("ManagedBy", "CDK");
-    }
+    addStandardTags(this.cluster, naming.env, clusterName);
+    addStandardTags(this.service, naming.env, serviceName);
+    addStandardTags(taskDefinition, naming.env, taskFamily);
+    addStandardTags(this.loadBalancer, naming.env, albName);
+    addStandardTags(httpsListener, naming.env, httpsListenerName);
+    addStandardTags(httpListener, naming.env, httpListenerName);
+    addStandardTags(albSecurityGroup, naming.env, albSgName);
+    addStandardTags(serviceSecurityGroup, naming.env, ecsSgName);
+    addStandardTags(targetGroup, naming.env, tgName);
+    addStandardTags(logGroup, naming.env, logGroupName);
+    addStandardTags(this.certificate, naming.env, certName);
   }
 
   /**

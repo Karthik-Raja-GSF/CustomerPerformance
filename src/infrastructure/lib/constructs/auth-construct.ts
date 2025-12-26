@@ -11,7 +11,7 @@ import { addStandardTags } from "../config/tags";
 export interface AuthConstructProps {
   envName: string;
   frontendUrl: string;
-  naming?: NamingConfig;
+  naming: NamingConfig;
 }
 
 export class AuthConstruct extends Construct {
@@ -23,14 +23,10 @@ export class AuthConstruct extends Construct {
 
     const { envName, frontendUrl, naming } = props;
 
-    // Generate names based on naming config (Cognito is global resource)
-    const n = naming ? createNamingHelper(naming) : null;
-    const userPoolName = n
-      ? n.globalName(ResourceTypes.COGNITO, "main", "01")
-      : `gsf-${envName}-user-pool`;
-    const clientName = n
-      ? n.globalName(ResourceTypes.COGNITO, "client", "01")
-      : `gsf-${envName}-app-client`;
+    // Generate resource names (Cognito is global resource)
+    const n = createNamingHelper(naming);
+    const userPoolName = n.globalName(ResourceTypes.COGNITO, "main", "01");
+    const clientName = n.globalName(ResourceTypes.COGNITO, "client", "01");
 
     const isProd = envName === "prod" || envName === "prd";
 
@@ -96,11 +92,7 @@ export class AuthConstruct extends Construct {
     });
 
     // Tags
-    if (naming) {
-      addStandardTags(this.userPool, naming.env);
-    } else {
-      cdk.Tags.of(this.userPool).add("Environment", envName);
-      cdk.Tags.of(this.userPool).add("ManagedBy", "CDK");
-    }
+    addStandardTags(this.userPool, naming.env, userPoolName);
+    addStandardTags(this.userPoolClient, naming.env, clientName);
   }
 }

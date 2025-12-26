@@ -15,7 +15,7 @@ export interface DatabaseConstructProps {
   envName: string;
   vpc: ec2.IVpc;
   config: AuroraConfig;
-  naming?: NamingConfig;
+  naming: NamingConfig;
 }
 
 export class DatabaseConstruct extends Construct {
@@ -28,23 +28,17 @@ export class DatabaseConstruct extends Construct {
 
     const { envName, vpc, config, naming } = props;
 
-    // Generate names based on naming config
-    const n = naming ? createNamingHelper(naming) : null;
-    const sgName = n
-      ? n.name(ResourceTypes.SECURITY_GROUP, "db", "01")
-      : `gsf-${envName}-aurora-sg`;
-    const clusterName = n
-      ? n.name(ResourceTypes.RDS, "app", "01")
-      : `gsf-${envName}-aurora`;
-    const secretName = n
-      ? n.name(ResourceTypes.SECRETS_MANAGER, "aurora", "01")
-      : `gsf-${envName}-aurora-credentials`;
+    // Generate resource names
+    const n = createNamingHelper(naming);
+    const sgName = n.name(ResourceTypes.SECURITY_GROUP, "db", "01");
+    const clusterName = n.name(ResourceTypes.RDS, "app", "01");
+    const secretName = n.name(ResourceTypes.SECRETS_MANAGER, "aurora", "01");
 
     // Security group for Aurora
     this.securityGroup = new ec2.SecurityGroup(this, "SecurityGroup", {
       vpc,
       securityGroupName: sgName,
-      description: `Security group for ${naming ? "AIT" : "GSF"} ${envName} Aurora Serverless v2`,
+      description: `Security group for AIT ${envName} Aurora Serverless v2`,
       allowAllOutbound: true,
     });
 
@@ -87,13 +81,9 @@ export class DatabaseConstruct extends Construct {
     this.secret = this.cluster.secret!;
 
     // Tags
-    if (naming) {
-      addStandardTags(this.cluster, naming.env);
-      addStandardTags(this.securityGroup, naming.env);
-    } else {
-      cdk.Tags.of(this.cluster).add("Environment", envName);
-      cdk.Tags.of(this.cluster).add("ManagedBy", "CDK");
-    }
+    addStandardTags(this.cluster, naming.env, clusterName);
+    addStandardTags(this.securityGroup, naming.env, sgName);
+    addStandardTags(this.secret, naming.env, secretName);
   }
 
   /**

@@ -10,7 +10,7 @@ import { addStandardTags } from "../config/tags";
 
 export interface EcrConstructProps {
   envName: string;
-  naming?: NamingConfig;
+  naming: NamingConfig;
   /** If true, import existing repository instead of creating new one */
   importExisting?: boolean;
 }
@@ -23,11 +23,9 @@ export class EcrConstruct extends Construct {
 
     const { envName, naming, importExisting } = props;
 
-    // Generate names based on naming config (ECR is global resource)
-    const n = naming ? createNamingHelper(naming) : null;
-    const repoName = n
-      ? n.globalName(ResourceTypes.ECR, "backend", "01")
-      : `gsf-${envName}-backend`;
+    // Generate resource names (ECR is global resource)
+    const n = createNamingHelper(naming);
+    const repoName = n.globalName(ResourceTypes.ECR, "backend", "01");
 
     const isProd = envName === "prod" || envName === "prd";
 
@@ -59,12 +57,7 @@ export class EcrConstruct extends Construct {
       });
 
       // Tags (only for newly created repos)
-      if (naming) {
-        addStandardTags(newRepo, naming.env);
-      } else {
-        cdk.Tags.of(newRepo).add("Environment", envName);
-        cdk.Tags.of(newRepo).add("ManagedBy", "CDK");
-      }
+      addStandardTags(newRepo, naming.env, repoName);
 
       this.repository = newRepo;
     }

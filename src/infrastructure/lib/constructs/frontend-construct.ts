@@ -17,7 +17,7 @@ export interface FrontendConstructProps {
   envName: string;
   domainName: string;
   hostedZone: route53.IHostedZone;
-  naming?: NamingConfig;
+  naming: NamingConfig;
 }
 
 export class FrontendConstruct extends Construct {
@@ -30,17 +30,18 @@ export class FrontendConstruct extends Construct {
 
     const { envName, domainName, hostedZone, naming } = props;
 
-    // Generate names based on naming config (S3, CloudFront are global resources)
-    const n = naming ? createNamingHelper(naming) : null;
-    const bucketName = n
-      ? n.uniqueName(ResourceTypes.S3, "webapp", "01")
-      : `gsf-${envName}-webapp-${cdk.Aws.ACCOUNT_ID}`;
-    const oacName = n
-      ? n.globalName(ResourceTypes.CLOUDFRONT, "oac", "01")
-      : `gsf-${envName}-webapp-oac`;
+    // Generate resource names (S3, CloudFront are global resources)
+    const n = createNamingHelper(naming);
+    const bucketName = n.uniqueName(ResourceTypes.S3, "webapp", "01");
+    const oacName = n.globalName(ResourceTypes.CLOUDFRONT, "oac", "01");
+    const distributionName = n.globalName(
+      ResourceTypes.CLOUDFRONT,
+      "webapp",
+      "01"
+    );
+    const certName = n.globalName(ResourceTypes.ROUTE53, "cert-webapp", "01");
 
     const isProd = envName === "prod" || envName === "prd";
-    const projectName = naming ? "AIT" : "GSF";
 
     // S3 bucket for static assets
     this.bucket = new s3.Bucket(this, "Bucket", {
@@ -67,7 +68,7 @@ export class FrontendConstruct extends Construct {
 
     // CloudFront distribution
     this.distribution = new cloudfront.Distribution(this, "Distribution", {
-      comment: `${projectName} ${envName} Webapp`,
+      comment: `AIT ${envName} Webapp`,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.bucket, {
           originAccessControl: oac,
@@ -107,12 +108,9 @@ export class FrontendConstruct extends Construct {
     });
 
     // Tags
-    if (naming) {
-      addStandardTags(this.bucket, naming.env);
-      addStandardTags(this.distribution, naming.env);
-    } else {
-      cdk.Tags.of(this.bucket).add("Environment", envName);
-      cdk.Tags.of(this.bucket).add("ManagedBy", "CDK");
-    }
+    addStandardTags(this.bucket, naming.env, bucketName);
+    addStandardTags(this.distribution, naming.env, distributionName);
+    addStandardTags(oac, naming.env, oacName);
+    addStandardTags(this.certificate, naming.env, certName);
   }
 }
