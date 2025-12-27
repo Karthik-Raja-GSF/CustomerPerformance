@@ -25,20 +25,10 @@ function getDatabaseUrl(): string {
 const databaseUrl = getDatabaseUrl();
 
 export default defineConfig({
-  earlyAccess: true,
   schema: path.join(__dirname, "prisma", "schema.prisma"),
 
   // Required for prisma migrate deploy
   datasource: {
     url: databaseUrl,
-  },
-
-  migrate: {
-    adapter: async () => {
-      const { PrismaPg } = await import("@prisma/adapter-pg");
-      const { Pool } = await import("pg");
-      const pool = new Pool({ connectionString: databaseUrl });
-      return new PrismaPg(pool);
-    },
   },
 });
