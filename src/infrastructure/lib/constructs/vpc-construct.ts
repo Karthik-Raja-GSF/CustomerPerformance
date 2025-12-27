@@ -30,6 +30,7 @@ export class VpcConstruct extends Construct {
 
     this.vpc = new ec2.Vpc(this, "Vpc", {
       vpcName,
+      ipAddresses: ec2.IpAddresses.cidr(config.cidr),
       maxAzs: config.maxAzs,
       natGateways: config.natGateways,
       subnetConfiguration: [

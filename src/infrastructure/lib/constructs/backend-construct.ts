@@ -22,7 +22,7 @@ export interface BackendConstructProps {
   envName: string;
   vpc: ec2.IVpc;
   ecrRepository: ecr.IRepository;
-  backendSecret: secretsmanager.ISecret;
+  databaseSecret: secretsmanager.ISecret;
   cognitoUserPoolId: string;
   cognitoClientId: string;
   domainName: string;
@@ -44,7 +44,7 @@ export class BackendConstruct extends Construct {
     const {
       vpc,
       ecrRepository,
-      backendSecret,
+      databaseSecret,
       cognitoUserPoolId,
       cognitoClientId,
       domainName,
@@ -126,10 +126,12 @@ export class BackendConstruct extends Construct {
         OTEL_METRICS_EXPORTER: "none",
       },
       secrets: {
-        DATABASE_URL: ecs.Secret.fromSecretsManager(
-          backendSecret,
-          "DATABASE_URL"
-        ),
+        // Pass Aurora secret fields individually - backend builds DATABASE_URL from these
+        DB_USERNAME: ecs.Secret.fromSecretsManager(databaseSecret, "username"),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(databaseSecret, "password"),
+        DB_HOST: ecs.Secret.fromSecretsManager(databaseSecret, "host"),
+        DB_PORT: ecs.Secret.fromSecretsManager(databaseSecret, "port"),
+        DB_NAME: ecs.Secret.fromSecretsManager(databaseSecret, "dbname"),
       },
       healthCheck: {
         command: [
@@ -148,8 +150,8 @@ export class BackendConstruct extends Construct {
       protocol: ecs.Protocol.TCP,
     });
 
-    // Grant read access to the secret (explicit grant for proper IAM policy)
-    backendSecret.grantRead(taskDefinition.executionRole!);
+    // Grant read access to the database secret (explicit grant for proper IAM policy)
+    databaseSecret.grantRead(taskDefinition.executionRole!);
 
     // ACM Certificate
     this.certificate = new acm.Certificate(this, "Certificate", {

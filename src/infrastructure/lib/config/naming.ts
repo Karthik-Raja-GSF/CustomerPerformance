@@ -39,6 +39,7 @@ export const ResourceTypes = {
   NAT: "nat",
   ROUTE_TABLE: "rt",
   EIP: "eip",
+  KEY_PAIR: "kp",
   ALB: "alb",
   NLB: "nlb",
   TARGET_GROUP: "tg",

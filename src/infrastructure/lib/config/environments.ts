@@ -11,6 +11,7 @@ export interface EcsConfig {
 }
 
 export interface VpcConfig {
+  cidr: string;
   natGateways: number;
   maxAzs: number;
 }
@@ -40,12 +41,13 @@ export const environments: Record<string, EnvironmentConfig> = {
       desiredCount: 1,
     },
     vpc: {
+      cidr: "10.201.0.0/16",
       natGateways: 1,
       maxAzs: 2,
     },
   },
-  prod: {
-    envName: "prod",
+  prd: {
+    envName: "prd",
     domainPrefix: "", // Configure later: '', 'prod', 'app', etc.
     baseDomain: "tratin.com",
     aurora: {
@@ -59,6 +61,7 @@ export const environments: Record<string, EnvironmentConfig> = {
       desiredCount: 2,
     },
     vpc: {
+      cidr: "10.202.0.0/16",
       natGateways: 2, // 2 NAT for HA
       maxAzs: 2,
     },

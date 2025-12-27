@@ -1,6 +1,5 @@
 import * as cdk from "aws-cdk-lib";
 import * as route53 from "aws-cdk-lib/aws-route53";
-import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import { EnvironmentConfig } from "../config/environments";
 import { NamingConfig, Environment } from "../config/naming";
@@ -11,6 +10,7 @@ import { AuthConstruct } from "../constructs/auth-construct";
 import { EcrConstruct } from "../constructs/ecr-construct";
 import { FrontendConstruct } from "../constructs/frontend-construct";
 import { BackendConstruct } from "../constructs/backend-construct";
+import { BastionConstruct } from "../constructs/bastion-construct";
 
 export interface AitStackProps extends cdk.StackProps {
   config: EnvironmentConfig;
@@ -33,7 +33,7 @@ export class AitStack extends cdk.Stack {
 
     // AIT-specific domain names (different from GSF stack)
     const aitDomainPrefix =
-      config.envName === "prod" ? "ait" : `ait-${config.envName}`;
+      config.envName === "prd" ? "ait" : `ait-${config.envName}`;
     const domains = {
       frontend: `${aitDomainPrefix}.${config.baseDomain}`, // ait-dev.tratin.com
       backend: `${aitDomainPrefix}-be.${config.baseDomain}`, // ait-dev-be.tratin.com
@@ -41,7 +41,7 @@ export class AitStack extends cdk.Stack {
 
     // Create naming config for all constructs
     // Map envName to Environment type ('dev' | 'prd')
-    const envCode: Environment = config.envName === "prod" ? "prd" : "dev";
+    const envCode: Environment = config.envName === "prd" ? "prd" : "dev";
     const naming: NamingConfig = {
       env: envCode,
       region: "ue1", // us-east-1
@@ -108,22 +108,6 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
-    // Backend Secret (create new one for AIT stack)
-    // ===================
-    const backendSecretName = `ait-${envCode}-ue1-sm-backend-01`;
-    const backendSecret = new secretsmanager.Secret(this, "BackendSecret", {
-      secretName: backendSecretName,
-      description: "Backend secrets for AIT application",
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({
-          DATABASE_URL: `postgresql://postgres:PLACEHOLDER@${databaseConstruct.cluster.clusterEndpoint.hostname}:5432/admin_panel`,
-        }),
-        generateStringKey: "TEMP_KEY",
-      },
-    });
-    addStandardTags(backendSecret, naming.env, backendSecretName);
-
-    // ===================
     // Backend (ECS Fargate + ALB)
     // ===================
     const ecsConfig = {
@@ -135,7 +119,7 @@ export class AitStack extends cdk.Stack {
       envName: config.envName,
       vpc: vpcConstruct.vpc,
       ecrRepository: ecrConstruct.repository,
-      backendSecret,
+      databaseSecret: databaseConstruct.secret,
       cognitoUserPoolId: authConstruct.userPool.userPoolId,
       cognitoClientId: authConstruct.userPoolClient.userPoolClientId,
       domainName: domains.backend,
@@ -149,6 +133,21 @@ export class AitStack extends cdk.Stack {
     databaseConstruct.allowConnectionsFrom(
       backendConstruct.getSecurityGroup(),
       "Allow Fargate to connect to Aurora"
+    );
+
+    // ===================
+    // Bastion Host (for database SSH tunnel access)
+    // ===================
+    const bastionConstruct = new BastionConstruct(this, "Bastion", {
+      envName: config.envName,
+      vpc: vpcConstruct.vpc,
+      naming,
+    });
+
+    // Allow Bastion to connect to Aurora
+    databaseConstruct.allowConnectionsFrom(
+      bastionConstruct.securityGroup,
+      "Allow Bastion SSH tunnel to Aurora"
     );
 
     // ===================
@@ -167,11 +166,6 @@ export class AitStack extends cdk.Stack {
     new cdk.CfnOutput(this, "AuroraSecretArn", {
       value: databaseConstruct.secret.secretArn,
       description: "Aurora Credentials Secret ARN",
-    });
-
-    new cdk.CfnOutput(this, "BackendSecretArn", {
-      value: backendSecret.secretArn,
-      description: "Backend Secret ARN (update with DATABASE_URL)",
     });
 
     new cdk.CfnOutput(this, "CognitoUserPoolId", {
@@ -217,6 +211,16 @@ export class AitStack extends cdk.Stack {
     new cdk.CfnOutput(this, "EcsServiceName", {
       value: backendConstruct.service.serviceName,
       description: "ECS Service Name",
+    });
+
+    new cdk.CfnOutput(this, "BastionPublicIp", {
+      value: bastionConstruct.getPublicIp(),
+      description: "Bastion Host Public IP (Elastic IP)",
+    });
+
+    new cdk.CfnOutput(this, "BastionKeyParameterName", {
+      value: bastionConstruct.getPrivateKeyParameterName(),
+      description: "SSM Parameter Store path for Bastion SSH private key",
     });
   }
 }
