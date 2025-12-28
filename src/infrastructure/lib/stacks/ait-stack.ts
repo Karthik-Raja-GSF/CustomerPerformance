@@ -1,11 +1,11 @@
 import * as cdk from "aws-cdk-lib";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import { Construct } from "constructs";
 import { EnvironmentConfig } from "../config/environments";
 import { NamingConfig, Environment } from "../config/naming";
 import { addStandardTags } from "../config/tags";
 import { VpcConstruct } from "../constructs/vpc-construct";
-import { VpcPeeringConstruct } from "../constructs/vpc-peering-construct";
 import { DatabaseConstruct } from "../constructs/database-construct";
 import { AuthConstruct } from "../constructs/auth-construct";
 import { EcrConstruct } from "../constructs/ecr-construct";
@@ -72,13 +72,33 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
-    // VPC Peering (optional)
+    // VPC Peering (imported - manually created)
     // ===================
-    if (config.vpcPeering?.enabled) {
-      new VpcPeeringConstruct(this, "VpcPeering", {
-        vpc: vpcConstruct.vpc,
-        config: config.vpcPeering,
-        naming,
+    if (config.vpcPeering?.enabled && config.vpcPeering.peeringConnectionId) {
+      // Routes will be added once peering is accepted
+      if (config.vpcPeering.accepted) {
+        // Add routes to private subnets
+        vpcConstruct.vpc.privateSubnets.forEach((subnet, i) => {
+          new ec2.CfnRoute(this, `VpcPeeringPrivateRoute${i + 1}`, {
+            routeTableId: subnet.routeTable.routeTableId,
+            destinationCidrBlock: config.vpcPeering!.peerVpcCidr,
+            vpcPeeringConnectionId: config.vpcPeering!.peeringConnectionId!,
+          });
+        });
+
+        // Add routes to isolated subnets
+        vpcConstruct.vpc.isolatedSubnets.forEach((subnet, i) => {
+          new ec2.CfnRoute(this, `VpcPeeringIsolatedRoute${i + 1}`, {
+            routeTableId: subnet.routeTable.routeTableId,
+            destinationCidrBlock: config.vpcPeering!.peerVpcCidr,
+            vpcPeeringConnectionId: config.vpcPeering!.peeringConnectionId!,
+          });
+        });
+      }
+
+      new cdk.CfnOutput(this, "VpcPeeringConnectionId", {
+        value: config.vpcPeering.peeringConnectionId,
+        description: "VPC Peering Connection ID (manually created)",
       });
     }
 

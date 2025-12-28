@@ -19,6 +19,7 @@ export interface VpcConfig {
 export interface VpcPeeringConfig {
   enabled: boolean;
   accepted: boolean; // Initially false, set to true after manual acceptance in peer account
+  peeringConnectionId?: string; // The manually-created peering connection ID (pcx-xxx)
   peerAccountId: string;
   peerVpcId: string;
   peerVpcCidr: string;
@@ -58,6 +59,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     vpcPeering: {
       enabled: true,
       accepted: false, // Set to true after peering is accepted in AWS console
+      peeringConnectionId: "pcx-0e31d0c0741877224", // ait-dev-ue1-pcx-manual-01
       peerAccountId: "453645557030",
       peerVpcId: "vpc-08f53d4e5b55a8e67",
       peerVpcCidr: "10.200.0.0/20",
