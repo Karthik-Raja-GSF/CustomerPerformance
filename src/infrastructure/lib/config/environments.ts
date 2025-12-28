@@ -16,6 +16,15 @@ export interface VpcConfig {
   maxAzs: number;
 }
 
+export interface VpcPeeringConfig {
+  enabled: boolean;
+  accepted: boolean; // Initially false, set to true after manual acceptance in peer account
+  peerAccountId: string;
+  peerVpcId: string;
+  peerVpcCidr: string;
+  peerRegion: string;
+}
+
 export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
@@ -23,6 +32,7 @@ export interface EnvironmentConfig {
   aurora: AuroraConfig;
   ecs: EcsConfig;
   vpc: VpcConfig;
+  vpcPeering?: VpcPeeringConfig;
 }
 
 export const environments: Record<string, EnvironmentConfig> = {
@@ -45,6 +55,14 @@ export const environments: Record<string, EnvironmentConfig> = {
       natGateways: 1,
       maxAzs: 2,
     },
+    vpcPeering: {
+      enabled: true,
+      accepted: false, // Set to true after peering is accepted in AWS console
+      peerAccountId: "453645557030",
+      peerVpcId: "vpc-08f53d4e5b55a8e67",
+      peerVpcCidr: "10.200.0.0/20",
+      peerRegion: "us-west-2",
+    },
   },
   prd: {
     envName: "prd",
@@ -64,6 +82,14 @@ export const environments: Record<string, EnvironmentConfig> = {
       cidr: "10.202.0.0/16",
       natGateways: 2, // 2 NAT for HA
       maxAzs: 2,
+    },
+    vpcPeering: {
+      enabled: true,
+      accepted: false, // Set to true after peering is accepted in AWS console
+      peerAccountId: "453645557030",
+      peerVpcId: "vpc-08f53d4e5b55a8e67",
+      peerVpcCidr: "10.200.0.0/20",
+      peerRegion: "us-west-2",
     },
   },
 };

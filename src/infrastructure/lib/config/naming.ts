@@ -33,6 +33,7 @@ export const ResourceTypes = {
 
   // Networking
   VPC: "vpc",
+  VPC_PEERING: "pcx",
   SUBNET: "sn",
   SECURITY_GROUP: "sg",
   IGW: "igw",

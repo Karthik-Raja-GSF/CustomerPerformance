@@ -5,6 +5,7 @@ import { EnvironmentConfig } from "../config/environments";
 import { NamingConfig, Environment } from "../config/naming";
 import { addStandardTags } from "../config/tags";
 import { VpcConstruct } from "../constructs/vpc-construct";
+import { VpcPeeringConstruct } from "../constructs/vpc-peering-construct";
 import { DatabaseConstruct } from "../constructs/database-construct";
 import { AuthConstruct } from "../constructs/auth-construct";
 import { EcrConstruct } from "../constructs/ecr-construct";
@@ -69,6 +70,17 @@ export class AitStack extends cdk.Stack {
       config: config.vpc,
       naming,
     });
+
+    // ===================
+    // VPC Peering (optional)
+    // ===================
+    if (config.vpcPeering?.enabled) {
+      new VpcPeeringConstruct(this, "VpcPeering", {
+        vpc: vpcConstruct.vpc,
+        config: config.vpcPeering,
+        naming,
+      });
+    }
 
     // ===================
     // Database (Aurora Serverless v2)
