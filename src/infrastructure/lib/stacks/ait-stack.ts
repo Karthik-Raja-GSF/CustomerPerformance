@@ -12,6 +12,7 @@ import { EcrConstruct } from "../constructs/ecr-construct";
 import { FrontendConstruct } from "../constructs/frontend-construct";
 import { BackendConstruct } from "../constructs/backend-construct";
 import { BastionConstruct } from "../constructs/bastion-construct";
+import { SecretsConstruct } from "../constructs/secrets-construct";
 
 export interface AitStackProps extends cdk.StackProps {
   config: EnvironmentConfig;
@@ -183,6 +184,14 @@ export class AitStack extends cdk.Stack {
     );
 
     // ===================
+    // External Database Secrets (DMS sources, etc.)
+    // ===================
+    const secretsConstruct = new SecretsConstruct(this, "Secrets", {
+      envName: config.envName,
+      naming,
+    });
+
+    // ===================
     // Outputs
     // ===================
     new cdk.CfnOutput(this, "VpcId", {
@@ -253,6 +262,11 @@ export class AitStack extends cdk.Stack {
     new cdk.CfnOutput(this, "BastionKeyParameterName", {
       value: bastionConstruct.getPrivateKeyParameterName(),
       description: "SSM Parameter Store path for Bastion SSH private key",
+    });
+
+    new cdk.CfnOutput(this, "Dw2SecretArn", {
+      value: secretsConstruct.dw2Secret.secretArn,
+      description: "DW2 SQL Server Credentials Secret ARN (DMS source)",
     });
   }
 }
