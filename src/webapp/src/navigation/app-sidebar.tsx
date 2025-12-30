@@ -1,18 +1,17 @@
+import * as React from "react";
+import { Settings2 } from "lucide-react";
+import { StarqIcon } from "@/components/icons/starq-icon";
 
-import * as React from "react"
-import { Settings2 } from "lucide-react"
-import { StarqIcon } from "@/components/icons/starq-icon"
-
-import { Branding } from "@/navigation/branding"
-import { NavMain } from "@/navigation/nav-main"
-import { NavUser } from "@/navigation/nav-user"
+import { Branding } from "@/navigation/branding";
+import { NavMain } from "@/navigation/nav-main";
+import { NavUser } from "@/navigation/nav-user";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/shadcn/components/sidebar"
+} from "@/shadcn/components/sidebar";
 
 // Navigation data
 const data = {
@@ -32,14 +31,15 @@ const data = {
           title: "Prompt Builder",
           url: "/settings",
         },
-        {
-          title: "SIQ Import",
-          url: "/siq-import",
-        },
+        // TODO: SIQ Import temporarily disabled
+        // {
+        //   title: "SIQ Import",
+        //   url: "/siq-import",
+        // },
       ],
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -55,5 +55,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

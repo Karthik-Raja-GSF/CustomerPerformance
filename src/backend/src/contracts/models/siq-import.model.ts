@@ -1,10 +1,9 @@
+// TODO: SIQ Import temporarily disabled - will be reformed with new architecture
+// These models matched the Prisma schema for SIQ data import
+/*
 import { ImportStatus, Prisma } from "@prisma/client";
 
 type Decimal = Prisma.Decimal;
-
-/**
- * SIQ Import Models - Internal models matching Prisma schema
- */
 
 export interface SiteModel {
   id: string;
@@ -104,3 +103,6 @@ export interface ImportLogModel {
   createdAt: Date;
   completedAt: Date | null;
 }
+*/
+
+export {};

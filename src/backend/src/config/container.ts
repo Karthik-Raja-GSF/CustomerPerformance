@@ -1,18 +1,31 @@
-import 'reflect-metadata';
-import { container } from 'tsyringe';
-import { PrismaClient } from '@prisma/client';
-import { ITokenService, TOKEN_SERVICE_TOKEN } from '@/services/ITokenService';
-import { TokenService } from '@/services/implementations/TokenService';
-import { IPromptService, PROMPT_SERVICE_TOKEN } from '@/services/IPromptService';
-import { PromptService } from '@/services/implementations/PromptService';
-import { ISiqImportService, SIQ_IMPORT_SERVICE_TOKEN } from '@/services/ISiqImportService';
-import { SiqImportService } from '@/services/implementations/SiqImportService';
-import { IBedrockService, BEDROCK_SERVICE_TOKEN } from '@/services/IBedrockService';
-import { BedrockService } from '@/services/implementations/BedrockService';
-import { IMcpClientService, MCP_CLIENT_SERVICE_TOKEN } from '@/services/IMcpClientService';
-import { McpClientService } from '@/services/implementations/McpClientService';
-import { IAssistantService, ASSISTANT_SERVICE_TOKEN } from '@/services/IAssistantService';
-import { AssistantService } from '@/services/implementations/AssistantService';
+import "reflect-metadata";
+import { container } from "tsyringe";
+import { PrismaClient } from "@prisma/client";
+import { ITokenService, TOKEN_SERVICE_TOKEN } from "@/services/ITokenService";
+import { TokenService } from "@/services/implementations/TokenService";
+import {
+  IPromptService,
+  PROMPT_SERVICE_TOKEN,
+} from "@/services/IPromptService";
+import { PromptService } from "@/services/implementations/PromptService";
+// TODO: SIQ Import temporarily disabled - will be reformed with new architecture
+// import { ISiqImportService, SIQ_IMPORT_SERVICE_TOKEN } from '@/services/ISiqImportService';
+// import { SiqImportService } from '@/services/implementations/SiqImportService';
+import {
+  IBedrockService,
+  BEDROCK_SERVICE_TOKEN,
+} from "@/services/IBedrockService";
+import { BedrockService } from "@/services/implementations/BedrockService";
+import {
+  IMcpClientService,
+  MCP_CLIENT_SERVICE_TOKEN,
+} from "@/services/IMcpClientService";
+import { McpClientService } from "@/services/implementations/McpClientService";
+import {
+  IAssistantService,
+  ASSISTANT_SERVICE_TOKEN,
+} from "@/services/IAssistantService";
+import { AssistantService } from "@/services/implementations/AssistantService";
 
 /**
  * DI Container Configuration
@@ -30,7 +43,7 @@ import { AssistantService } from '@/services/implementations/AssistantService';
 export function setupContainer(prisma: PrismaClient): void {
   // Register PrismaClient as a singleton
   // All repositories will receive the same Prisma instance
-  container.register<PrismaClient>('PrismaClient', {
+  container.register<PrismaClient>("PrismaClient", {
     useValue: prisma,
   });
 
@@ -44,10 +57,10 @@ export function setupContainer(prisma: PrismaClient): void {
     useClass: PromptService,
   });
 
-  // Register SiqImportService for SIQ data import
-  container.register<ISiqImportService>(SIQ_IMPORT_SERVICE_TOKEN, {
-    useClass: SiqImportService,
-  });
+  // TODO: SIQ Import temporarily disabled - will be reformed with new architecture
+  // container.register<ISiqImportService>(SIQ_IMPORT_SERVICE_TOKEN, {
+  //   useClass: SiqImportService,
+  // });
 
   // Register BedrockService for AWS Bedrock LLM invocation
   container.register<IBedrockService>(BEDROCK_SERVICE_TOKEN, {
@@ -55,7 +68,10 @@ export function setupContainer(prisma: PrismaClient): void {
   });
 
   // Register McpClientService as singleton for PostgreSQL MCP access
-  container.registerSingleton<IMcpClientService>(MCP_CLIENT_SERVICE_TOKEN, McpClientService);
+  container.registerSingleton<IMcpClientService>(
+    MCP_CLIENT_SERVICE_TOKEN,
+    McpClientService
+  );
 
   // Register AssistantService for AI assistant functionality
   container.register<IAssistantService>(ASSISTANT_SERVICE_TOKEN, {

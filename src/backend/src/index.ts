@@ -14,7 +14,8 @@ import { setupContainer } from "./config/container";
 import { errorHandler } from "./middleware/error-handler";
 import { telemetryMiddleware } from "./middleware/telemetry";
 import promptsRouter from "./routes/prompts";
-import siqImportRouter from "./routes/siq-import";
+// TODO: SIQ Import temporarily disabled - will be reformed with new architecture
+// import siqImportRouter from "./routes/siq-import";
 import assistantRouter from "./routes/assistant";
 
 const serverLogger = createChildLogger("server");
@@ -85,7 +86,8 @@ class Server {
 
     // Register routes
     this.app.use("/prompts", promptsRouter);
-    this.app.use("/siq-import", siqImportRouter);
+    // TODO: SIQ Import temporarily disabled - will be reformed with new architecture
+    // this.app.use("/siq-import", siqImportRouter);
     this.app.use("/assistant", assistantRouter);
   }
 

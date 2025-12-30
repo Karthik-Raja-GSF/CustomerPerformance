@@ -1,5 +1,9 @@
 import path from "node:path";
+import dotenv from "dotenv";
 import { defineConfig } from "prisma/config";
+
+// Load .env file for Prisma CLI operations
+dotenv.config();
 
 // Build DATABASE_URL from components if not provided directly
 // This matches the logic in src/config/index.ts for Aurora Serverless compatibility
@@ -12,7 +16,7 @@ function getDatabaseUrl(): string {
   const password = process.env.DB_PASSWORD;
   const host = process.env.DB_HOST;
   const port = process.env.DB_PORT || "5432";
-  const dbname = process.env.DB_NAME || "admin_panel";
+  const dbname = process.env.DB_NAME || "ait_db";
 
   if (username && password && host) {
     return `postgresql://${username}:${encodeURIComponent(password)}@${host}:${port}/${dbname}`;
