@@ -48,7 +48,7 @@ export class DatabaseConstruct extends Construct {
         version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
       clusterIdentifier: clusterName,
-      defaultDatabaseName: "ait_procurement",
+      defaultDatabaseName: "admin_panel",
       credentials: rds.Credentials.fromGeneratedSecret("postgres", {
         secretName: secretName,
       }),
