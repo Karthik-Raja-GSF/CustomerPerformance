@@ -13,6 +13,7 @@ import { FrontendConstruct } from "../constructs/frontend-construct";
 import { BackendConstruct } from "../constructs/backend-construct";
 import { BastionConstruct } from "../constructs/bastion-construct";
 import { SecretsConstruct } from "../constructs/secrets-construct";
+import { DmsConstruct } from "../constructs/dms-construct";
 
 export interface AitStackProps extends cdk.StackProps {
   config: EnvironmentConfig;
@@ -78,18 +79,18 @@ export class AitStack extends cdk.Stack {
     if (config.vpcPeering?.enabled && config.vpcPeering.peeringConnectionId) {
       // Routes will be added once peering is accepted
       if (config.vpcPeering.accepted) {
-        // Add routes to private subnets
-        vpcConstruct.vpc.privateSubnets.forEach((subnet, i) => {
-          new ec2.CfnRoute(this, `VpcPeeringPrivateRoute${i + 1}`, {
+        // Add routes to isolated subnets (for DMS access to Aurora)
+        vpcConstruct.vpc.isolatedSubnets.forEach((subnet, i) => {
+          new ec2.CfnRoute(this, `VpcPeeringIsolatedRoute${i + 1}`, {
             routeTableId: subnet.routeTable.routeTableId,
             destinationCidrBlock: config.vpcPeering!.peerVpcCidr,
             vpcPeeringConnectionId: config.vpcPeering!.peeringConnectionId!,
           });
         });
 
-        // Add routes to isolated subnets
-        vpcConstruct.vpc.isolatedSubnets.forEach((subnet, i) => {
-          new ec2.CfnRoute(this, `VpcPeeringIsolatedRoute${i + 1}`, {
+        // Add routes to private subnets (for DMS replication instance access to peer VPC)
+        vpcConstruct.vpc.privateSubnets.forEach((subnet, i) => {
+          new ec2.CfnRoute(this, `VpcPeeringPrivateRoute${i + 1}`, {
             routeTableId: subnet.routeTable.routeTableId,
             destinationCidrBlock: config.vpcPeering!.peerVpcCidr,
             vpcPeeringConnectionId: config.vpcPeering!.peeringConnectionId!,
@@ -112,6 +113,15 @@ export class AitStack extends cdk.Stack {
       config: config.aurora,
       naming,
     });
+
+    // Allow DMS from peer VPC to connect to Aurora (via VPC peering)
+    if (config.vpcPeering?.enabled && config.vpcPeering.accepted) {
+      databaseConstruct.securityGroup.addIngressRule(
+        ec2.Peer.ipv4(config.vpcPeering.peerVpcCidr),
+        ec2.Port.tcp(5432),
+        `Allow DMS from peer VPC (${config.vpcPeering.peerVpcCidr})`
+      );
+    }
 
     // ===================
     // Auth (Cognito)
@@ -192,6 +202,27 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
+    // DMS (Database Migration Service)
+    // ===================
+    let dmsConstruct: DmsConstruct | undefined;
+    if (
+      config.dms &&
+      config.vpcPeering?.enabled &&
+      config.vpcPeering.accepted
+    ) {
+      dmsConstruct = new DmsConstruct(this, "Dms", {
+        envName: config.envName,
+        vpc: vpcConstruct.vpc,
+        naming,
+        config: config.dms,
+        sourceSecret: secretsConstruct.dw2Secret,
+        auroraCluster: databaseConstruct.cluster,
+        auroraSecret: databaseConstruct.secret,
+        auroraSecurityGroup: databaseConstruct.securityGroup,
+      });
+    }
+
+    // ===================
     // Outputs
     // ===================
     new cdk.CfnOutput(this, "VpcId", {
@@ -268,5 +299,23 @@ export class AitStack extends cdk.Stack {
       value: secretsConstruct.dw2Secret.secretArn,
       description: "DW2 SQL Server Credentials Secret ARN (DMS source)",
     });
+
+    // DMS Outputs
+    if (dmsConstruct) {
+      new cdk.CfnOutput(this, "DmsReplicationInstanceArn", {
+        value: dmsConstruct.replicationInstance.ref,
+        description: "DMS Replication Instance ARN",
+      });
+
+      new cdk.CfnOutput(this, "DmsSourceEndpointArn", {
+        value: dmsConstruct.sourceEndpoint.ref,
+        description: "DMS Source Endpoint ARN (DW2 SQL Server)",
+      });
+
+      new cdk.CfnOutput(this, "DmsTargetEndpointArn", {
+        value: dmsConstruct.targetEndpoint.ref,
+        description: "DMS Target Endpoint ARN (Aurora PostgreSQL)",
+      });
+    }
   }
 }

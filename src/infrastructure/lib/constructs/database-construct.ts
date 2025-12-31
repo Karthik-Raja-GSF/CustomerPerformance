@@ -48,7 +48,7 @@ export class DatabaseConstruct extends Construct {
         version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
       clusterIdentifier: clusterName,
-      defaultDatabaseName: "admin_panel",
+      defaultDatabaseName: "ait_procurement",
       credentials: rds.Credentials.fromGeneratedSecret("postgres", {
         secretName: secretName,
       }),
@@ -106,6 +106,6 @@ export class DatabaseConstruct extends Construct {
    */
   public getDatabaseUrl(): string {
     // This will be used in ECS task definition with secretsmanager reference
-    return `postgresql://\${username}:\${password}@${this.cluster.clusterEndpoint.hostname}:${this.cluster.clusterEndpoint.port}/admin_panel`;
+    return `postgresql://\${username}:\${password}@${this.cluster.clusterEndpoint.hostname}:${this.cluster.clusterEndpoint.port}/ait_procurement`;
   }
 }

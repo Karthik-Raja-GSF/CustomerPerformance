@@ -26,6 +26,13 @@ export interface VpcPeeringConfig {
   peerRegion: string;
 }
 
+export interface DmsConfig {
+  instanceClass: string; // e.g., "dms.t3.large"
+  allocatedStorage: number; // GB
+  multiAz: boolean;
+  publiclyAccessible: boolean;
+}
+
 export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
@@ -34,6 +41,7 @@ export interface EnvironmentConfig {
   ecs: EcsConfig;
   vpc: VpcConfig;
   vpcPeering?: VpcPeeringConfig;
+  dms?: DmsConfig;
 }
 
 export const environments: Record<string, EnvironmentConfig> = {
@@ -58,12 +66,18 @@ export const environments: Record<string, EnvironmentConfig> = {
     },
     vpcPeering: {
       enabled: true,
-      accepted: false, // Set to true after peering is accepted in AWS console
+      accepted: true, // Set to true after peering is accepted in AWS console
       peeringConnectionId: "pcx-0e31d0c0741877224", // ait-dev-ue1-pcx-manual-01
       peerAccountId: "453645557030",
       peerVpcId: "vpc-08f53d4e5b55a8e67",
       peerVpcCidr: "10.200.0.0/20",
       peerRegion: "us-west-2",
+    },
+    dms: {
+      instanceClass: "dms.t3.large",
+      allocatedStorage: 50,
+      multiAz: false,
+      publiclyAccessible: false,
     },
   },
   prd: {
@@ -92,6 +106,12 @@ export const environments: Record<string, EnvironmentConfig> = {
       peerVpcId: "vpc-08f53d4e5b55a8e67",
       peerVpcCidr: "10.200.0.0/20",
       peerRegion: "us-west-2",
+    },
+    dms: {
+      instanceClass: "dms.t3.large",
+      allocatedStorage: 100,
+      multiAz: true,
+      publiclyAccessible: false,
     },
   },
 };
