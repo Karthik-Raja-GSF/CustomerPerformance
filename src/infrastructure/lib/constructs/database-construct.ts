@@ -22,11 +22,15 @@ export class DatabaseConstruct extends Construct {
   public readonly cluster: rds.DatabaseCluster;
   public readonly secret: secretsmanager.ISecret;
   public readonly securityGroup: ec2.SecurityGroup;
+  public readonly databaseName: string;
 
   constructor(scope: Construct, id: string, props: DatabaseConstructProps) {
     super(scope, id);
 
     const { envName, vpc, config, naming } = props;
+
+    // Store database name for later use
+    this.databaseName = config.databaseName;
 
     // Generate resource names
     const n = createNamingHelper(naming);
@@ -48,7 +52,7 @@ export class DatabaseConstruct extends Construct {
         version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
       clusterIdentifier: clusterName,
-      defaultDatabaseName: "admin_panel",
+      defaultDatabaseName: config.databaseName,
       credentials: rds.Credentials.fromGeneratedSecret("postgres", {
         secretName: secretName,
       }),
@@ -106,6 +110,6 @@ export class DatabaseConstruct extends Construct {
    */
   public getDatabaseUrl(): string {
     // This will be used in ECS task definition with secretsmanager reference
-    return `postgresql://\${username}:\${password}@${this.cluster.clusterEndpoint.hostname}:${this.cluster.clusterEndpoint.port}/ait_procurement`;
+    return `postgresql://\${username}:\${password}@${this.cluster.clusterEndpoint.hostname}:${this.cluster.clusterEndpoint.port}/${this.databaseName}`;
   }
 }

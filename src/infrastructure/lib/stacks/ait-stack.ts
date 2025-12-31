@@ -219,6 +219,7 @@ export class AitStack extends cdk.Stack {
         auroraCluster: databaseConstruct.cluster,
         auroraSecret: databaseConstruct.secret,
         auroraSecurityGroup: databaseConstruct.securityGroup,
+        targetDatabaseName: config.aurora.databaseName,
       });
     }
 

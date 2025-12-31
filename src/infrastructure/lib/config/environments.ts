@@ -2,6 +2,7 @@ export interface AuroraConfig {
   minCapacity: number; // ACU (0.5 - 128)
   maxCapacity: number; // ACU
   deletionProtection: boolean;
+  databaseName: string; // Database name created in the cluster
 }
 
 export interface EcsConfig {
@@ -53,6 +54,7 @@ export const environments: Record<string, EnvironmentConfig> = {
       minCapacity: 0.5, // Min 0.5 ACU (~$0.06/hour when active)
       maxCapacity: 2, // Max 2 ACU
       deletionProtection: false,
+      databaseName: "admin_panel", // Existing cluster - can't change CDK property but we manually updated to "ait_procurement"
     },
     ecs: {
       cpu: 512, // 0.5 vCPU
@@ -88,6 +90,7 @@ export const environments: Record<string, EnvironmentConfig> = {
       minCapacity: 0.5, // Scales to 0.5 at idle
       maxCapacity: 8, // Max 8 ACU for load
       deletionProtection: true,
+      databaseName: "ait_procurement", // New cluster - use correct name
     },
     ecs: {
       cpu: 1024, // 1 vCPU

@@ -26,6 +26,7 @@ export interface DmsConstructProps {
   auroraCluster: rds.IDatabaseCluster;
   auroraSecret: secretsmanager.ISecret;
   auroraSecurityGroup: ec2.ISecurityGroup;
+  targetDatabaseName: string; // Database name in Aurora to replicate to
 }
 
 /**
@@ -50,6 +51,7 @@ export class DmsConstruct extends Construct {
       auroraCluster,
       auroraSecret,
       auroraSecurityGroup,
+      targetDatabaseName,
     } = props;
 
     // Generate resource names
@@ -161,7 +163,7 @@ export class DmsConstruct extends Construct {
 
       serverName: auroraCluster.clusterEndpoint.hostname,
       port: auroraCluster.clusterEndpoint.port,
-      databaseName: "ait_procurement",
+      databaseName: targetDatabaseName,
       username: "postgres",
       password: cdk.SecretValue.secretsManager(auroraSecret.secretArn, {
         jsonField: "password",
