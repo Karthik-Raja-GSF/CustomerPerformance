@@ -141,11 +141,17 @@ export class DmsConstruct extends Construct {
       endpointType: "source",
       engineName: "sqlserver",
 
-      // Connection info from DW2 secret
-      serverName: "10.200.6.172",
-      port: 1433,
-      databaseName: "DW2",
-      username: "SysAI",
+      // All connection info from DW2 secret
+      serverName: cdk.SecretValue.secretsManager(sourceSecret.secretArn, {
+        jsonField: "host",
+      }).unsafeUnwrap(),
+      port: 1433, // Standard SQL Server port
+      databaseName: cdk.SecretValue.secretsManager(sourceSecret.secretArn, {
+        jsonField: "database",
+      }).unsafeUnwrap(),
+      username: cdk.SecretValue.secretsManager(sourceSecret.secretArn, {
+        jsonField: "username",
+      }).unsafeUnwrap(),
       password: cdk.SecretValue.secretsManager(sourceSecret.secretArn, {
         jsonField: "password",
       }).unsafeUnwrap(),
@@ -164,7 +170,9 @@ export class DmsConstruct extends Construct {
       serverName: auroraCluster.clusterEndpoint.hostname,
       port: auroraCluster.clusterEndpoint.port,
       databaseName: targetDatabaseName,
-      username: "postgres",
+      username: cdk.SecretValue.secretsManager(auroraSecret.secretArn, {
+        jsonField: "username",
+      }).unsafeUnwrap(),
       password: cdk.SecretValue.secretsManager(auroraSecret.secretArn, {
         jsonField: "password",
       }).unsafeUnwrap(),

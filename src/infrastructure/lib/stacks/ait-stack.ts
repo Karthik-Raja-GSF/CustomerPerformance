@@ -301,6 +301,11 @@ export class AitStack extends cdk.Stack {
       description: "DW2 SQL Server Credentials Secret ARN (DMS source)",
     });
 
+    new cdk.CfnOutput(this, "SiqSecretArn", {
+      value: secretsConstruct.siqSecret.secretArn,
+      description: "Stock IQ API Credentials Secret ARN",
+    });
+
     // DMS Outputs
     if (dmsConstruct) {
       new cdk.CfnOutput(this, "DmsReplicationInstanceArn", {

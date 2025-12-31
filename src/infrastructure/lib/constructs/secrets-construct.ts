@@ -19,6 +19,7 @@ export interface SecretsConstructProps {
  */
 export class SecretsConstruct extends Construct {
   public readonly dw2Secret: secretsmanager.Secret;
+  public readonly siqSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: SecretsConstructProps) {
     super(scope, id);
@@ -47,5 +48,23 @@ export class SecretsConstruct extends Construct {
 
     // Tags
     addStandardTags(this.dw2Secret, naming.env, dw2SecretName);
+
+    // Stock IQ API secret (basic auth)
+    // Username and password are placeholders - update manually after deployment
+    const siqSecretName = n.name(ResourceTypes.SECRETS_MANAGER, "siq", "01");
+    this.siqSecret = new secretsmanager.Secret(this, "SiqSecret", {
+      secretName: siqSecretName,
+      description: `${envName.toUpperCase()} - Stock IQ API credentials`,
+      secretObjectValue: {
+        username: cdk.SecretValue.unsafePlainText(
+          "PLACEHOLDER_UPDATE_MANUALLY"
+        ),
+        password: cdk.SecretValue.unsafePlainText(
+          "PLACEHOLDER_UPDATE_MANUALLY"
+        ),
+      },
+    });
+
+    addStandardTags(this.siqSecret, naming.env, siqSecretName);
   }
 }
