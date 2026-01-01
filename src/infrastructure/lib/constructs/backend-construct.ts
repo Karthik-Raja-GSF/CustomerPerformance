@@ -121,9 +121,10 @@ export class BackendConstruct extends Construct {
         AWS_REGION: cdk.Aws.REGION,
         AWS_COGNITO_USER_POOL_ID: cognitoUserPoolId,
         AWS_COGNITO_CLIENT_ID: cognitoClientId,
+        // OpenTelemetry config - sends to ADOT Collector sidecar
         OTEL_SERVICE_NAME: otelServiceName,
-        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
-        OTEL_METRICS_EXPORTER: "none",
+        OTEL_SERVICE_VERSION: "1.0.0",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317",
       },
       secrets: {
         // Pass Aurora secret fields individually - backend builds DATABASE_URL from these
@@ -149,6 +150,68 @@ export class BackendConstruct extends Construct {
       containerPort: 8887,
       protocol: ecs.Protocol.TCP,
     });
+
+    // ADOT Collector Sidecar for OpenTelemetry export to AWS
+    const otelCollector = taskDefinition.addContainer("otel-collector", {
+      image: ecs.ContainerImage.fromRegistry(
+        "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+      ),
+      containerName: `${containerName}-otel`,
+      essential: false, // Allow task to continue if collector fails
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: "otel-collector",
+        logGroup,
+      }),
+      environment: {
+        AWS_REGION: cdk.Aws.REGION,
+        ENVIRONMENT: naming.env,
+        OTEL_SERVICE_NAME: otelServiceName,
+      },
+      command: ["--config=/etc/ecs/ecs-default-config.yaml"],
+      cpu: 256,
+      memoryLimitMiB: 512,
+      // Health check on ADOT's health_check extension endpoint (port 13133)
+      healthCheck: {
+        command: [
+          "CMD-SHELL",
+          "curl -f http://localhost:13133/health || exit 1",
+        ],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3,
+        startPeriod: cdk.Duration.seconds(30),
+      },
+    });
+
+    otelCollector.addPortMappings(
+      { containerPort: 4317, protocol: ecs.Protocol.TCP }, // gRPC
+      { containerPort: 4318, protocol: ecs.Protocol.TCP }, // HTTP
+      { containerPort: 13133, protocol: ecs.Protocol.TCP } // Health check
+    );
+
+    // Grant ADOT Collector permissions for X-Ray, CloudWatch Logs, and CloudWatch Metrics
+    taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          // X-Ray permissions
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+          "xray:GetSamplingStatisticSummaries",
+          // CloudWatch Logs permissions
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          // CloudWatch Metrics permissions
+          "cloudwatch:PutMetricData",
+        ],
+        resources: ["*"],
+      })
+    );
 
     // Grant read access to the database secret (explicit grant for proper IAM policy)
     databaseSecret.grantRead(taskDefinition.executionRole!);

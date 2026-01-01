@@ -1,4 +1,6 @@
-// ADOT auto-instrumentation is loaded via --require flag in package.json scripts
+// OpenTelemetry instrumentation MUST be imported first, before any other imports
+import "./telemetry/instrumentation";
+
 import { createChildLogger } from "./telemetry/logger";
 
 import "reflect-metadata"; // Must be imported for DI to work
