@@ -22,12 +22,11 @@ processors:
     send_batch_size: 1024
     send_batch_max_size: 2048
 
-  # Resource detection for ECS metadata
+  # Resource detection for ECS metadata (no ec2 detector - not available in Fargate)
   resourcedetection:
     detectors:
       - env
       - ecs
-      - ec2
     timeout: 5s
     override: false
 

@@ -9,7 +9,10 @@ import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
+import * as fs from "fs";
+import * as path from "path";
 import { EcsConfig } from "../config/environments";
 import {
   NamingConfig,
@@ -69,6 +72,25 @@ export class BackendConstruct extends Construct {
     const certName = n.name(ResourceTypes.ROUTE53, "cert-backend", "01");
     const httpsListenerName = n.name(ResourceTypes.ALB, "https-listener", "01");
     const httpListenerName = n.name(ResourceTypes.ALB, "http-listener", "01");
+
+    // Read OTEL collector config from infrastructure config directory
+    const otelConfigPath = path.join(
+      __dirname,
+      "../config/otel-collector-config.yaml"
+    );
+    const otelConfigContent = fs.readFileSync(otelConfigPath, "utf-8");
+
+    // Store OTEL config in SSM Parameter Store (ADOT reads from AOT_CONFIG_CONTENT)
+    const otelConfigParam = new ssm.StringParameter(
+      this,
+      "OtelCollectorConfig",
+      {
+        parameterName: `/ait/${naming.env}/otel-collector-config`,
+        stringValue: otelConfigContent,
+        description: `ADOT Collector configuration for AIT ${naming.env} backend`,
+        tier: ssm.ParameterTier.ADVANCED, // Required for configs > 4KB
+      }
+    );
 
     // ECS Cluster
     this.cluster = new ecs.Cluster(this, "Cluster", {
@@ -167,14 +189,17 @@ export class BackendConstruct extends Construct {
         ENVIRONMENT: naming.env,
         OTEL_SERVICE_NAME: otelServiceName,
       },
-      command: ["--config=/etc/ecs/ecs-default-config.yaml"],
+      secrets: {
+        // Load config from SSM - ADOT reads from AOT_CONFIG_CONTENT automatically
+        AOT_CONFIG_CONTENT: ecs.Secret.fromSsmParameter(otelConfigParam),
+      },
       cpu: 256,
       memoryLimitMiB: 512,
       // Health check on ADOT's health_check extension endpoint (port 13133)
       healthCheck: {
         command: [
           "CMD-SHELL",
-          "curl -f http://localhost:13133/health || exit 1",
+          "wget -q --spider http://localhost:13133/health || exit 1",
         ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
@@ -188,6 +213,9 @@ export class BackendConstruct extends Construct {
       { containerPort: 4318, protocol: ecs.Protocol.TCP }, // HTTP
       { containerPort: 13133, protocol: ecs.Protocol.TCP } // Health check
     );
+
+    // Grant execution role permission to read SSM parameter for OTEL config
+    otelConfigParam.grantRead(taskDefinition.executionRole!);
 
     // Grant ADOT Collector permissions for X-Ray, CloudWatch Logs, and CloudWatch Metrics
     taskDefinition.taskRole.addToPrincipalPolicy(
