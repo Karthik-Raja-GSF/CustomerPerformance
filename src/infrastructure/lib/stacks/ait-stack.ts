@@ -14,6 +14,7 @@ import { BackendConstruct } from "../constructs/backend-construct";
 import { BastionConstruct } from "../constructs/bastion-construct";
 import { SecretsConstruct } from "../constructs/secrets-construct";
 import { DmsConstruct } from "../constructs/dms-construct";
+import { DashboardConstruct } from "../constructs/dashboard-construct";
 
 export interface AitStackProps extends cdk.StackProps {
   config: EnvironmentConfig;
@@ -224,6 +225,13 @@ export class AitStack extends cdk.Stack {
     }
 
     // ===================
+    // CloudWatch Dashboard
+    // ===================
+    const dashboardConstruct = new DashboardConstruct(this, "Dashboard", {
+      naming,
+    });
+
+    // ===================
     // Outputs
     // ===================
     new cdk.CfnOutput(this, "VpcId", {
@@ -323,5 +331,10 @@ export class AitStack extends cdk.Stack {
         description: "DMS Target Endpoint ARN (Aurora PostgreSQL)",
       });
     }
+
+    new cdk.CfnOutput(this, "DashboardUrl", {
+      value: `https://${cdk.Aws.REGION}.console.aws.amazon.com/cloudwatch/home?region=${cdk.Aws.REGION}#dashboards:name=${dashboardConstruct.dashboard.dashboardName}`,
+      description: "CloudWatch Dashboard URL",
+    });
   }
 }
