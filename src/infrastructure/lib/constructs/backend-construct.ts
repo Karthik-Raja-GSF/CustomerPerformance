@@ -195,16 +195,13 @@ export class BackendConstruct extends Construct {
       },
       cpu: 256,
       memoryLimitMiB: 512,
-      // Health check on ADOT's health_check extension endpoint (port 13133)
+      // Health check using ADOT's built-in healthcheck binary
       healthCheck: {
-        command: [
-          "CMD-SHELL",
-          "wget -q --spider http://localhost:13133/health || exit 1",
-        ],
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(5),
-        retries: 3,
-        startPeriod: cdk.Duration.seconds(30),
+        command: ["CMD", "/healthcheck"],
+        interval: cdk.Duration.seconds(5),
+        timeout: cdk.Duration.seconds(3),
+        retries: 2,
+        startPeriod: cdk.Duration.seconds(5),
       },
     });
 
