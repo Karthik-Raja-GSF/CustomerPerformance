@@ -16,7 +16,7 @@ export interface DashboardConstructProps {
  * CloudWatch Dashboard for AIT Backend Metrics
  *
  * Displays OpenTelemetry metrics exported via ADOT Collector to CloudWatch EMF.
- * Organized into 4 sections: HTTP, Bedrock/LLM, Database, and Assistant.
+ * Organized into 3 sections: HTTP, Bedrock/LLM, and Assistant.
  */
 export class DashboardConstruct extends Construct {
   public readonly dashboard: cloudwatch.Dashboard;
@@ -141,6 +141,95 @@ export class DashboardConstruct extends Construct {
     );
 
     // ===================
+    // Database Metrics Section
+    // ===================
+    this.dashboard.addWidgets(
+      new cloudwatch.TextWidget({
+        markdown: "# Database Metrics",
+        width: 24,
+        height: 1,
+      })
+    );
+
+    this.dashboard.addWidgets(
+      // Query Rate
+      new cloudwatch.GraphWidget({
+        title: "Query Rate",
+        width: 12,
+        height: 6,
+        left: [
+          createMetric("db.query.total", {
+            statistic: "Sum",
+            label: "Queries/min",
+          }),
+        ],
+        leftYAxis: { label: "Queries", showUnits: false },
+      }),
+
+      // Query Duration (percentiles)
+      new cloudwatch.GraphWidget({
+        title: "Query Duration",
+        width: 12,
+        height: 6,
+        left: [
+          createMetric("db.query.duration", {
+            statistic: "p50",
+            label: "p50",
+          }),
+          createMetric("db.query.duration", {
+            statistic: "p90",
+            label: "p90",
+          }),
+          createMetric("db.query.duration", {
+            statistic: "p99",
+            label: "p99",
+          }),
+        ],
+        leftYAxis: { label: "Duration (ms)", showUnits: false },
+      })
+    );
+
+    this.dashboard.addWidgets(
+      // Connection Pool Size
+      new cloudwatch.SingleValueWidget({
+        title: "Connection Pool Size",
+        width: 12,
+        height: 6,
+        metrics: [
+          createMetric("db.connection_pool.size", {
+            statistic: "Average",
+            label: "Pool Size",
+          }),
+        ],
+      }),
+
+      // Query Duration by Operation
+      new cloudwatch.GraphWidget({
+        title: "Query Duration by Operation",
+        width: 12,
+        height: 6,
+        left: [
+          createMetric("db.query.duration", {
+            statistic: "p90",
+            dimensions: { "db.operation.name": "SELECT" },
+            label: "SELECT p90",
+          }),
+          createMetric("db.query.duration", {
+            statistic: "p90",
+            dimensions: { "db.operation.name": "INSERT" },
+            label: "INSERT p90",
+          }),
+          createMetric("db.query.duration", {
+            statistic: "p90",
+            dimensions: { "db.operation.name": "UPDATE" },
+            label: "UPDATE p90",
+          }),
+        ],
+        leftYAxis: { label: "Duration (ms)", showUnits: false },
+      })
+    );
+
+    // ===================
     // Bedrock/LLM Metrics Section
     // ===================
     this.dashboard.addWidgets(
@@ -225,77 +314,6 @@ export class DashboardConstruct extends Construct {
           }),
         ],
         leftYAxis: { label: "Errors", showUnits: false },
-      })
-    );
-
-    // ===================
-    // Database Metrics Section
-    // ===================
-    this.dashboard.addWidgets(
-      new cloudwatch.TextWidget({
-        markdown: "# Database Metrics",
-        width: 24,
-        height: 1,
-      })
-    );
-
-    this.dashboard.addWidgets(
-      // DB Query Rate
-      new cloudwatch.GraphWidget({
-        title: "Query Rate",
-        width: 12,
-        height: 6,
-        left: [
-          createMetric("db.query.total", {
-            statistic: "Sum",
-            label: "Queries/min",
-          }),
-        ],
-        leftYAxis: { label: "Queries", showUnits: false },
-      }),
-
-      // DB Query Duration
-      new cloudwatch.GraphWidget({
-        title: "Query Duration",
-        width: 12,
-        height: 6,
-        left: [
-          createMetric("db.query.duration", {
-            statistic: "p50",
-            label: "p50",
-          }),
-          createMetric("db.query.duration", {
-            statistic: "p90",
-            label: "p90",
-          }),
-          createMetric("db.query.duration", {
-            statistic: "p99",
-            label: "p99",
-          }),
-        ],
-        leftYAxis: { label: "Duration (ms)", showUnits: false },
-      })
-    );
-
-    this.dashboard.addWidgets(
-      // Connection Pool Size
-      new cloudwatch.SingleValueWidget({
-        title: "Connection Pool Size",
-        width: 12,
-        height: 6,
-        metrics: [
-          createMetric("db.connection_pool.size", {
-            statistic: "Average",
-            label: "Pool Size",
-          }),
-        ],
-      }),
-
-      // Empty placeholder for alignment
-      new cloudwatch.TextWidget({
-        markdown: "",
-        width: 12,
-        height: 6,
       })
     );
 

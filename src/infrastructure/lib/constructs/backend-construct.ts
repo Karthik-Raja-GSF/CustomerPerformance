@@ -132,10 +132,6 @@ export class BackendConstruct extends Construct {
     const container = taskDefinition.addContainer("backend", {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, "latest"),
       containerName,
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: "backend",
-        logGroup,
-      }),
       environment: {
         PORT: "8887",
         NODE_ENV: "production",
@@ -176,7 +172,7 @@ export class BackendConstruct extends Construct {
     // ADOT Collector Sidecar for OpenTelemetry export to AWS
     const otelCollector = taskDefinition.addContainer("otel-collector", {
       image: ecs.ContainerImage.fromRegistry(
-        "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+        "public.ecr.aws/aws-observability/aws-otel-collector:v0.40.0"
       ),
       containerName: `${containerName}-otel`,
       essential: false, // Allow task to continue if collector fails

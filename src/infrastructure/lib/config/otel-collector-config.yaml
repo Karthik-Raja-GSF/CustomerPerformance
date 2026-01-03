@@ -48,26 +48,23 @@ exporters:
     namespace: AIT/Backend
     log_group_name: /ait/${env:ENVIRONMENT}/backend/metrics
     log_stream_name: otel-metrics
+    output_destination: cloudwatch
     dimension_rollup_option: NoDimensionRollup
     resource_to_telemetry_conversion:
       enabled: true
     metric_declarations:
-      # HTTP metrics (auto-instrumentation + custom)
+      # HTTP metrics - use regex to match histogram variants
       - dimensions:
           - - service.name
           - - service.name
-            - http.method
+            - method
           - - service.name
-            - http.method
-            - http.route
-            - http.status_code
+            - method
+            - route
+            - status_code
         metric_name_selectors:
-          - "http.server.duration"
-          - "http.server.request.duration"
-          - "http.server.requests.total"
-          - "http.server.errors.total"
-          - "http.server.active_connections"
-      # Database metrics (auto-instrumentation + custom)
+          - "^http\\.server\\..*"
+      # Database metrics - use regex to match all db.* metrics
       - dimensions:
           - - service.name
           - - service.name
@@ -76,30 +73,19 @@ exporters:
             - db.system
             - db.operation.name
         metric_name_selectors:
-          - "db.client.operation.duration"
-          - "db.client.connection.count"
-          - "db.client.connection.pending_requests"
-          - "db.query.duration"
-          - "db.query.total"
-          - "db.connection_pool.size"
+          - "^db\\..*"
       # Bedrock/LLM metrics
       - dimensions:
           - - service.name
           - - service.name
             - bedrock.model
         metric_name_selectors:
-          - "bedrock.invocations.total"
-          - "bedrock.latency"
-          - "bedrock.tokens.input"
-          - "bedrock.tokens.output"
-          - "bedrock.errors.total"
+          - "^bedrock\\..*"
       # Assistant metrics
       - dimensions:
           - - service.name
         metric_name_selectors:
-          - "assistant.chat.requests.total"
-          - "assistant.chat.stream_events.total"
-          - "assistant.sql_generation.duration"
+          - "^assistant\\..*"
 
   # AWS CloudWatch Logs for application logs
   awscloudwatchlogs:
@@ -108,11 +94,11 @@ exporters:
     log_stream_name: ${env:OTEL_SERVICE_NAME}
     log_retention: 30
 
-  # Debug exporter for troubleshooting (optional, low verbosity)
-  debug:
-    verbosity: basic
-    sampling_initial: 5
-    sampling_thereafter: 200
+  # Logging exporter for troubleshooting (ADOT uses 'logging' instead of 'debug')
+  logging:
+    verbosity: detailed
+    sampling_initial: 10
+    sampling_thereafter: 100
 
 extensions:
   health_check:
@@ -132,6 +118,7 @@ service:
         - batch
       exporters:
         - awsxray
+        - logging
 
     # Metrics pipeline -> CloudWatch EMF
     metrics:
@@ -142,7 +129,7 @@ service:
         - batch
       exporters:
         - awsemf
-        - debug
+        - logging
 
     # Logs pipeline -> CloudWatch Logs
     logs:
@@ -156,4 +143,4 @@ service:
 
   telemetry:
     logs:
-      level: info
+      level: debug

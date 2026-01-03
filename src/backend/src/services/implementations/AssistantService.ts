@@ -1,13 +1,33 @@
-import { injectable, inject } from 'tsyringe';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { IAssistantService, StreamChatCallbacks } from '@/services/IAssistantService';
-import { IBedrockService, BEDROCK_SERVICE_TOKEN } from '@/services/IBedrockService';
-import { IPromptService, PROMPT_SERVICE_TOKEN } from '@/services/IPromptService';
-import { IMcpClientService, MCP_CLIENT_SERVICE_TOKEN } from '@/services/IMcpClientService';
-import { ChatRequestDto, ChatResponseDto, ModelListDto } from '@/contracts/dtos/assistant.dto';
-import { SUPPORTED_MODELS } from '@/contracts/models/assistant.model';
-import { NoActivePromptError, UnsupportedModelError } from '@/utils/errors/assistant-errors';
+import { injectable, inject } from "tsyringe";
+import { readFileSync } from "fs";
+import { join } from "path";
+import {
+  IAssistantService,
+  StreamChatCallbacks,
+} from "@/services/IAssistantService";
+import {
+  IBedrockService,
+  BEDROCK_SERVICE_TOKEN,
+} from "@/services/IBedrockService";
+import {
+  IPromptService,
+  PROMPT_SERVICE_TOKEN,
+} from "@/services/IPromptService";
+import {
+  IMcpClientService,
+  MCP_CLIENT_SERVICE_TOKEN,
+} from "@/services/IMcpClientService";
+import {
+  ChatRequestDto,
+  ChatResponseDto,
+  ModelListDto,
+} from "@/contracts/dtos/assistant.dto";
+import { SUPPORTED_MODELS } from "@/contracts/models/assistant.model";
+import {
+  NoActivePromptError,
+  UnsupportedModelError,
+} from "@/utils/errors/assistant-errors";
+import { getSqlGenerationDuration } from "@/telemetry/metrics";
 
 @injectable()
 export class AssistantService implements IAssistantService {
@@ -97,7 +117,7 @@ Generate the SQL query:`;
       return sqlMatch[1].trim();
     }
 
-    if (response.includes('NO_QUERY_NEEDED')) {
+    if (response.includes("NO_QUERY_NEEDED")) {
       return null;
     }
 
@@ -107,13 +127,13 @@ Generate the SQL query:`;
   private isSelectQuery(sql: string): boolean {
     const normalized = sql.trim().toUpperCase();
     return (
-      normalized.startsWith('SELECT') &&
-      !normalized.includes('INSERT') &&
-      !normalized.includes('UPDATE') &&
-      !normalized.includes('DELETE') &&
-      !normalized.includes('DROP') &&
-      !normalized.includes('ALTER') &&
-      !normalized.includes('TRUNCATE')
+      normalized.startsWith("SELECT") &&
+      !normalized.includes("INSERT") &&
+      !normalized.includes("UPDATE") &&
+      !normalized.includes("DELETE") &&
+      !normalized.includes("DROP") &&
+      !normalized.includes("ALTER") &&
+      !normalized.includes("TRUNCATE")
     );
   }
 
@@ -136,7 +156,8 @@ Generate the SQL query:`;
     let jsonString = JSON.stringify(truncatedResults, null, 2);
 
     if (jsonString.length > MAX_CHARS) {
-      jsonString = jsonString.slice(0, MAX_CHARS) + '\n... (truncated due to size)';
+      jsonString =
+        jsonString.slice(0, MAX_CHARS) + "\n... (truncated due to size)";
       wasTruncated = true;
     }
 
@@ -147,7 +168,11 @@ Generate the SQL query:`;
     return jsonString;
   }
 
-  private buildAnswerPrompt(base: string, dbPrompt: string, queryResults: string): string {
+  private buildAnswerPrompt(
+    base: string,
+    dbPrompt: string,
+    queryResults: string
+  ): string {
     let prompt = `${base}\n\n## Additional Context\n\n${dbPrompt}`;
 
     if (queryResults) {
@@ -173,15 +198,15 @@ ${queryResults}
   }
 
   private loadBaseSystemPrompt(): string {
-    const promptPath = join(__dirname, '../../config/system_prompt.md');
-    return readFileSync(promptPath, 'utf-8');
+    const promptPath = join(__dirname, "../../config/system_prompt.md");
+    return readFileSync(promptPath, "utf-8");
   }
 
   async chat(request: ChatRequestDto): Promise<ChatResponseDto> {
     // Step 1: Get active prompt from database
     const activePrompt = await this.promptService.findActive();
     if (!activePrompt) {
-      throw new NoActivePromptError('No active prompt configured');
+      throw new NoActivePromptError("No active prompt configured");
     }
 
     // Step 2: Validate model
@@ -190,7 +215,7 @@ ${queryResults}
       throw new UnsupportedModelError(activePrompt.model);
     }
 
-    let queryResults = '';
+    let queryResults = "";
 
     // Step 3: Try to initialize MCP and query database
     try {
@@ -198,19 +223,29 @@ ${queryResults}
       const schemaInfo = await this.getSchemaInfo();
 
       // Step 3a: Ask LLM to generate SQL
-      const sqlPrompt = this.buildSqlGenerationPrompt(schemaInfo, request.question);
+      const sqlPrompt = this.buildSqlGenerationPrompt(
+        schemaInfo,
+        request.question
+      );
+      const sqlStartTime = Date.now();
       const sqlResponse = await this.bedrockService.invoke(
         sqlPrompt,
         request.question,
         activePrompt.model
       );
+      const sqlDuration = Date.now() - sqlStartTime;
+      getSqlGenerationDuration().record(sqlDuration, {
+        model: activePrompt.model,
+      });
 
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
 
       if (sql) {
         if (!this.isSelectQuery(sql)) {
-          console.warn('Generated SQL was not a SELECT query, skipping execution');
+          console.warn(
+            "Generated SQL was not a SELECT query, skipping execution"
+          );
         } else {
           // Step 3c: Execute the generated SQL
           const results = await this.mcpClient.executeQuery(sql);
@@ -219,7 +254,10 @@ ${queryResults}
       }
     } catch (error) {
       // Log MCP errors but continue without database data
-      console.error('MCP error (continuing without data):', error instanceof Error ? error.message : error);
+      console.error(
+        "MCP error (continuing without data):",
+        error instanceof Error ? error.message : error
+      );
     }
 
     // Step 4: Build final prompt with data (if available)
@@ -247,11 +285,14 @@ ${queryResults}
     };
   }
 
-  async chatStream(request: ChatRequestDto, callbacks: StreamChatCallbacks): Promise<void> {
+  async chatStream(
+    request: ChatRequestDto,
+    callbacks: StreamChatCallbacks
+  ): Promise<void> {
     // Step 1: Get active prompt from database
     const activePrompt = await this.promptService.findActive();
     if (!activePrompt) {
-      callbacks.onError(new NoActivePromptError('No active prompt configured'));
+      callbacks.onError(new NoActivePromptError("No active prompt configured"));
       return;
     }
 
@@ -262,7 +303,7 @@ ${queryResults}
       return;
     }
 
-    let queryResults = '';
+    let queryResults = "";
 
     // Step 3: Try to initialize MCP and query database
     try {
@@ -270,19 +311,29 @@ ${queryResults}
       const schemaInfo = await this.getSchemaInfo();
 
       // Step 3a: Ask LLM to generate SQL (non-streaming for SQL generation)
-      const sqlPrompt = this.buildSqlGenerationPrompt(schemaInfo, request.question);
+      const sqlPrompt = this.buildSqlGenerationPrompt(
+        schemaInfo,
+        request.question
+      );
+      const sqlStartTime = Date.now();
       const sqlResponse = await this.bedrockService.invoke(
         sqlPrompt,
         request.question,
         activePrompt.model
       );
+      const sqlDuration = Date.now() - sqlStartTime;
+      getSqlGenerationDuration().record(sqlDuration, {
+        model: activePrompt.model,
+      });
 
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
 
       if (sql) {
         if (!this.isSelectQuery(sql)) {
-          console.warn('Generated SQL was not a SELECT query, skipping execution');
+          console.warn(
+            "Generated SQL was not a SELECT query, skipping execution"
+          );
         } else {
           // Step 3c: Execute the generated SQL
           const results = await this.mcpClient.executeQuery(sql);
@@ -291,7 +342,10 @@ ${queryResults}
       }
     } catch (error) {
       // Log MCP errors but continue without database data
-      console.error('MCP error (continuing without data):', error instanceof Error ? error.message : error);
+      console.error(
+        "MCP error (continuing without data):",
+        error instanceof Error ? error.message : error
+      );
     }
 
     // Step 4: Build final prompt with data (if available)
