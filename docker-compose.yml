@@ -34,15 +34,29 @@ services:
       timeout: 5s
       retries: 5
 
-  aspire_dashboard:
-    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
-    restart: always
+  # DISABLED - Use adot_collector for local OTEL testing
+  # aspire_dashboard:
+  #   image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
+  #   restart: always
+  #   ports:
+  #     - 18888:18888
+  #     - 4317:18889
+  #   environment:
+  #     - Dashboard:ApplicationName=GSF
+  #     - Dashboard:Frontend:BrowserToken=password
+
+  # ADOT Collector for local telemetry testing
+  adot_collector:
+    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+    container_name: adot-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./src/infrastructure/lib/config/otel-collector-config.local.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - 18888:18888
-      - 4317:18889
-    environment:
-      - Dashboard:ApplicationName=GSF
-      - Dashboard:Frontend:BrowserToken=password
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "13133:13133" # Health check
 
 volumes:
   postgres_data:

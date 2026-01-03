@@ -1,0 +1,76 @@
+# ADOT Collector Configuration for Local Development
+# Mirrors production config but exports to console instead of AWS services.
+#
+# Usage: Mount this file into ADOT collector container
+#   docker-compose up -d adot_collector
+#   docker logs -f adot-collector
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Batch processor for efficient export
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Resource detection (env only for local, no ECS)
+  resourcedetection:
+    detectors:
+      - env
+    timeout: 5s
+    override: false
+
+exporters:
+  # Console/debug exporter - outputs all telemetry to stdout
+  debug:
+    verbosity: detailed
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions:
+    - health_check
+
+  pipelines:
+    # Traces pipeline -> Console
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - resourcedetection
+        - batch
+      exporters:
+        - debug
+
+    # Metrics pipeline -> Console
+    metrics:
+      receivers:
+        - otlp
+      processors:
+        - resourcedetection
+        - batch
+      exporters:
+        - debug
+
+    # Logs pipeline -> Console
+    logs:
+      receivers:
+        - otlp
+      processors:
+        - resourcedetection
+        - batch
+      exporters:
+        - debug
+
+  telemetry:
+    logs:
+      level: info

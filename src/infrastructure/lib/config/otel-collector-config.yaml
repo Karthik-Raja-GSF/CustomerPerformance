@@ -52,34 +52,54 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
     metric_declarations:
-      # HTTP metrics
+      # HTTP metrics (auto-instrumentation + custom)
       - dimensions:
+          - - service.name
+          - - service.name
+            - http.method
           - - service.name
             - http.method
             - http.route
             - http.status_code
         metric_name_selectors:
+          - "http.server.duration"
           - "http.server.request.duration"
           - "http.server.requests.total"
           - "http.server.errors.total"
           - "http.server.active_connections"
+      # Database metrics (auto-instrumentation + custom)
+      - dimensions:
+          - - service.name
+          - - service.name
+            - db.system
+          - - service.name
+            - db.system
+            - db.operation.name
+        metric_name_selectors:
+          - "db.client.operation.duration"
+          - "db.client.connection.count"
+          - "db.client.connection.pending_requests"
+          - "db.query.duration"
+          - "db.query.total"
+          - "db.connection_pool.size"
       # Bedrock/LLM metrics
       - dimensions:
           - - service.name
+          - - service.name
             - bedrock.model
         metric_name_selectors:
-          - "bedrock.*"
-      # Database metrics
-      - dimensions:
-          - - service.name
-            - db.system
-        metric_name_selectors:
-          - "db.*"
+          - "bedrock.invocations.total"
+          - "bedrock.latency"
+          - "bedrock.tokens.input"
+          - "bedrock.tokens.output"
+          - "bedrock.errors.total"
       # Assistant metrics
       - dimensions:
           - - service.name
         metric_name_selectors:
-          - "assistant.*"
+          - "assistant.chat.requests.total"
+          - "assistant.chat.stream_events.total"
+          - "assistant.sql_generation.duration"
 
   # AWS CloudWatch Logs for application logs
   awscloudwatchlogs:
@@ -122,6 +142,7 @@ service:
         - batch
       exporters:
         - awsemf
+        - debug
 
     # Logs pipeline -> CloudWatch Logs
     logs:

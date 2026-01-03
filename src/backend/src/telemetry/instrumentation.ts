@@ -4,42 +4,40 @@
  * This file MUST be imported at the very top of the application entry point
  * before any other imports, to ensure all modules are properly instrumented.
  *
- * Local Development: Set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 (Aspire Dashboard)
- * Production (ECS): Set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 (ADOT Collector Sidecar)
+ * Configuration via environment variables (exporters read these automatically):
+ * - OTEL_EXPORTER_OTLP_ENDPOINT: Base URL (default: http://localhost:4317)
+ * - OTEL_EXPORTER_OTLP_PROTOCOL: Protocol (default: grpc)
+ * - OTEL_SERVICE_NAME: Service name
+ * - OTEL_SERVICE_VERSION: Service version
+ * - OTEL_SDK_DISABLED: Set to "true" to disable telemetry
+ *
+ * Local Development: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 (Aspire Dashboard)
+ * Production (ECS): OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 (ADOT Collector Sidecar)
  */
 
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { Resource } from "@opentelemetry/resources";
 import {
-  SEMRESATTRS_SERVICE_NAME,
-  SEMRESATTRS_SERVICE_VERSION,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 import { PrismaInstrumentation } from "@prisma/instrumentation";
 
-// Get OTLP endpoint from environment (defaults to local Aspire Dashboard)
-const endpoint =
-  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4317";
-
-// Service metadata
-const serviceName = process.env.OTEL_SERVICE_NAME || "admin-panel-backend";
+// Read from environment (for logging and resource - exporters read OTEL_EXPORTER_OTLP_ENDPOINT directly)
+const serviceName = process.env.OTEL_SERVICE_NAME || "ait-backend";
 const serviceVersion = process.env.OTEL_SERVICE_VERSION || "1.0.0";
-const environment = process.env.NODE_ENV || "development";
-
-// Check if telemetry is enabled (can be disabled for testing)
 const telemetryEnabled = process.env.OTEL_SDK_DISABLED !== "true";
 
 // Create resource with service metadata
 const resource = new Resource({
-  [SEMRESATTRS_SERVICE_NAME]: serviceName,
-  [SEMRESATTRS_SERVICE_VERSION]: serviceVersion,
-  [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: environment,
+  [ATTR_SERVICE_NAME]: serviceName,
+  [ATTR_SERVICE_VERSION]: serviceVersion,
 });
 
 // Initialize SDK only if enabled
@@ -49,27 +47,16 @@ if (telemetryEnabled) {
   sdk = new NodeSDK({
     resource,
 
-    // Trace exporter - sends spans to OTLP endpoint
-    traceExporter: new OTLPTraceExporter({
-      url: `${endpoint}/v1/traces`,
-    }),
+    // gRPC exporters read OTEL_EXPORTER_OTLP_ENDPOINT automatically
+    // DO NOT pass url - let the SDK handle it from environment variables
+    traceExporter: new OTLPTraceExporter(),
 
-    // Metric reader - periodically exports metrics to OTLP endpoint
     metricReader: new PeriodicExportingMetricReader({
-      exporter: new OTLPMetricExporter({
-        url: `${endpoint}/v1/metrics`,
-      }),
-      exportIntervalMillis: 60000, // Export metrics every 60 seconds
+      exporter: new OTLPMetricExporter(),
+      exportIntervalMillis: 5000, // 5 seconds - matches official Aspire example
     }),
 
-    // Log processor - batches and exports logs to OTLP endpoint
-    logRecordProcessors: [
-      new BatchLogRecordProcessor(
-        new OTLPLogExporter({
-          url: `${endpoint}/v1/logs`,
-        })
-      ),
-    ],
+    logRecordProcessors: [new BatchLogRecordProcessor(new OTLPLogExporter())],
 
     // Auto-instrumentation for common libraries
     instrumentations: [
@@ -94,9 +81,11 @@ if (telemetryEnabled) {
   // Start the SDK
   sdk.start();
 
-  // Log startup info (to console since OTEL logger isn't ready yet)
+  // Log startup info
+  const endpoint =
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4317";
   console.log(
-    `[OpenTelemetry] SDK started - exporting to ${endpoint} (service: ${serviceName})`
+    `[OpenTelemetry] SDK started - endpoint: ${endpoint}, service: ${serviceName}`
   );
 }
 
