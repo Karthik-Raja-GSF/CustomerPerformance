@@ -43,8 +43,21 @@ export const config = {
   // Telemetry is configured via OTEL_* env vars (ADOT SDK reads them directly)
   // These are only used by our logger wrapper for metadata
   telemetry: {
-    serviceName: process.env.OTEL_SERVICE_NAME || "admin-panel-backend",
+    serviceName: process.env.OTEL_SERVICE_NAME || "ait-backend",
     serviceVersion: process.env.OTEL_SERVICE_VERSION || "1.0.0",
     environment: process.env.NODE_ENV || "development",
+  },
+  // StockIQ API Configuration
+  // Credentials are injected from AWS Secrets Manager at runtime
+  stockiq: {
+    baseUrl:
+      process.env.STOCKIQ_BASE_URL || "https://goldstarfoods.stockiqtech.net",
+    customReportId: process.env.STOCKIQ_CUSTOM_REPORT_ID || "1",
+    username: process.env.STOCKIQ_USERNAME || "",
+    password: process.env.STOCKIQ_PASSWORD || "",
+    timeoutMs: parseInt(process.env.STOCKIQ_TIMEOUT_MS || "60000", 10),
+    // Cron expression for scheduled sync (empty string disables scheduling)
+    // Examples: "0 6 * * *" (6 AM daily), "0 */4 * * *" (every 4 hours)
+    syncCronExpression: process.env.STOCKIQ_SYNC_CRON || "",
   },
 };

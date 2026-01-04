@@ -12,13 +12,16 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { config } from "./config";
-import { setupContainer } from "./config/container";
+import { container, setupContainer } from "./config/container";
 import { errorHandler } from "./middleware/error-handler";
+import {
+  ISchedulerService,
+  SCHEDULER_SERVICE_TOKEN,
+} from "./services/ISchedulerService";
 import { telemetryMiddleware } from "./middleware/telemetry";
 import promptsRouter from "./routes/prompts";
-// TODO: SIQ Import temporarily disabled - will be reformed with new architecture
-// import siqImportRouter from "./routes/siq-import";
 import assistantRouter from "./routes/assistant";
+import stockiqRouter from "./routes/stockiq";
 
 const serverLogger = createChildLogger("server");
 
@@ -30,6 +33,7 @@ class Server {
   private app: Application;
   private prisma: PrismaClient;
   private pool: Pool;
+  private scheduler: ISchedulerService | null = null;
 
   constructor() {
     this.app = express();
@@ -88,9 +92,8 @@ class Server {
 
     // Register routes
     this.app.use("/prompts", promptsRouter);
-    // TODO: SIQ Import temporarily disabled - will be reformed with new architecture
-    // this.app.use("/siq-import", siqImportRouter);
     this.app.use("/assistant", assistantRouter);
+    this.app.use("/stockiq", stockiqRouter);
   }
 
   private initializeErrorHandling(): void {
@@ -117,6 +120,12 @@ class Server {
           `Server is running on port ${String(config.port)}`
         );
       });
+
+      // Start scheduled tasks (after DI container is ready)
+      this.scheduler = container.resolve<ISchedulerService>(
+        SCHEDULER_SERVICE_TOKEN
+      );
+      this.scheduler.start();
     } catch (error) {
       serverLogger.error(
         { event: "server.start.failed", error },
@@ -128,6 +137,10 @@ class Server {
   }
 
   public async stop(): Promise<void> {
+    // Stop scheduled tasks
+    if (this.scheduler) {
+      this.scheduler.stop();
+    }
     await this.prisma.$disconnect();
     await this.pool.end();
     serverLogger.info({ event: "server.stopped" }, "Server stopped");

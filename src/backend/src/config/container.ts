@@ -8,9 +8,6 @@ import {
   PROMPT_SERVICE_TOKEN,
 } from "@/services/IPromptService";
 import { PromptService } from "@/services/implementations/PromptService";
-// TODO: SIQ Import temporarily disabled - will be reformed with new architecture
-// import { ISiqImportService, SIQ_IMPORT_SERVICE_TOKEN } from '@/services/ISiqImportService';
-// import { SiqImportService } from '@/services/implementations/SiqImportService';
 import {
   IBedrockService,
   BEDROCK_SERVICE_TOKEN,
@@ -26,6 +23,16 @@ import {
   ASSISTANT_SERVICE_TOKEN,
 } from "@/services/IAssistantService";
 import { AssistantService } from "@/services/implementations/AssistantService";
+import {
+  IStockIqService,
+  STOCKIQ_SERVICE_TOKEN,
+} from "@/services/IStockIqService";
+import { StockIqService } from "@/services/implementations/StockIqService";
+import {
+  ISchedulerService,
+  SCHEDULER_SERVICE_TOKEN,
+} from "@/services/ISchedulerService";
+import { SchedulerService } from "@/services/implementations/SchedulerService";
 
 /**
  * DI Container Configuration
@@ -57,11 +64,6 @@ export function setupContainer(prisma: PrismaClient): void {
     useClass: PromptService,
   });
 
-  // TODO: SIQ Import temporarily disabled - will be reformed with new architecture
-  // container.register<ISiqImportService>(SIQ_IMPORT_SERVICE_TOKEN, {
-  //   useClass: SiqImportService,
-  // });
-
   // Register BedrockService for AWS Bedrock LLM invocation
   container.register<IBedrockService>(BEDROCK_SERVICE_TOKEN, {
     useClass: BedrockService,
@@ -77,6 +79,19 @@ export function setupContainer(prisma: PrismaClient): void {
   container.register<IAssistantService>(ASSISTANT_SERVICE_TOKEN, {
     useClass: AssistantService,
   });
+
+  // Register StockIqService for StockIQ API integration
+  container.register<IStockIqService>(STOCKIQ_SERVICE_TOKEN, {
+    useClass: StockIqService,
+  });
+
+  // Register SchedulerService for in-app scheduled tasks
+  // Uses PostgreSQL advisory locks for distributed coordination
+  // MUST be registered after StockIqService (dependency)
+  container.registerSingleton<ISchedulerService>(
+    SCHEDULER_SERVICE_TOKEN,
+    SchedulerService
+  );
 
   // Register Repository implementations
   // Example:

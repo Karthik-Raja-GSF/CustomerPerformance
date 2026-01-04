@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["dw2_nav", "ait"]
+  schemas  = ["dw2_nav", "ait", "siq"]
 }
 
 // ============================================
@@ -2429,4 +2429,89 @@ model Prompt {
 
   @@map("prompts")
   @@schema("ait")
+}
+
+// ============================================
+// SIQ SCHEMA - StockIQ Integration Tables
+// ============================================
+
+model SiqReportData {
+  siteCode                 String   @map("site_code")
+  itemCode                 String   @map("item_code")
+
+  // Planning
+  abcClass                 String?  @map("abc_class")
+  safetyStock              Decimal? @map("safety_stock")
+  targetStock              Decimal? @map("target_stock")
+  preferredMax             Decimal? @map("preferred_max")
+  maxStock                 Decimal? @map("max_stock")
+
+  // Demand
+  openEstimates            Decimal? @map("open_estimates")
+  openSalesPlusEstimates   Decimal? @map("open_sales_plus_estimates")
+
+  // Forecasts
+  currentMonthForecast     Decimal? @map("current_month_forecast")
+  forecastMonth1           Decimal? @map("forecast_month_1")
+  forecastMonth2           Decimal? @map("forecast_month_2")
+  forecastMonth3           Decimal? @map("forecast_month_3")
+  forecastMonth4           Decimal? @map("forecast_month_4")
+
+  // Metrics (calculated by SIQ)
+  weeksSupplyOnhand        Decimal? @map("weeks_supply_onhand")
+  weeksOnhandEst           Decimal? @map("weeks_onhand_est")
+  forecastVarianceMtd      Decimal? @map("forecast_variance_mtd")
+  supplyVariance           Decimal? @map("supply_variance")
+
+  // Customer
+  totalCustomers           Int?     @map("total_customers")
+  top5CustomerShipTos      String?  @map("top_5_customer_ship_tos") @db.Text
+
+  // Sync metadata
+  syncId                   String   @map("sync_id")
+  syncedAt                 DateTime @default(now()) @map("synced_at")
+
+  // Relations
+  syncLog                  SiqSyncLog @relation(fields: [syncId], references: [id])
+
+  @@id([siteCode, itemCode])
+  @@index([syncId])
+  @@index([abcClass])
+  @@map("report_data")
+  @@schema("siq")
+}
+
+model SiqSyncLog {
+  id                String    @id @default(uuid())
+  status            String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, FAILED
+  startedAt         DateTime  @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+
+  // Record counts
+  recordsTotal      Int?      @map("records_total")
+  recordsInserted   Int?      @map("records_inserted")
+  recordsUpdated    Int?      @map("records_updated")
+  recordsDeleted    Int?      @map("records_deleted")
+
+  // API response info
+  apiResponseStatus Int?      @map("api_response_status")
+  apiResponseTimeMs Int?      @map("api_response_time_ms")
+  apiErrorMessage   String?   @map("api_error_message") @db.Text
+
+  // Error handling (service-level errors)
+  errorMessage      String?   @map("error_message") @db.Text
+
+  // Performance
+  durationMs        Int?      @map("duration_ms")
+
+  // Trigger info
+  triggeredBy       String    @map("triggered_by")
+
+  // Relations
+  records           SiqReportData[]
+
+  @@index([status])
+  @@index([startedAt])
+  @@map("sync_log")
+  @@schema("siq")
 }
