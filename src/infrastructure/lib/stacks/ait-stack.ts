@@ -152,6 +152,14 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
+    // External Database Secrets (DMS sources, StockIQ API)
+    // ===================
+    const secretsConstruct = new SecretsConstruct(this, "Secrets", {
+      envName: config.envName,
+      naming,
+    });
+
+    // ===================
     // Backend (ECS Fargate + ALB)
     // ===================
     const ecsConfig = {
@@ -164,6 +172,7 @@ export class AitStack extends cdk.Stack {
       vpc: vpcConstruct.vpc,
       ecrRepository: ecrConstruct.repository,
       databaseSecret: databaseConstruct.secret,
+      siqSecret: secretsConstruct.siqSecret,
       cognitoUserPoolId: authConstruct.userPool.userPoolId,
       cognitoClientId: authConstruct.userPoolClient.userPoolClientId,
       domainName: domains.backend,
@@ -193,14 +202,6 @@ export class AitStack extends cdk.Stack {
       bastionConstruct.securityGroup,
       "Allow Bastion SSH tunnel to Aurora"
     );
-
-    // ===================
-    // External Database Secrets (DMS sources, etc.)
-    // ===================
-    const secretsConstruct = new SecretsConstruct(this, "Secrets", {
-      envName: config.envName,
-      naming,
-    });
 
     // ===================
     // DMS (Database Migration Service)

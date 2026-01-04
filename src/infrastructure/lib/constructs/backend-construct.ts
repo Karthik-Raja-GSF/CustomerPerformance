@@ -26,6 +26,7 @@ export interface BackendConstructProps {
   vpc: ec2.IVpc;
   ecrRepository: ecr.IRepository;
   databaseSecret: secretsmanager.ISecret;
+  siqSecret: secretsmanager.ISecret;
   cognitoUserPoolId: string;
   cognitoClientId: string;
   domainName: string;
@@ -48,6 +49,7 @@ export class BackendConstruct extends Construct {
       vpc,
       ecrRepository,
       databaseSecret,
+      siqSecret,
       cognitoUserPoolId,
       cognitoClientId,
       domainName,
@@ -143,6 +145,8 @@ export class BackendConstruct extends Construct {
         OTEL_SERVICE_NAME: otelServiceName,
         OTEL_SERVICE_VERSION: "1.0.0",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317",
+        // StockIQ scheduled sync - daily at 00:01
+        STOCKIQ_SYNC_CRON: "1 0 * * *",
       },
       secrets: {
         // Pass Aurora secret fields individually - backend builds DATABASE_URL from these
@@ -151,6 +155,9 @@ export class BackendConstruct extends Construct {
         DB_HOST: ecs.Secret.fromSecretsManager(databaseSecret, "host"),
         DB_PORT: ecs.Secret.fromSecretsManager(databaseSecret, "port"),
         DB_NAME: ecs.Secret.fromSecretsManager(databaseSecret, "dbname"),
+        // StockIQ API credentials
+        STOCKIQ_USERNAME: ecs.Secret.fromSecretsManager(siqSecret, "username"),
+        STOCKIQ_PASSWORD: ecs.Secret.fromSecretsManager(siqSecret, "password"),
       },
       healthCheck: {
         command: [
@@ -236,6 +243,7 @@ export class BackendConstruct extends Construct {
 
     // Grant read access to the database secret (explicit grant for proper IAM policy)
     databaseSecret.grantRead(taskDefinition.executionRole!);
+    siqSecret.grantRead(taskDefinition.executionRole!);
 
     // ACM Certificate
     this.certificate = new acm.Certificate(this, "Certificate", {
