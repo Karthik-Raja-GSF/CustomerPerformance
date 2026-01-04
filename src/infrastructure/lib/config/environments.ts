@@ -57,8 +57,8 @@ export const environments: Record<string, EnvironmentConfig> = {
       databaseName: "admin_panel", // Existing cluster - can't change CDK property but we manually updated to "ait_procurement"
     },
     ecs: {
-      cpu: 512, // 0.5 vCPU
-      memory: 1024, // 1 GB
+      cpu: 1024, // 1 vCPU
+      memory: 2048, // 2 GB
       desiredCount: 1,
     },
     vpc: {
@@ -93,7 +93,7 @@ export const environments: Record<string, EnvironmentConfig> = {
       databaseName: "ait_procurement", // New cluster - use correct name
     },
     ecs: {
-      cpu: 1024, // 1 vCPU
+      cpu: 2048, // 2 vCPU
       memory: 2048, // 2 GB
       desiredCount: 2,
     },
