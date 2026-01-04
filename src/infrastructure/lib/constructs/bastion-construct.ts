@@ -39,12 +39,8 @@ export class BastionConstruct extends Construct {
       allowAllOutbound: true,
     });
 
-    // Allow SSH from anywhere (0.0.0.0/0) per user preference
-    this.securityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(22),
-      "Allow SSH access from anywhere"
-    );
+    // NOTE: SSH ingress rules are managed manually via AWS Console
+    // This allows flexible IP whitelisting without CDK redeployment
 
     // Use CDK's native KeyPair - stores private key in SSM Parameter Store
     // Key is stored at /ec2/keypair/<keypair-id> as SecureString
