@@ -31,11 +31,10 @@ const data = {
           title: "Prompt Builder",
           url: "/settings",
         },
-        // TODO: SIQ Import temporarily disabled
-        // {
-        //   title: "SIQ Import",
-        //   url: "/siq-import",
-        // },
+        {
+          title: "StockIQ Sync",
+          url: "/stockiq-sync",
+        },
       ],
     },
   ],
