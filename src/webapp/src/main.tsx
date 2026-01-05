@@ -1,11 +1,11 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-import { AuthProvider } from '@/contexts/auth-context'
-import { apiClient } from '@/apis/client'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import App from "./App.tsx";
+import { AuthProvider } from "@/contexts/auth-context";
+import { apiClient } from "@/apis/client";
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider
       onRefresh={(authResponse) => {
@@ -14,5 +14,5 @@ createRoot(document.getElementById('root')!).render(
     >
       <App />
     </AuthProvider>
-  </StrictMode>,
-)
+  </StrictMode>
+);
