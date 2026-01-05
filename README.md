@@ -189,29 +189,36 @@ aws ecs update-service \
 
 ## GitHub Environment Setup (One-time)
 
-### Create Production Environment
+### Required Environments
 
-1. Go to **Settings** → **Environments** → **New environment**
-2. Name: `production`
+Create these 3 environments in **Settings** → **Environments** → **New environment**:
 
-### Protection Rules
+#### 1. `production-ecr` (Backend - Prod ECR Push Gate)
 
-- ✅ Required reviewers: **2** (you + 1 team member)
-- ✅ Deployment branches: Tags matching `v*.*.*`
-- ✅ Wait timer: 0 minutes
+- **Protection rules**: Required reviewers (2)
+- **Purpose**: Approves pushing Docker image to production ECR
+
+#### 2. `approval` (Frontend - Prod Deployment Gate)
+
+- **Protection rules**: Required reviewers (2)
+- **Purpose**: Approves production build and deployment for frontend
+
+#### 3. `production` (Final Prod Deployment)
+
+- **Protection rules**: Required reviewers (2)
+- **Purpose**: Approves final deployment to production (backend ECS + frontend S3)
 
 ### Repository Secrets
 
 Add the following secrets to **Settings → Secrets and variables → Actions → Repository secrets**:
 
-**Dev** (already exist):
+**Dev**:
 
 ```
 AWS_ACCESS_KEY_ID=<IAM key for dev account 201002506909>
 AWS_SECRET_ACCESS_KEY=<Secret key>
-S3_BUCKET=<dev S3 bucket>
-CLOUDFRONT_DISTRIBUTION_ID=<dev CloudFront ID>
-AWS_REGION=us-east-1
+S3_BUCKET=ait-dev-gbl-s3-webapp-01-201002506909
+CLOUDFRONT_DISTRIBUTION_ID=E20DSSZY8XDOFO
 ```
 
 **Prod** (need to add):
