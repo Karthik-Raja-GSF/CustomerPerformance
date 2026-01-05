@@ -6,18 +6,9 @@ on:
     paths:
       - "src/backend/**"
       - ".github/workflows/deploy-backend.yml"
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment to deploy to"
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
 
 concurrency:
-  group: backend-deploy-${{ github.event_name == 'push' && github.sha || inputs.environment }}
+  group: backend-deploy-${{ github.sha }}
   cancel-in-progress: false # Never cancel to avoid orphaned artifacts
 
 env:
@@ -26,42 +17,31 @@ env:
 
 jobs:
   setup:
-    name: Setup Environment
+    name: Setup Resource Names
     runs-on: ubuntu-latest
     outputs:
-      environment: ${{ steps.determine-env.outputs.environment }}
-      is_prod: ${{ steps.determine-env.outputs.is_prod }}
-      ecr_repository: ${{ steps.determine-env.outputs.ecr_repository }}
-      ecs_cluster: ${{ steps.determine-env.outputs.ecs_cluster }}
-      ecs_service: ${{ steps.determine-env.outputs.ecs_service }}
+      dev_ecr_repository: ${{ steps.set-resources.outputs.dev_ecr_repository }}
+      dev_ecs_cluster: ${{ steps.set-resources.outputs.dev_ecs_cluster }}
+      dev_ecs_service: ${{ steps.set-resources.outputs.dev_ecs_service }}
+      prod_ecr_repository: ${{ steps.set-resources.outputs.prod_ecr_repository }}
+      prod_ecs_cluster: ${{ steps.set-resources.outputs.prod_ecs_cluster }}
+      prod_ecs_service: ${{ steps.set-resources.outputs.prod_ecs_service }}
 
     steps:
-      - name: Determine environment
-        id: determine-env
+      - name: Set resource names
+        id: set-resources
         run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            ENV="dev"
-            IS_PROD="false"
-          else
-            ENV="${{ inputs.environment }}"
-            IS_PROD="${{ inputs.environment == 'prod' }}"
-          fi
+          # Dev resources
+          echo "dev_ecr_repository=ait-dev-gbl-ecr-backend-01" >> $GITHUB_OUTPUT
+          echo "dev_ecs_cluster=ait-dev-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
+          echo "dev_ecs_service=ait-dev-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
 
-          echo "environment=$ENV" >> $GITHUB_OUTPUT
-          echo "is_prod=$IS_PROD" >> $GITHUB_OUTPUT
+          # Prod resources
+          echo "prod_ecr_repository=ait-prd-gbl-ecr-backend-01" >> $GITHUB_OUTPUT
+          echo "prod_ecs_cluster=ait-prd-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
+          echo "prod_ecs_service=ait-prd-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
 
-          # Set resource names based on environment
-          if [ "$IS_PROD" == "true" ]; then
-            echo "ecr_repository=ait-prd-gbl-ecr-backend-01" >> $GITHUB_OUTPUT
-            echo "ecs_cluster=ait-prd-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
-            echo "ecs_service=ait-prd-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
-          else
-            echo "ecr_repository=ait-dev-gbl-ecr-backend-01" >> $GITHUB_OUTPUT
-            echo "ecs_cluster=ait-dev-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
-            echo "ecs_service=ait-dev-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
-          fi
-
-          echo "✅ Deploying to: $ENV"
+          echo "✅ Resource names configured"
 
   validate:
     name: Validate & Typecheck
@@ -91,9 +71,8 @@ jobs:
         run: pnpm --filter backend typecheck
 
   build-and-save-artifact:
-    name: Build, Save Artifact & Deploy to Dev
+    name: Build, Save Artifact & Push to Dev ECR
     needs: [setup, validate]
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     outputs:
@@ -156,7 +135,7 @@ jobs:
       - name: Tag and push to dev ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ needs.setup.outputs.ecr_repository }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.dev_ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "Tagging image for dev ECR..."
@@ -171,8 +150,7 @@ jobs:
 
   load-artifact-and-push-prod:
     name: Load Artifact & Push to Prod ECR
-    needs: [setup, validate]
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
+    needs: [setup, build-and-save-artifact, deploy-dev]
     runs-on: ubuntu-latest
 
     outputs:
@@ -239,7 +217,6 @@ jobs:
   deploy-dev:
     name: Deploy to Dev
     needs: [setup, build-and-save-artifact]
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
@@ -252,8 +229,8 @@ jobs:
 
       - name: Deploy to ECS
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
           IMAGE_TAG: ${{ needs.build-and-save-artifact.outputs.image_tag }}
         run: |
           echo "Deploying to dev ECS with image tag: $IMAGE_TAG"
@@ -266,8 +243,8 @@ jobs:
 
       - name: Wait for deployment
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
         run: |
           echo "Waiting for ECS service to stabilize..."
 
@@ -291,7 +268,6 @@ jobs:
   deploy-prod:
     name: Deploy to Prod
     needs: [setup, load-artifact-and-push-prod]
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
     runs-on: ubuntu-latest
     environment: production
 
@@ -306,8 +282,8 @@ jobs:
       - name: Get current task definition
         id: current-task
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
         run: |
           TASK_DEF_ARN=$(aws ecs describe-services \
             --cluster $ECS_CLUSTER \
@@ -320,9 +296,9 @@ jobs:
 
       - name: Run database migrations
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
-          ECR_REPOSITORY: ${{ needs.setup.outputs.ecr_repository }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.prod_ecr_repository }}
           IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
         run: |
           echo "Running database migrations..."
@@ -377,8 +353,8 @@ jobs:
 
       - name: Deploy to ECS
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
           IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
         run: |
           echo "Deploying to prod ECS with image tag: $IMAGE_TAG"
@@ -391,8 +367,8 @@ jobs:
 
       - name: Wait for deployment
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
         run: |
           echo "Waiting for ECS service to stabilize..."
 
@@ -481,8 +457,8 @@ jobs:
 
       - name: Rollback to previous task definition
         env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
         run: |
           echo "⚠️ Deployment failed, initiating rollback..."
 
