@@ -15,18 +15,10 @@ on:
         options:
           - dev
           - prod
-      version:
-        description: "Version tag for prod (e.g., v1.0.0)"
-        required: false
-        type: string
-      release_notes:
-        description: "Release notes for prod"
-        required: false
-        type: string
 
 concurrency:
-  group: backend-${{ github.event_name == 'push' && github.ref || format('backend-{0}', inputs.environment) }}
-  cancel-in-progress: ${{ github.event_name == 'push' }} # Only cancel for dev
+  group: backend-deploy-${{ github.event_name == 'push' && github.sha || inputs.environment }}
+  cancel-in-progress: false # Never cancel to avoid orphaned artifacts
 
 env:
   NODE_VERSION: "20"
@@ -71,72 +63,14 @@ jobs:
 
           echo "✅ Deploying to: $ENV"
 
-  create-tag:
-    name: Create Git Tag
-    needs: setup
-    if: needs.setup.outputs.is_prod == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.validate.outputs.version }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Validate version format
-        id: validate
-        run: |
-          VERSION="${{ inputs.version }}"
-
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Invalid version format: $VERSION"
-            echo "Expected format: v1.0.0"
-            exit 1
-          fi
-
-          if git rev-parse "$VERSION" >/dev/null 2>&1; then
-            echo "✅ Tag $VERSION already exists"
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create annotated tag
-        run: |
-          VERSION="${{ steps.validate.outputs.version }}"
-          RELEASE_NOTES="${{ inputs.release_notes }}"
-
-          if git rev-parse "$VERSION" >/dev/null 2>&1; then
-            echo "Tag already exists, skipping"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if [ -z "$RELEASE_NOTES" ]; then
-            git tag -a "$VERSION" -m "Release $VERSION"
-          else
-            git tag -a "$VERSION" -m "Release $VERSION" -m "$RELEASE_NOTES"
-          fi
-
-          git push origin "$VERSION"
-          echo "✅ Created and pushed tag: $VERSION"
-
   validate:
     name: Validate & Typecheck
-    needs: [setup, create-tag]
-    if: always() && needs.setup.result == 'success'
+    needs: setup
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.create-tag.outputs.version || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -156,21 +90,10 @@ jobs:
       - name: Typecheck
         run: pnpm --filter backend typecheck
 
-      - name: Validate migrations (prod only)
-        if: needs.setup.outputs.is_prod == 'true'
-        run: |
-          if [ ! -d "src/backend/prisma/migrations" ]; then
-            echo "⚠️ Warning: No migrations directory found"
-            exit 0
-          fi
-
-          MIGRATION_COUNT=$(find src/backend/prisma/migrations -name "migration.sql" | wc -l)
-          echo "✅ Found $MIGRATION_COUNT migrations"
-
-  build:
-    name: Build & Push to Dev ECR
+  build-and-save-artifact:
+    name: Build, Save Artifact & Deploy to Dev
     needs: [setup, validate]
-    if: needs.setup.outputs.is_prod == 'false'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     outputs:
@@ -179,6 +102,45 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Build Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building Docker image..."
+
+          docker build --platform linux/amd64 \
+            -f src/backend/Dockerfile \
+            -t backend-image:$IMAGE_TAG \
+            .
+
+          echo "✅ Image built: backend-image:$IMAGE_TAG"
+
+      - name: Save Docker image to artifact
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Saving image to tar.gz..."
+          docker save backend-image:$IMAGE_TAG | gzip > backend-image.tar.gz
+
+          SIZE=$(ls -lh backend-image.tar.gz | awk '{print $5}')
+          echo "✅ Image saved: backend-image.tar.gz (size: $SIZE)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image-${{ github.sha }}
+          path: backend-image.tar.gz
+          retention-days: 7
+          compression-level: 0
+
+      - name: Load image from artifact
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Loading image for dev deployment..."
+          gunzip < backend-image.tar.gz | docker load
+          docker image inspect backend-image:$IMAGE_TAG
 
       - name: Configure AWS credentials (dev)
         uses: aws-actions/configure-aws-credentials@v4
@@ -191,54 +153,64 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to dev ECR
+      - name: Tag and push to dev ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ needs.setup.outputs.ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Building Docker image for dev..."
-
-          docker build --platform linux/amd64 \
-            -f src/backend/Dockerfile \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
+          echo "Tagging image for dev ECR..."
+          docker tag backend-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag backend-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
           echo "Pushing image with tags: $IMAGE_TAG, latest"
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-  copy-image:
-    name: Copy Image from Dev to Prod ECR
+          echo "✅ Image pushed to dev ECR"
+
+  load-artifact-and-push-prod:
+    name: Load Artifact & Push to Prod ECR
     needs: [setup, validate]
-    if: needs.setup.outputs.is_prod == 'true'
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
     runs-on: ubuntu-latest
 
     outputs:
       image_tag: ${{ github.sha }}
 
     steps:
-      - name: Configure AWS credentials (dev - read access)
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          name: backend-image-${{ github.sha }}
 
-      - name: Login to dev ECR
-        id: login-dev-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Validate artifact exists
+        run: |
+          if [ ! -f backend-image.tar.gz ]; then
+            echo "❌ Artifact not found for SHA: ${{ github.sha }}"
+            echo "Please ensure dev build completed successfully"
+            exit 1
+          fi
 
-      - name: Pull image from dev ECR
+          # Check tar is valid
+          if ! tar -tzf backend-image.tar.gz > /dev/null 2>&1; then
+            echo "❌ Corrupted artifact"
+            exit 1
+          fi
+
+          SIZE=$(ls -lh backend-image.tar.gz | awk '{print $5}')
+          echo "✅ Artifact validated (size: $SIZE)"
+
+      - name: Load Docker image
         env:
-          DEV_ECR: 201002506909.dkr.ecr.us-east-1.amazonaws.com
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Pulling image from dev ECR: $IMAGE_TAG"
-          docker pull $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG
+          echo "Loading image from artifact..."
+          gunzip < backend-image.tar.gz | docker load
+          docker image inspect backend-image:$IMAGE_TAG
+          echo "✅ Image loaded: backend-image:$IMAGE_TAG"
 
-      - name: Configure AWS credentials (prod - write access)
+      - name: Configure AWS credentials (prod)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
@@ -251,40 +223,87 @@ jobs:
 
       - name: Tag and push to prod ECR
         env:
-          DEV_ECR: 201002506909.dkr.ecr.us-east-1.amazonaws.com
           PROD_ECR: ${{ steps.login-prod-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
-          VERSION_TAG: ${{ needs.create-tag.outputs.version }}
         run: |
           echo "Tagging image for prod ECR..."
-          docker tag $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
-          docker tag $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:$VERSION_TAG
-          docker tag $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
+          docker tag backend-image:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
+          docker tag backend-image:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
 
-          echo "Pushing image to prod ECR with tags: $IMAGE_TAG, $VERSION_TAG, latest"
+          echo "Pushing image to prod ECR with tags: $IMAGE_TAG, latest"
           docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
-          docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:$VERSION_TAG
           docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
 
-          echo "✅ Successfully copied image from dev to prod ECR"
+          echo "✅ Image pushed to prod ECR"
 
-  deploy:
-    name: Deploy to ${{ needs.setup.outputs.environment }}
-    needs: [setup, build, copy-image]
-    if: always() && needs.setup.result == 'success' && (needs.build.result == 'success' || needs.copy-image.result == 'success')
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [setup, build-and-save-artifact]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: ${{ needs.setup.outputs.environment == 'prod' && 'production' || null }}
 
     steps:
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ needs.setup.outputs.is_prod == 'true' && secrets.AWS_ACCESS_KEY_ID_PROD || secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ needs.setup.outputs.is_prod == 'true' && secrets.AWS_SECRET_ACCESS_KEY_PROD || secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get current task definition (prod only)
-        if: needs.setup.outputs.is_prod == 'true'
+      - name: Deploy to ECS
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          IMAGE_TAG: ${{ needs.build-and-save-artifact.outputs.image_tag }}
+        run: |
+          echo "Deploying to dev ECS with image tag: $IMAGE_TAG"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Wait for deployment
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --cli-read-timeout 300
+
+      - name: Deployment summary
+        if: success()
+        env:
+          BACKEND_URL: https://ait-dev-be.tratin.com
+          IMAGE_TAG: ${{ needs.build-and-save-artifact.outputs.image_tag }}
+        run: |
+          echo "## Dev Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** dev" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+
+  deploy-prod:
+    name: Deploy to Prod
+    needs: [setup, load-artifact-and-push-prod]
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Configure AWS credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get current task definition
         id: current-task
         env:
           ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
@@ -299,13 +318,12 @@ jobs:
           echo "current_task_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
           echo "Current task definition: $TASK_DEF_ARN"
 
-      - name: Run database migrations (prod only)
-        if: needs.setup.outputs.is_prod == 'true'
+      - name: Run database migrations
         env:
           ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
           ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
           ECR_REPOSITORY: ${{ needs.setup.outputs.ecr_repository }}
-          IMAGE_TAG: ${{ needs.copy-image.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
         run: |
           echo "Running database migrations..."
 
@@ -361,9 +379,9 @@ jobs:
         env:
           ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
           ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
-          IMAGE_TAG: ${{ needs.build.outputs.image_tag || needs.copy-image.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
         run: |
-          echo "Deploying to ECS with image tag: $IMAGE_TAG"
+          echo "Deploying to prod ECS with image tag: $IMAGE_TAG"
 
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
@@ -378,15 +396,12 @@ jobs:
         run: |
           echo "Waiting for ECS service to stabilize..."
 
-          TIMEOUT="${{ needs.setup.outputs.is_prod == 'true' && '600' || '300' }}"
-
           aws ecs wait services-stable \
             --cluster $ECS_CLUSTER \
             --services $ECS_SERVICE \
-            --cli-read-timeout $TIMEOUT
+            --cli-read-timeout 600
 
-      - name: Verify health check (prod only)
-        if: needs.setup.outputs.is_prod == 'true'
+      - name: Verify health check
         run: |
           echo "Verifying backend health..."
 
@@ -405,8 +420,7 @@ jobs:
           echo "❌ Health check failed after 10 attempts"
           exit 1
 
-      - name: Monitor CloudWatch alarms (prod only)
-        if: needs.setup.outputs.is_prod == 'true'
+      - name: Monitor CloudWatch alarms
         run: |
           echo "Checking CloudWatch alarms for 5 minutes..."
 
@@ -442,21 +456,19 @@ jobs:
       - name: Deployment summary
         if: success()
         env:
-          BACKEND_URL: ${{ needs.setup.outputs.is_prod == 'true' && 'https://ait-be.tratin.com' || 'https://ait-dev-be.tratin.com' }}
-          IMAGE_TAG: ${{ needs.build.outputs.image_tag || needs.copy-image.outputs.image_tag }}
-          VERSION: ${{ needs.create-tag.outputs.version || 'dev' }}
+          BACKEND_URL: https://ait-be.tratin.com
+          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
         run: |
-          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "## Prod Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** prod" >> $GITHUB_STEP_SUMMARY
           echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
 
   rollback:
     name: Rollback on Failure
-    needs: [setup, deploy]
-    if: failure() && needs.setup.outputs.is_prod == 'true'
+    needs: [setup, deploy-prod]
+    if: failure()
     runs-on: ubuntu-latest
 
     steps:
