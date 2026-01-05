@@ -94,7 +94,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     },
     ecs: {
       cpu: 2048, // 2 vCPU
-      memory: 2048, // 2 GB
+      memory: 4096, // 4 GB
       desiredCount: 2,
     },
     vpc: {
