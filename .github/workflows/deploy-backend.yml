@@ -152,6 +152,7 @@ jobs:
     name: Load Artifact & Push to Prod ECR
     needs: [setup, build-and-save-artifact, deploy-dev]
     runs-on: ubuntu-latest
+    environment: production-ecr
 
     outputs:
       image_tag: ${{ github.sha }}
