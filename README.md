@@ -98,18 +98,19 @@ git push origin main
 
 #### Step 2: Deploy Backend to Production
 
-1. Go to **GitHub Actions** → **Deploy Backend to Production**
+1. Go to **GitHub Actions** → **Deploy Backend**
 2. Click **Run workflow**
-3. Input version: `v1.0.0` (semantic versioning)
-4. Add release notes (optional)
-5. Click **Run workflow**
+3. Select environment: **prod**
+4. Input version: `v1.0.0` (semantic versioning)
+5. Add release notes (optional)
+6. Click **Run workflow**
 
 **What happens:**
 
 - ✅ Creates git tag `v1.0.0` (if doesn't exist)
 - ✅ Typechecks code
-- ✅ Builds Docker image for linux/amd64
-- ✅ Pushes to ECR with tags: `:sha`, `:v1.0.0`, `:latest`
+- ✅ **Copies dev Docker image** (exact same container tested in dev - no rebuild!)
+- ✅ Pushes to prod ECR with tags: `:sha`, `:v1.0.0`, `:latest`
 - ⏸️ **WAITS FOR MANUAL APPROVAL** (2 reviewers required)
 - ✅ Runs database migrations (separate task)
 - ✅ Updates ECS service (zero-downtime deployment)
@@ -119,10 +120,11 @@ git push origin main
 
 #### Step 3: Deploy Frontend to Production
 
-1. Go to **GitHub Actions** → **Deploy Frontend to Production**
+1. Go to **GitHub Actions** → **Deploy Frontend**
 2. Click **Run workflow**
-3. Input same version: `v1.0.0`
-4. Click **Run workflow**
+3. Select environment: **prod**
+4. Input same version: `v1.0.0`
+5. Click **Run workflow**
 
 **What happens:**
 
@@ -161,9 +163,11 @@ Production deployments automatically rollback on:
 
 **Using GitHub Actions:**
 
-1. Go to **Deploy Backend to Production**
-2. Input previous version tag: `v1.0.0`
-3. Approve deployment
+1. Go to **Deploy Backend** workflow
+2. Click **Run workflow**
+3. Select environment: **prod**
+4. Input previous version tag: `v1.0.0`
+5. Approve deployment
 
 **Using AWS CLI:**
 
@@ -196,26 +200,49 @@ aws ecs update-service \
 - ✅ Deployment branches: Tags matching `v*.*.*`
 - ✅ Wait timer: 0 minutes
 
-### Secrets
+### Repository Secrets
 
-Add the following secrets to the `production` environment:
+Add the following secrets to **Settings → Secrets and variables → Actions → Repository secrets**:
+
+**Dev** (already exist):
 
 ```
-AWS_ACCESS_KEY_ID_PROD=<IAM key for account 231570082843>
+AWS_ACCESS_KEY_ID=<IAM key for dev account 201002506909>
+AWS_SECRET_ACCESS_KEY=<Secret key>
+S3_BUCKET=<dev S3 bucket>
+CLOUDFRONT_DISTRIBUTION_ID=<dev CloudFront ID>
+AWS_REGION=us-east-1
+```
+
+**Prod** (need to add):
+
+```
+AWS_ACCESS_KEY_ID_PROD=<IAM key for prod account 231570082843>
 AWS_SECRET_ACCESS_KEY_PROD=<Secret key>
 AWS_ACCOUNT_ID_PROD=231570082843
 S3_BUCKET_PROD=ait-prd-gbl-s3-webapp-01-231570082843
-CLOUDFRONT_DISTRIBUTION_ID_PROD=<from CDK output>
+CLOUDFRONT_DISTRIBUTION_ID_PROD=E2Q5JID33W5NY8
 ```
 
-### Variables
+### Repository Variables
 
-Add the following variables to the `production` environment:
+Add the following variables to **Settings → Secrets and variables → Actions → Repository variables**:
+
+**Dev**:
+
+```
+VITE_API_BASE_URL=https://ait-dev-be.tratin.com
+VITE_COGNITO_USER_POOL_ID=<from dev CDK output>
+VITE_COGNITO_CLIENT_ID=<from dev CDK output>
+VITE_COGNITO_REGION=us-east-1
+```
+
+**Prod**:
 
 ```
 VITE_API_BASE_URL_PROD=https://ait-be.tratin.com
-VITE_COGNITO_USER_POOL_ID_PROD=<from CDK output>
-VITE_COGNITO_CLIENT_ID_PROD=<from CDK output>
+VITE_COGNITO_USER_POOL_ID_PROD=us-east-1_W5bvCFDmH
+VITE_COGNITO_CLIENT_ID_PROD=5q7a6h16r5f2drnd4nr4206hme
 VITE_COGNITO_REGION_PROD=us-east-1
 ```
 

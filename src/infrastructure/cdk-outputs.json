@@ -1,0 +1,23 @@
+{
+  "AitPrdStack": {
+    "CloudFrontDistributionId": "E2Q5JID33W5NY8",
+    "EcsClusterName": "ait-prd-ue1-ecs-cluster-01",
+    "FrontendUrl": "https://ait.tratin.com",
+    "BastionPublicIp": "100.29.108.216",
+    "CognitoUserPoolId": "us-east-1_W5bvCFDmH",
+    "CognitoClientId": "5q7a6h16r5f2drnd4nr4206hme",
+    "FrontendCloudFrontDomainName5E6D3798": "dh9bw9y4lrir7.cloudfront.net",
+    "BackendALBDnsName8D986CEE": "ait-prd-ue1-alb-backend-01-1644925629.us-east-1.elb.amazonaws.com",
+    "VpcId": "vpc-0285de69fbf6ccb3b",
+    "AuroraClusterEndpoint": "ait-prd-ue1-rds-app-01.cluster-ckze6g0ig9wz.us-east-1.rds.amazonaws.com",
+    "AuroraSecretArn": "arn:aws:secretsmanager:us-east-1:231570082843:secret:ait-prd-ue1-sm-aurora-01-9wJM7Q",
+    "EcrRepositoryUri": "231570082843.dkr.ecr.us-east-1.amazonaws.com/ait-prd-gbl-ecr-backend-01",
+    "BackendUrl": "https://ait-be.tratin.com",
+    "Dw2SecretArn": "arn:aws:secretsmanager:us-east-1:231570082843:secret:ait-prd-ue1-sm-dw2-01-JhJ6aH",
+    "S3BucketName": "ait-prd-gbl-s3-webapp-01-231570082843",
+    "BastionKeyParameterName": "/ec2/keypair/key-0e324b4234383791a",
+    "EcsServiceName": "ait-prd-ue1-ecs-backend-01",
+    "SiqSecretArn": "arn:aws:secretsmanager:us-east-1:231570082843:secret:ait-prd-ue1-sm-siq-01-BG5EAs",
+    "DashboardUrl": "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=ait-prd-ue1-cw-dashboard-01"
+  }
+}

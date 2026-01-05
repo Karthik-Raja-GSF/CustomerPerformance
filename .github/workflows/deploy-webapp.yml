@@ -1,4 +1,4 @@
-name: Deploy Webapp
+name: Deploy Frontend
 
 on:
   push:
@@ -9,22 +9,107 @@ on:
       - "pnpm-lock.yaml"
       - ".github/workflows/deploy-webapp.yml"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      version:
+        description: "Version tag for prod (e.g., v1.0.0 - should match backend)"
+        required: false
+        type: string
 
 concurrency:
-  group: webapp-${{ github.ref }}
-  cancel-in-progress: true
+  group: webapp-${{ github.event_name == 'push' && github.ref || format('webapp-{0}', inputs.environment) }}
+  cancel-in-progress: ${{ github.event_name == 'push' }} # Only cancel for dev
 
 env:
   NODE_VERSION: "20"
+  AWS_REGION: us-east-1
 
 jobs:
-  build:
-    name: Build & Test
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.determine-env.outputs.environment }}
+      is_prod: ${{ steps.determine-env.outputs.is_prod }}
+      s3_bucket: ${{ steps.determine-env.outputs.s3_bucket }}
+      cloudfront_id: ${{ steps.determine-env.outputs.cloudfront_id }}
+      frontend_url: ${{ steps.determine-env.outputs.frontend_url }}
+
+    steps:
+      - name: Determine environment
+        id: determine-env
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            ENV="dev"
+            IS_PROD="false"
+          else
+            ENV="${{ inputs.environment }}"
+            IS_PROD="${{ inputs.environment == 'prod' }}"
+          fi
+
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "is_prod=$IS_PROD" >> $GITHUB_OUTPUT
+
+          # Set resource names based on environment
+          if [ "$IS_PROD" == "true" ]; then
+            echo "s3_bucket=${{ secrets.S3_BUCKET_PROD }}" >> $GITHUB_OUTPUT
+            echo "cloudfront_id=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}" >> $GITHUB_OUTPUT
+            echo "frontend_url=https://ait.tratin.com" >> $GITHUB_OUTPUT
+          else
+            echo "s3_bucket=${{ secrets.S3_BUCKET }}" >> $GITHUB_OUTPUT
+            echo "cloudfront_id=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "frontend_url=https://ait-dev.tratin.com" >> $GITHUB_OUTPUT
+          fi
+
+          echo "✅ Deploying to: $ENV"
+
+  validate:
+    name: Validate Version
+    needs: setup
+    if: needs.setup.outputs.is_prod == 'true'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version tag exists
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.0.0"
+            exit 1
+          fi
+
+          if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "❌ Tag $VERSION does not exist"
+            echo "Please deploy the backend first to create the tag"
+            exit 1
+          fi
+
+          echo "✅ Tag $VERSION exists and is valid"
+
+  build:
+    name: Build Frontend
+    needs: [setup, validate]
+    if: always() && needs.setup.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -44,68 +129,124 @@ jobs:
       - name: Build webapp
         run: pnpm --filter webapp build
         env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_COGNITO_USER_POOL_ID: ${{ needs.setup.outputs.is_prod == 'true' && vars.VITE_COGNITO_USER_POOL_ID_PROD || vars.VITE_COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ needs.setup.outputs.is_prod == 'true' && vars.VITE_COGNITO_CLIENT_ID_PROD || vars.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REGION: ${{ needs.setup.outputs.is_prod == 'true' && vars.VITE_COGNITO_REGION_PROD || vars.VITE_COGNITO_REGION }}
+          VITE_API_BASE_URL: ${{ needs.setup.outputs.is_prod == 'true' && vars.VITE_API_BASE_URL_PROD || vars.VITE_API_BASE_URL }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webapp-dist
+          name: webapp-dist-${{ needs.setup.outputs.environment }}
           path: src/webapp/dist
-          retention-days: 1
+          retention-days: ${{ needs.setup.outputs.is_prod == 'true' && 7 || 1 }}
 
   deploy:
-    name: Deploy to AWS
-    needs: build
+    name: Deploy to ${{ needs.setup.outputs.environment }}
+    needs: [setup, build]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    environment: ${{ needs.setup.outputs.environment == 'prod' && 'production' || null }}
 
     steps:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: webapp-dist
+          name: webapp-dist-${{ needs.setup.outputs.environment }}
           path: dist
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ needs.setup.outputs.is_prod == 'true' && secrets.AWS_ACCESS_KEY_ID_PROD || secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.setup.outputs.is_prod == 'true' && secrets.AWS_SECRET_ACCESS_KEY_PROD || secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
+        env:
+          S3_BUCKET: ${{ needs.setup.outputs.s3_bucket }}
         run: |
-          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} \
+          echo "Deploying to S3 bucket: $S3_BUCKET"
+
+          # Sync static assets with aggressive caching (1 year)
+          aws s3 sync dist/ s3://$S3_BUCKET \
             --delete \
             --cache-control "public, max-age=31536000, immutable" \
             --exclude "index.html" \
             --exclude "*.json"
 
-          # Upload index.html and JSON files with no-cache
-          aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET }}/index.html \
+          # Upload index.html with no-cache (always fetch latest)
+          aws s3 cp dist/index.html s3://$S3_BUCKET/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
 
           # Upload any JSON files with no-cache (if they exist)
           if ls dist/*.json 1> /dev/null 2>&1; then
-            aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} \
+            aws s3 sync dist/ s3://$S3_BUCKET \
               --exclude "*" \
               --include "*.json" \
               --cache-control "no-cache, no-store, must-revalidate"
           fi
 
+          echo "✅ S3 sync complete"
+
       - name: Invalidate CloudFront cache
+        env:
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ needs.setup.outputs.cloudfront_id }}
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+          echo "Invalidating CloudFront cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
+
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+
+          echo "Invalidation ID: $INVALIDATION_ID"
+
+          # Wait for invalidation to complete for prod
+          if [ "${{ needs.setup.outputs.is_prod }}" == "true" ]; then
+            echo "Waiting for cache invalidation to complete..."
+            aws cloudfront wait invalidation-completed \
+              --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+              --id $INVALIDATION_ID \
+              --cli-read-timeout 300 || echo "⚠️ Invalidation still in progress"
+          fi
+
+          echo "✅ CloudFront cache invalidation initiated"
+
+      - name: Verify frontend health
+        env:
+          FRONTEND_URL: ${{ needs.setup.outputs.frontend_url }}
+        run: |
+          echo "Verifying frontend is accessible at $FRONTEND_URL..."
+
+          for i in {1..10}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $FRONTEND_URL || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Frontend health check passed (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+
+            echo "⏳ Health check attempt $i/10 failed (HTTP $HTTP_CODE), retrying..."
+            sleep 6
+          done
+
+          echo "❌ Frontend health check failed after 10 attempts"
+          exit 1
 
       - name: Deployment summary
+        if: success()
+        env:
+          FRONTEND_URL: ${{ needs.setup.outputs.frontend_url }}
+          VERSION: ${{ inputs.version || 'dev' }}
         run: |
-          echo "## Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://ait-dev.tratin.com" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** $FRONTEND_URL" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "CloudFront cache invalidation initiated." >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ S3 sync complete" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CloudFront cache invalidated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Frontend health check passed" >> $GITHUB_STEP_SUMMARY

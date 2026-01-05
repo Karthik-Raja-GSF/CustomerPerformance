@@ -7,29 +7,136 @@ on:
       - "src/backend/**"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      version:
+        description: "Version tag for prod (e.g., v1.0.0)"
+        required: false
+        type: string
+      release_notes:
+        description: "Release notes for prod"
+        required: false
+        type: string
 
 concurrency:
-  group: backend-${{ github.ref }}
-  cancel-in-progress: true
+  group: backend-${{ github.event_name == 'push' && github.ref || format('backend-{0}', inputs.environment) }}
+  cancel-in-progress: ${{ github.event_name == 'push' }} # Only cancel for dev
 
 env:
   NODE_VERSION: "20"
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: ait-dev-gbl-ecr-backend-01
-  ECS_CLUSTER: ait-dev-ue1-ecs-cluster-01
-  ECS_SERVICE: ait-dev-ue1-ecs-backend-01
 
 jobs:
-  build:
-    name: Build & Push
+  setup:
+    name: Setup Environment
     runs-on: ubuntu-latest
-
     outputs:
-      image_tag: ${{ github.sha }}
+      environment: ${{ steps.determine-env.outputs.environment }}
+      is_prod: ${{ steps.determine-env.outputs.is_prod }}
+      ecr_repository: ${{ steps.determine-env.outputs.ecr_repository }}
+      ecs_cluster: ${{ steps.determine-env.outputs.ecs_cluster }}
+      ecs_service: ${{ steps.determine-env.outputs.ecs_service }}
+
+    steps:
+      - name: Determine environment
+        id: determine-env
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            ENV="dev"
+            IS_PROD="false"
+          else
+            ENV="${{ inputs.environment }}"
+            IS_PROD="${{ inputs.environment == 'prod' }}"
+          fi
+
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "is_prod=$IS_PROD" >> $GITHUB_OUTPUT
+
+          # Set resource names based on environment
+          if [ "$IS_PROD" == "true" ]; then
+            echo "ecr_repository=ait-prd-gbl-ecr-backend-01" >> $GITHUB_OUTPUT
+            echo "ecs_cluster=ait-prd-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
+            echo "ecs_service=ait-prd-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
+          else
+            echo "ecr_repository=ait-dev-gbl-ecr-backend-01" >> $GITHUB_OUTPUT
+            echo "ecs_cluster=ait-dev-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
+            echo "ecs_service=ait-dev-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
+          fi
+
+          echo "✅ Deploying to: $ENV"
+
+  create-tag:
+    name: Create Git Tag
+    needs: setup
+    if: needs.setup.outputs.is_prod == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.0.0"
+            exit 1
+          fi
+
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "✅ Tag $VERSION already exists"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create annotated tag
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          RELEASE_NOTES="${{ inputs.release_notes }}"
+
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag already exists, skipping"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -z "$RELEASE_NOTES" ]; then
+            git tag -a "$VERSION" -m "Release $VERSION"
+          else
+            git tag -a "$VERSION" -m "Release $VERSION" -m "$RELEASE_NOTES"
+          fi
+
+          git push origin "$VERSION"
+          echo "✅ Created and pushed tag: $VERSION"
+
+  validate:
+    name: Validate & Typecheck
+    needs: [setup, create-tag]
+    if: always() && needs.setup.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-tag.outputs.version || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -49,7 +156,31 @@ jobs:
       - name: Typecheck
         run: pnpm --filter backend typecheck
 
-      - name: Configure AWS credentials
+      - name: Validate migrations (prod only)
+        if: needs.setup.outputs.is_prod == 'true'
+        run: |
+          if [ ! -d "src/backend/prisma/migrations" ]; then
+            echo "⚠️ Warning: No migrations directory found"
+            exit 0
+          fi
+
+          MIGRATION_COUNT=$(find src/backend/prisma/migrations -name "migration.sql" | wc -l)
+          echo "✅ Found $MIGRATION_COUNT migrations"
+
+  build:
+    name: Build & Push to Dev ECR
+    needs: [setup, validate]
+    if: needs.setup.outputs.is_prod == 'false'
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -60,38 +191,180 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to ECR
+      - name: Build, tag, and push image to dev ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Build Docker image from project root (Dockerfile expects this context)
+          echo "Building Docker image for dev..."
+
           docker build --platform linux/amd64 \
             -f src/backend/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .
 
-          # Push both tags
+          echo "Pushing image with tags: $IMAGE_TAG, latest"
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-  deploy:
-    name: Deploy to AWS
-    needs: build
+  copy-image:
+    name: Copy Image from Dev to Prod ECR
+    needs: [setup, validate]
+    if: needs.setup.outputs.is_prod == 'true'
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+
+    outputs:
+      image_tag: ${{ github.sha }}
 
     steps:
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (dev - read access)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy to ECS
+      - name: Login to dev ECR
+        id: login-dev-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull image from dev ECR
+        env:
+          DEV_ECR: 201002506909.dkr.ecr.us-east-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
         run: |
+          echo "Pulling image from dev ECR: $IMAGE_TAG"
+          docker pull $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG
+
+      - name: Configure AWS credentials (prod - write access)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to prod ECR
+        id: login-prod-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag and push to prod ECR
+        env:
+          DEV_ECR: 201002506909.dkr.ecr.us-east-1.amazonaws.com
+          PROD_ECR: ${{ steps.login-prod-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          VERSION_TAG: ${{ needs.create-tag.outputs.version }}
+        run: |
+          echo "Tagging image for prod ECR..."
+          docker tag $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
+          docker tag $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:$VERSION_TAG
+          docker tag $DEV_ECR/ait-dev-gbl-ecr-backend-01:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
+
+          echo "Pushing image to prod ECR with tags: $IMAGE_TAG, $VERSION_TAG, latest"
+          docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
+          docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:$VERSION_TAG
+          docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
+
+          echo "✅ Successfully copied image from dev to prod ECR"
+
+  deploy:
+    name: Deploy to ${{ needs.setup.outputs.environment }}
+    needs: [setup, build, copy-image]
+    if: always() && needs.setup.result == 'success' && (needs.build.result == 'success' || needs.copy-image.result == 'success')
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment == 'prod' && 'production' || null }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ needs.setup.outputs.is_prod == 'true' && secrets.AWS_ACCESS_KEY_ID_PROD || secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ needs.setup.outputs.is_prod == 'true' && secrets.AWS_SECRET_ACCESS_KEY_PROD || secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get current task definition (prod only)
+        if: needs.setup.outputs.is_prod == 'true'
+        id: current-task
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+        run: |
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          echo "current_task_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          echo "Current task definition: $TASK_DEF_ARN"
+
+      - name: Run database migrations (prod only)
+        if: needs.setup.outputs.is_prod == 'true'
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.ecr_repository }}
+          IMAGE_TAG: ${{ needs.copy-image.outputs.image_tag }}
+        run: |
+          echo "Running database migrations..."
+
+          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+          SUBNETS=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' \
+            --output json)
+
+          SECURITY_GROUPS=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' \
+            --output json)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster $ECS_CLUSTER \
+            --task-definition ${{ steps.current-task.outputs.current_task_arn }} \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=$SUBNETS,securityGroups=$SECURITY_GROUPS,assignPublicIp=DISABLED}" \
+            --overrides '{
+              "containerOverrides": [
+                {
+                  "name": "ait-prd-ue1-ecs-container-01",
+                  "command": ["sh", "-c", "export DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-ait_procurement} && npx prisma migrate deploy"]
+                }
+              ]
+            }' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task ARN: $TASK_ARN"
+          echo "Waiting for migrations to complete..."
+          aws ecs wait tasks-stopped --cluster $ECS_CLUSTER --tasks $TASK_ARN
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster $ECS_CLUSTER \
+            --tasks $TASK_ARN \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ Migration failed with exit code: $EXIT_CODE"
+            exit 1
+          fi
+
+          echo "✅ Migrations completed successfully"
+
+      - name: Deploy to ECS
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+          IMAGE_TAG: ${{ needs.build.outputs.image_tag || needs.copy-image.outputs.image_tag }}
+        run: |
+          echo "Deploying to ECS with image tag: $IMAGE_TAG"
+
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
@@ -99,14 +372,145 @@ jobs:
             --no-cli-pager
 
       - name: Wait for deployment
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
         run: |
+          echo "Waiting for ECS service to stabilize..."
+
+          TIMEOUT="${{ needs.setup.outputs.is_prod == 'true' && '600' || '300' }}"
+
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --cli-read-timeout $TIMEOUT
+
+      - name: Verify health check (prod only)
+        if: needs.setup.outputs.is_prod == 'true'
+        run: |
+          echo "Verifying backend health..."
+
+          for i in {1..10}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://ait-be.tratin.com/health || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Health check passed (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+
+            echo "⏳ Health check attempt $i/10 failed (HTTP $HTTP_CODE), retrying..."
+            sleep 6
+          done
+
+          echo "❌ Health check failed after 10 attempts"
+          exit 1
+
+      - name: Monitor CloudWatch alarms (prod only)
+        if: needs.setup.outputs.is_prod == 'true'
+        run: |
+          echo "Checking CloudWatch alarms for 5 minutes..."
+
+          ALARM_NAMES=$(aws cloudwatch describe-alarms \
+            --alarm-name-prefix "ait-prd-ue1-cw-alarm" \
+            --query 'MetricAlarms[].AlarmName' \
+            --output text)
+
+          if [ -z "$ALARM_NAMES" ]; then
+            echo "⚠️ No CloudWatch alarms found"
+            exit 0
+          fi
+
+          echo "Monitoring alarms: $ALARM_NAMES"
+
+          for i in {1..10}; do
+            ALARM_STATES=$(aws cloudwatch describe-alarms \
+              --alarm-names $ALARM_NAMES \
+              --query 'MetricAlarms[?StateValue==`ALARM`].AlarmName' \
+              --output text)
+
+            if [ -n "$ALARM_STATES" ]; then
+              echo "❌ Alarms in ALARM state: $ALARM_STATES"
+              exit 1
+            fi
+
+            echo "✅ All alarms OK (check $i/10)"
+            sleep 30
+          done
+
+          echo "✅ CloudWatch monitoring complete - no alarms triggered"
+
+      - name: Deployment summary
+        if: success()
+        env:
+          BACKEND_URL: ${{ needs.setup.outputs.is_prod == 'true' && 'https://ait-be.tratin.com' || 'https://ait-dev-be.tratin.com' }}
+          IMAGE_TAG: ${{ needs.build.outputs.image_tag || needs.copy-image.outputs.image_tag }}
+          VERSION: ${{ needs.create-tag.outputs.version || 'dev' }}
+        run: |
+          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+
+  rollback:
+    name: Rollback on Failure
+    needs: [setup, deploy]
+    if: failure() && needs.setup.outputs.is_prod == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback to previous task definition
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.ecs_service }}
+        run: |
+          echo "⚠️ Deployment failed, initiating rollback..."
+
+          PREVIOUS_TASK_DEF=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --query 'services[0].deployments[1].taskDefinition' \
+            --output text || echo "none")
+
+          if [ "$PREVIOUS_TASK_DEF" = "none" ] || [ -z "$PREVIOUS_TASK_DEF" ]; then
+            echo "❌ No previous task definition found for rollback"
+            exit 1
+          fi
+
+          echo "Rolling back to: $PREVIOUS_TASK_DEF"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition $PREVIOUS_TASK_DEF \
+            --force-new-deployment \
+            --no-cli-pager
+
           aws ecs wait services-stable \
             --cluster $ECS_CLUSTER \
             --services $ECS_SERVICE
 
-      - name: Deployment summary
-        run: |
-          echo "## Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://ait-dev-be.tratin.com" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ needs.build.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Rollback complete"
+
+      - name: Create rollback incident issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Production Deployment Failed - Rollback Initiated`,
+              body: `## Deployment Failure\n\n**Workflow:** [${context.workflow}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n**Time:** ${new Date().toISOString()}\n\n### Action Required\n- Investigate deployment logs\n- Fix underlying issue\n- Re-run deployment when ready\n\n### Rollback Status\nAutomatic rollback to previous task definition has been initiated.`,
+              labels: ['deployment', 'production', 'incident']
+            });
+
+            console.log(`Created incident issue: ${issue.data.html_url}`);
