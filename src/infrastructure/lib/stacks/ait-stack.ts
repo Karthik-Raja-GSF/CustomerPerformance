@@ -15,10 +15,21 @@ import { BastionConstruct } from "../constructs/bastion-construct";
 import { SecretsConstruct } from "../constructs/secrets-construct";
 import { DmsConstruct } from "../constructs/dms-construct";
 import { DashboardConstruct } from "../constructs/dashboard-construct";
+import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
+
+export interface CrossAccountRoute53Config {
+  roleArn: string; // ARN of IAM role in dev account that can manage Route53
+  hostedZoneId: string; // Hosted zone ID in dev account
+  zoneName: string; // tratin.com
+}
 
 export interface AitStackProps extends cdk.StackProps {
   config: EnvironmentConfig;
   hostedZoneId: string;
+  // For dev: create delegation role for this account
+  trustedAccountId?: string;
+  // For prod: use cross-account Route53
+  crossAccountRoute53?: CrossAccountRoute53Config;
 }
 
 /**
@@ -33,7 +44,8 @@ export class AitStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AitStackProps) {
     super(scope, id, props);
 
-    const { config, hostedZoneId } = props;
+    const { config, hostedZoneId, trustedAccountId, crossAccountRoute53 } =
+      props;
 
     // AIT-specific domain names (different from GSF stack)
     const aitDomainPrefix =
@@ -55,15 +67,25 @@ export class AitStack extends cdk.Stack {
     // Apply standard tags to entire stack
     addStandardTags(this, naming.env);
 
-    // Import existing Route53 Hosted Zone
-    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
-      this,
-      "HostedZone",
-      {
+    // Import existing Route53 Hosted Zone (only if same account)
+    // For cross-account, hostedZone will be undefined - DNS records created manually
+    const hostedZone = crossAccountRoute53
+      ? undefined
+      : route53.HostedZone.fromHostedZoneAttributes(this, "HostedZone", {
+          hostedZoneId: hostedZoneId,
+          zoneName: config.baseDomain,
+        });
+
+    // ===================
+    // Route53 Delegation Role (for dev stack only)
+    // ===================
+    if (trustedAccountId && config.envName === "dev") {
+      new Route53DelegationConstruct(this, "Route53Delegation", {
         hostedZoneId: hostedZoneId,
-        zoneName: config.baseDomain,
-      }
-    );
+        trustedAccountId: trustedAccountId,
+        naming,
+      });
+    }
 
     // ===================
     // VPC

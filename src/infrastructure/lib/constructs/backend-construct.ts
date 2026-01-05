@@ -7,6 +7,7 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
@@ -31,7 +32,8 @@ export interface BackendConstructProps {
   cognitoClientId: string;
   domainName: string;
   frontendUrl: string;
-  hostedZone: route53.IHostedZone;
+  hostedZone?: route53.IHostedZone; // Optional for cross-account
+  certificateArn?: string; // Use existing cert if hostedZone not available
   config: EcsConfig;
   naming: NamingConfig;
 }
@@ -40,7 +42,7 @@ export class BackendConstruct extends Construct {
   public readonly cluster: ecs.Cluster;
   public readonly service: ecs.FargateService;
   public readonly loadBalancer: elbv2.ApplicationLoadBalancer;
-  public readonly certificate: acm.Certificate;
+  public readonly certificate: acm.ICertificate;
 
   constructor(scope: Construct, id: string, props: BackendConstructProps) {
     super(scope, id);
@@ -55,6 +57,7 @@ export class BackendConstruct extends Construct {
       domainName,
       frontendUrl,
       hostedZone,
+      certificateArn,
       config,
       naming,
     } = props;
@@ -246,10 +249,26 @@ export class BackendConstruct extends Construct {
     siqSecret.grantRead(taskDefinition.executionRole!);
 
     // ACM Certificate
-    this.certificate = new acm.Certificate(this, "Certificate", {
-      domainName: domainName,
-      validation: acm.CertificateValidation.fromDns(hostedZone),
-    });
+    // Import existing cert if ARN provided, otherwise create with DNS validation
+    if (certificateArn) {
+      this.certificate = acm.Certificate.fromCertificateArn(
+        this,
+        "Certificate",
+        certificateArn
+      );
+    } else if (hostedZone) {
+      this.certificate = new acm.Certificate(this, "Certificate", {
+        domainName: domainName,
+        validation: acm.CertificateValidation.fromDns(hostedZone),
+      });
+    } else {
+      // No hosted zone and no cert ARN - create cert with DNS validation
+      // User will need to manually add DNS validation records
+      this.certificate = new acm.Certificate(this, "Certificate", {
+        domainName: domainName,
+        validation: acm.CertificateValidation.fromDns(),
+      });
+    }
 
     // Security Group for ALB
     const albSecurityGroup = new ec2.SecurityGroup(this, "ALBSecurityGroup", {
@@ -351,14 +370,156 @@ export class BackendConstruct extends Construct {
       this.service.attachToApplicationTargetGroup(targetGroup);
     }
 
-    // Route53 A record
-    new route53.ARecord(this, "AliasRecord", {
-      zone: hostedZone,
-      recordName: domainName,
-      target: route53.RecordTarget.fromAlias(
-        new route53Targets.LoadBalancerTarget(this.loadBalancer)
-      ),
-    });
+    // Route53 A record (only if hosted zone is available)
+    if (hostedZone) {
+      new route53.ARecord(this, "AliasRecord", {
+        zone: hostedZone,
+        recordName: domainName,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.LoadBalancerTarget(this.loadBalancer)
+        ),
+      });
+    }
+
+    // Output ALB DNS for manual DNS setup if no hosted zone
+    if (!hostedZone) {
+      new cdk.CfnOutput(this, "ALBDnsName", {
+        value: this.loadBalancer.loadBalancerDnsName,
+        description: `ALB DNS - create CNAME ${domainName} -> this value`,
+      });
+    }
+
+    // ===================
+    // Auto Scaling
+    // ===================
+    if (config.autoScaling && config.desiredCount > 0) {
+      const scaling = this.service.autoScaleTaskCount({
+        minCapacity: config.autoScaling.minCount,
+        maxCapacity: config.autoScaling.maxCount,
+      });
+
+      // CPU-based scaling
+      scaling.scaleOnCpuUtilization("CpuScaling", {
+        targetUtilizationPercent: config.autoScaling.cpuTargetPercent,
+        scaleInCooldown: cdk.Duration.seconds(
+          config.autoScaling.scaleInCooldown
+        ),
+        scaleOutCooldown: cdk.Duration.seconds(
+          config.autoScaling.scaleOutCooldown
+        ),
+      });
+
+      // Memory-based scaling (optional)
+      if (config.autoScaling.memoryTargetPercent) {
+        scaling.scaleOnMemoryUtilization("MemoryScaling", {
+          targetUtilizationPercent: config.autoScaling.memoryTargetPercent,
+          scaleInCooldown: cdk.Duration.seconds(
+            config.autoScaling.scaleInCooldown
+          ),
+          scaleOutCooldown: cdk.Duration.seconds(
+            config.autoScaling.scaleOutCooldown
+          ),
+        });
+      }
+    }
+
+    // ===================
+    // CloudWatch Alarms (Production only)
+    // ===================
+    if (naming.env === "prd" && config.autoScaling) {
+      // High CPU Utilization Alarm
+      new cloudwatch.Alarm(this, "HighCpuAlarm", {
+        alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-cpu", "01"),
+        metric: this.service.metricCpuUtilization({
+          period: cdk.Duration.minutes(5),
+        }),
+        threshold: 80,
+        evaluationPeriods: 2,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+        alarmDescription:
+          "Alert when CPU utilization exceeds 80% for 10 minutes",
+      });
+
+      // High Memory Utilization Alarm
+      new cloudwatch.Alarm(this, "HighMemoryAlarm", {
+        alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-memory", "01"),
+        metric: this.service.metricMemoryUtilization({
+          period: cdk.Duration.minutes(5),
+        }),
+        threshold: 80,
+        evaluationPeriods: 2,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+        alarmDescription:
+          "Alert when memory utilization exceeds 80% for 10 minutes",
+      });
+
+      // HTTP 5xx Errors Alarm
+      const http5xxMetric = targetGroup.metricHttpCodeTarget(
+        elbv2.HttpCodeTarget.TARGET_5XX_COUNT,
+        {
+          period: cdk.Duration.minutes(1),
+          statistic: "Sum",
+        }
+      );
+
+      new cloudwatch.Alarm(this, "High5xxErrorsAlarm", {
+        alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-5xx", "01"),
+        metric: http5xxMetric,
+        threshold: 10,
+        evaluationPeriods: 1,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+        alarmDescription: "Alert when 5xx errors exceed 10 per minute",
+      });
+
+      // Unhealthy Target Count Alarm
+      const unhealthyHostMetric = targetGroup.metricUnhealthyHostCount({
+        period: cdk.Duration.minutes(2),
+      });
+
+      new cloudwatch.Alarm(this, "UnhealthyTargetsAlarm", {
+        alarmName: n.name(
+          ResourceTypes.CLOUDWATCH_ALARM,
+          "unhealthy-targets",
+          "01"
+        ),
+        metric: unhealthyHostMetric,
+        threshold: 0,
+        evaluationPeriods: 1,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+        alarmDescription: "Alert when any target is unhealthy",
+      });
+
+      // Failed Task Count Alarm (tasks that stopped unexpectedly)
+      // Note: This is approximated using running task count dropping below minimum
+      const runningTaskMetric = new cloudwatch.Metric({
+        namespace: "AWS/ECS",
+        metricName: "CPUUtilization",
+        dimensionsMap: {
+          ServiceName: this.service.serviceName,
+          ClusterName: this.cluster.clusterName,
+        },
+        period: cdk.Duration.minutes(1),
+        statistic: "SampleCount",
+      });
+
+      new cloudwatch.Alarm(this, "LowTaskCountAlarm", {
+        alarmName: n.name(
+          ResourceTypes.CLOUDWATCH_ALARM,
+          "low-task-count",
+          "01"
+        ),
+        metric: runningTaskMetric,
+        threshold: config.autoScaling.minCount,
+        evaluationPeriods: 3,
+        comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+        alarmDescription: `Alert when running tasks drop below ${config.autoScaling.minCount}`,
+        treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      });
+    }
 
     // Tags
     addStandardTags(this.cluster, naming.env, clusterName);
@@ -371,7 +532,14 @@ export class BackendConstruct extends Construct {
     addStandardTags(serviceSecurityGroup, naming.env, ecsSgName);
     addStandardTags(targetGroup, naming.env, tgName);
     addStandardTags(logGroup, naming.env, logGroupName);
-    addStandardTags(this.certificate, naming.env, certName);
+    // Only tag certificate if it was created (not imported)
+    if (!certificateArn) {
+      addStandardTags(
+        this.certificate as acm.Certificate,
+        naming.env,
+        certName
+      );
+    }
   }
 
   /**

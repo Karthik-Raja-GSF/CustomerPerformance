@@ -16,19 +16,20 @@ import { addStandardTags } from "../config/tags";
 export interface FrontendConstructProps {
   envName: string;
   domainName: string;
-  hostedZone: route53.IHostedZone;
+  hostedZone?: route53.IHostedZone; // Optional for cross-account
+  certificateArn?: string; // Use existing cert if hostedZone not available
   naming: NamingConfig;
 }
 
 export class FrontendConstruct extends Construct {
   public readonly bucket: s3.Bucket;
   public readonly distribution: cloudfront.Distribution;
-  public readonly certificate: acm.Certificate;
+  public readonly certificate: acm.ICertificate;
 
   constructor(scope: Construct, id: string, props: FrontendConstructProps) {
     super(scope, id);
 
-    const { envName, domainName, hostedZone, naming } = props;
+    const { envName, domainName, hostedZone, certificateArn, naming } = props;
 
     // Generate resource names (S3, CloudFront are global resources)
     const n = createNamingHelper(naming);
@@ -55,10 +56,36 @@ export class FrontendConstruct extends Construct {
     });
 
     // ACM Certificate (must be in us-east-1 for CloudFront)
-    this.certificate = new acm.Certificate(this, "Certificate", {
-      domainName: domainName,
-      validation: acm.CertificateValidation.fromDns(hostedZone),
-    });
+    // Import existing cert if ARN provided, otherwise create with DNS validation
+    if (certificateArn) {
+      this.certificate = acm.Certificate.fromCertificateArn(
+        this,
+        "Certificate",
+        certificateArn
+      );
+    } else if (hostedZone) {
+      this.certificate = new acm.Certificate(this, "Certificate", {
+        domainName: domainName,
+        validation: acm.CertificateValidation.fromDns(hostedZone),
+      });
+      addStandardTags(
+        this.certificate as acm.Certificate,
+        naming.env,
+        certName
+      );
+    } else {
+      // No hosted zone and no cert ARN - create cert with DNS validation
+      // User will need to manually add DNS validation records
+      this.certificate = new acm.Certificate(this, "Certificate", {
+        domainName: domainName,
+        validation: acm.CertificateValidation.fromDns(),
+      });
+      addStandardTags(
+        this.certificate as acm.Certificate,
+        naming.env,
+        certName
+      );
+    }
 
     // Origin Access Control for S3
     const oac = new cloudfront.S3OriginAccessControl(this, "OAC", {
@@ -98,19 +125,28 @@ export class FrontendConstruct extends Construct {
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
-    // Route53 A record
-    new route53.ARecord(this, "AliasRecord", {
-      zone: hostedZone,
-      recordName: domainName,
-      target: route53.RecordTarget.fromAlias(
-        new route53Targets.CloudFrontTarget(this.distribution)
-      ),
-    });
+    // Route53 A record (only if hosted zone is available)
+    if (hostedZone) {
+      new route53.ARecord(this, "AliasRecord", {
+        zone: hostedZone,
+        recordName: domainName,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.CloudFrontTarget(this.distribution)
+        ),
+      });
+    }
+
+    // Output CloudFront domain for manual DNS setup if no hosted zone
+    if (!hostedZone) {
+      new cdk.CfnOutput(this, "CloudFrontDomainName", {
+        value: this.distribution.distributionDomainName,
+        description: `CloudFront domain - create CNAME ${domainName} -> this value`,
+      });
+    }
 
     // Tags
     addStandardTags(this.bucket, naming.env, bucketName);
     addStandardTags(this.distribution, naming.env, distributionName);
     addStandardTags(oac, naming.env, oacName);
-    addStandardTags(this.certificate, naming.env, certName);
   }
 }

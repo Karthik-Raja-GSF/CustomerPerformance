@@ -5,10 +5,20 @@ export interface AuroraConfig {
   databaseName: string; // Database name created in the cluster
 }
 
+export interface EcsAutoScalingConfig {
+  minCount: number;
+  maxCount: number;
+  cpuTargetPercent: number; // Target CPU utilization (e.g., 70)
+  memoryTargetPercent?: number; // Optional memory target
+  scaleInCooldown: number; // Seconds
+  scaleOutCooldown: number; // Seconds
+}
+
 export interface EcsConfig {
   cpu: number;
   memory: number;
   desiredCount: number;
+  autoScaling?: EcsAutoScalingConfig;
 }
 
 export interface VpcConfig {
@@ -84,22 +94,30 @@ export const environments: Record<string, EnvironmentConfig> = {
   },
   prd: {
     envName: "prd",
-    domainPrefix: "", // Configure later: '', 'prod', 'app', etc.
+    domainPrefix: "", // ait.tratin.com (без префикса dev)
     baseDomain: "tratin.com",
     aurora: {
       minCapacity: 0.5, // Scales to 0.5 at idle
       maxCapacity: 8, // Max 8 ACU for load
       deletionProtection: true,
-      databaseName: "ait_procurement", // New cluster - use correct name
+      databaseName: "ait_procurement",
     },
     ecs: {
       cpu: 2048, // 2 vCPU
       memory: 4096, // 4 GB
-      desiredCount: 2,
+      desiredCount: 2, // Start with 2 tasks for HA
+      autoScaling: {
+        minCount: 2, // Always at least 2 tasks (high availability)
+        maxCount: 4,
+        cpuTargetPercent: 70,
+        memoryTargetPercent: 80,
+        scaleInCooldown: 300, // 5 minutes
+        scaleOutCooldown: 60, // 1 minute
+      },
     },
     vpc: {
       cidr: "10.202.0.0/16",
-      natGateways: 2, // 2 NAT for HA
+      natGateways: 2, // 2 NAT gateways for high availability
       maxAzs: 2,
     },
     vpcPeering: {
@@ -113,7 +131,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     dms: {
       instanceClass: "dms.t3.large",
       allocatedStorage: 100,
-      multiAz: true,
+      multiAz: false, // Single AZ для экономии
       publiclyAccessible: false,
     },
   },

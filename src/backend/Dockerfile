@@ -33,4 +33,5 @@ RUN cp -r src/config dist/
 EXPOSE 8887
 
 # Run migrations and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Build DATABASE_URL from env vars before running Prisma
+CMD ["sh", "-c", "export DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-ait_procurement} && npx prisma migrate deploy && node dist/index.js"]

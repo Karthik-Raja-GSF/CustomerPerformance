@@ -71,6 +71,7 @@ export const ResourceTypes = {
 
   // Monitoring
   CLOUDWATCH: "cw",
+  CLOUDWATCH_ALARM: "cw-alarm",
 } as const;
 
 /**
