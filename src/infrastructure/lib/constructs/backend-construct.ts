@@ -21,6 +21,8 @@ import {
   ResourceTypes,
 } from "../config/naming";
 import { addStandardTags } from "../config/tags";
+import { CrossAccountRoute53RecordConstruct } from "./cross-account-route53-record-construct";
+import { CrossAccountRoute53Config } from "./frontend-construct";
 
 export interface BackendConstructProps {
   envName: string;
@@ -36,6 +38,7 @@ export interface BackendConstructProps {
   certificateArn?: string; // Use existing cert if hostedZone not available
   config: EcsConfig;
   naming: NamingConfig;
+  crossAccountRoute53?: CrossAccountRoute53Config; // For cross-account DNS
 }
 
 export class BackendConstruct extends Construct {
@@ -60,6 +63,7 @@ export class BackendConstruct extends Construct {
       certificateArn,
       config,
       naming,
+      crossAccountRoute53,
     } = props;
 
     // Generate resource names
@@ -370,8 +374,9 @@ export class BackendConstruct extends Construct {
       this.service.attachToApplicationTargetGroup(targetGroup);
     }
 
-    // Route53 A record (only if hosted zone is available)
+    // Route53 A record
     if (hostedZone) {
+      // Same-account: use native Route53 construct
       new route53.ARecord(this, "AliasRecord", {
         zone: hostedZone,
         recordName: domainName,
@@ -379,10 +384,19 @@ export class BackendConstruct extends Construct {
           new route53Targets.LoadBalancerTarget(this.loadBalancer)
         ),
       });
-    }
-
-    // Output ALB DNS for manual DNS setup if no hosted zone
-    if (!hostedZone) {
+    } else if (crossAccountRoute53) {
+      // Cross-account: use custom resource with role assumption
+      new CrossAccountRoute53RecordConstruct(this, "CrossAccountRecord", {
+        recordName: domainName,
+        hostedZoneId: crossAccountRoute53.hostedZoneId,
+        delegationRoleArn: crossAccountRoute53.roleArn,
+        target: {
+          type: "alb",
+          loadBalancer: this.loadBalancer,
+        },
+      });
+    } else {
+      // Output ALB DNS for manual DNS setup if no hosted zone
       new cdk.CfnOutput(this, "ALBDnsName", {
         value: this.loadBalancer.loadBalancerDnsName,
         description: `ALB DNS - create CNAME ${domainName} -> this value`,

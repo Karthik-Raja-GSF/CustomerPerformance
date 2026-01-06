@@ -171,6 +171,7 @@ export class AitStack extends cdk.Stack {
       domainName: domains.frontend,
       hostedZone,
       naming,
+      crossAccountRoute53,
     });
 
     // ===================
@@ -202,6 +203,7 @@ export class AitStack extends cdk.Stack {
       hostedZone,
       config: ecsConfig,
       naming,
+      crossAccountRoute53,
     });
 
     // Allow Fargate to connect to Aurora

@@ -12,6 +12,13 @@ import {
   ResourceTypes,
 } from "../config/naming";
 import { addStandardTags } from "../config/tags";
+import { CrossAccountRoute53RecordConstruct } from "./cross-account-route53-record-construct";
+
+export interface CrossAccountRoute53Config {
+  roleArn: string;
+  hostedZoneId: string;
+  zoneName: string;
+}
 
 export interface FrontendConstructProps {
   envName: string;
@@ -19,6 +26,7 @@ export interface FrontendConstructProps {
   hostedZone?: route53.IHostedZone; // Optional for cross-account
   certificateArn?: string; // Use existing cert if hostedZone not available
   naming: NamingConfig;
+  crossAccountRoute53?: CrossAccountRoute53Config; // For cross-account DNS
 }
 
 export class FrontendConstruct extends Construct {
@@ -29,7 +37,14 @@ export class FrontendConstruct extends Construct {
   constructor(scope: Construct, id: string, props: FrontendConstructProps) {
     super(scope, id);
 
-    const { envName, domainName, hostedZone, certificateArn, naming } = props;
+    const {
+      envName,
+      domainName,
+      hostedZone,
+      certificateArn,
+      naming,
+      crossAccountRoute53,
+    } = props;
 
     // Generate resource names (S3, CloudFront are global resources)
     const n = createNamingHelper(naming);
@@ -125,8 +140,9 @@ export class FrontendConstruct extends Construct {
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
-    // Route53 A record (only if hosted zone is available)
+    // Route53 A record
     if (hostedZone) {
+      // Same-account: use native Route53 construct
       new route53.ARecord(this, "AliasRecord", {
         zone: hostedZone,
         recordName: domainName,
@@ -134,10 +150,19 @@ export class FrontendConstruct extends Construct {
           new route53Targets.CloudFrontTarget(this.distribution)
         ),
       });
-    }
-
-    // Output CloudFront domain for manual DNS setup if no hosted zone
-    if (!hostedZone) {
+    } else if (crossAccountRoute53) {
+      // Cross-account: use custom resource with role assumption
+      new CrossAccountRoute53RecordConstruct(this, "CrossAccountRecord", {
+        recordName: domainName,
+        hostedZoneId: crossAccountRoute53.hostedZoneId,
+        delegationRoleArn: crossAccountRoute53.roleArn,
+        target: {
+          type: "cloudfront",
+          distribution: this.distribution,
+        },
+      });
+    } else {
+      // Output CloudFront domain for manual DNS setup if no hosted zone
       new cdk.CfnOutput(this, "CloudFrontDomainName", {
         value: this.distribution.distributionDomainName,
         description: `CloudFront domain - create CNAME ${domainName} -> this value`,
