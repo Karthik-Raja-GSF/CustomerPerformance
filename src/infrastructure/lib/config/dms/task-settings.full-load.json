@@ -1,0 +1,17 @@
+{
+  "TargetMetadata": {
+    "SupportLobs": true,
+    "FullLobMode": false,
+    "LimitedSizeLobMode": true,
+    "LobMaxSize": 32
+  },
+  "FullLoadSettings": {
+    "TargetTablePrepMode": "TRUNCATE_BEFORE_LOAD",
+    "CreatePkAfterFullLoad": false,
+    "MaxFullLoadSubTasks": 8,
+    "CommitRate": 10000
+  },
+  "Logging": {
+    "EnableLogging": true
+  }
+}

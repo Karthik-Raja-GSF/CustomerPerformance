@@ -1,3 +1,5 @@
+// src/infastructure/lib/config/environments.ts
+
 export interface AuroraConfig {
   minCapacity: number; // ACU (0.5 - 128)
   maxCapacity: number; // ACU
@@ -37,11 +39,31 @@ export interface VpcPeeringConfig {
   peerRegion: string;
 }
 
+/**
+ * DMS configuration.
+ * CS 1/6/26
+ * NOTE:
+ * - sourceSchemaName is the schema name as it exists on SQL Server (DW2)
+ * - targetSchemaName is the schema name DMS should create/use on Aurora PostgreSQL
+ * - startTaskOnDeploy will auto-run the replication task after CloudFormation creates it
+ */
 export interface DmsConfig {
   instanceClass: string; // e.g., "dms.t3.large"
   allocatedStorage: number; // GB
   multiAz: boolean;
   publiclyAccessible: boolean;
+
+  // PATHS TO DMS MAPPINGS AND TASK CONFIG JSON FILES CS 1/5/26
+  tableMappingsFile?: string;
+  taskSettingsFile?: string;
+
+  // SCHEMA FIX: source is "nav", target must be "dw2_nav" CS 1/6/26
+  sourceSchemaName?: string; // default "nav"
+  targetSchemaName?: string; // default "dw2_nav"
+
+  // AUTO-START the replication task after deploy CS 1/6/26
+  startTaskOnDeploy?: boolean; // default true
+  startTaskType?: "start-replication" | "resume-processing" | "reload-target"; // default "start-replication"
 }
 
 export interface EnvironmentConfig {
@@ -90,8 +112,21 @@ export const environments: Record<string, EnvironmentConfig> = {
       allocatedStorage: 50,
       multiAz: false,
       publiclyAccessible: false,
+
+      // POINTERS TO TABLE MAPPING AND TASK SETTING JSON CS 1/5/26
+      tableMappingsFile: "lib/config/dms/table-mappings.full-load.json",
+      taskSettingsFile: "lib/config/dms/task-settings.full-load.json",
+
+      // FIX: target schema must be dw2_nav CS 1/6/26
+      sourceSchemaName: "nav",
+      targetSchemaName: "dw2_nav",
+
+      // AUTO-RUN full load task after deploy CS 1/6/26
+      startTaskOnDeploy: true,
+      startTaskType: "start-replication",
     },
   },
+
   prd: {
     envName: "prd",
     domainPrefix: "", // ait.tratin.com (без префикса dev)
@@ -133,6 +168,18 @@ export const environments: Record<string, EnvironmentConfig> = {
       allocatedStorage: 100,
       multiAz: false, // Single AZ для экономии
       publiclyAccessible: false,
+
+      // USE SPECIFIC FILES IF THEY DIFFER CS 1/5/26
+      tableMappingsFile: "lib/config/dms/table-mappings.full-load.json",
+      taskSettingsFile: "lib/config/dms/task-settings.full-load.json",
+
+      // FIX: target schema must be dw2_nav
+      sourceSchemaName: "nav",
+      targetSchemaName: "dw2_nav",
+
+      // AUTO-RUN full load task after deploy
+      startTaskOnDeploy: true,
+      startTaskType: "start-replication",
     },
   },
 };
