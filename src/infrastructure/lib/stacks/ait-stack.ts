@@ -351,6 +351,11 @@ export class AitStack extends cdk.Stack {
         description: "DMS Source Endpoint ARN (DW2 SQL Server)",
       });
 
+      new cdk.CfnOutput(this, "DmsGuestdataSourceEndpointArn", {
+        value: dmsConstruct.guestdataSourceEndpoint.ref,
+        description: "DMS Source Endpoint ARN (GUESTDATA SQL Server)",
+      });
+
       new cdk.CfnOutput(this, "DmsTargetEndpointArn", {
         value: dmsConstruct.targetEndpoint.ref,
         description: "DMS Target Endpoint ARN (Aurora PostgreSQL)",

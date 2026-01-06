@@ -122,7 +122,7 @@ export const environments: Record<string, EnvironmentConfig> = {
       targetSchemaName: "dw2_nav",
 
       // AUTO-RUN full load task after deploy CS 1/6/26
-      startTaskOnDeploy: true,
+      startTaskOnDeploy: false, // Temporarily disabled
       startTaskType: "start-replication",
     },
   },
@@ -178,7 +178,7 @@ export const environments: Record<string, EnvironmentConfig> = {
       targetSchemaName: "dw2_nav",
 
       // AUTO-RUN full load task after deploy
-      startTaskOnDeploy: true,
+      startTaskOnDeploy: false, // Temporarily disabled
       startTaskType: "start-replication",
     },
   },
