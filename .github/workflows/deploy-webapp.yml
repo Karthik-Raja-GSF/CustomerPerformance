@@ -18,26 +18,8 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  setup-dev:
-    name: Setup Dev Resources
-    runs-on: ubuntu-latest
-    outputs:
-      s3_bucket: ${{ steps.set-resources.outputs.s3_bucket }}
-      cloudfront_id: ${{ steps.set-resources.outputs.cloudfront_id }}
-      frontend_url: ${{ steps.set-resources.outputs.frontend_url }}
-
-    steps:
-      - name: Set dev resources
-        id: set-resources
-        run: |
-          echo "s3_bucket=${{ secrets.S3_BUCKET }}" >> $GITHUB_OUTPUT
-          echo "cloudfront_id=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
-          echo "frontend_url=https://ait-dev.tratin.com" >> $GITHUB_OUTPUT
-          echo "✅ Dev resources configured"
-
   build-dev:
     name: Build Frontend (Dev)
-    needs: setup-dev
     runs-on: ubuntu-latest
 
     steps:
@@ -76,7 +58,7 @@ jobs:
 
   deploy-dev:
     name: Deploy to Dev
-    needs: [setup-dev, build-dev]
+    needs: build-dev
     runs-on: ubuntu-latest
 
     steps:
@@ -94,25 +76,23 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
-        env:
-          S3_BUCKET: ${{ needs.setup-dev.outputs.s3_bucket }}
         run: |
-          echo "Deploying to S3 bucket: $S3_BUCKET"
+          echo "Deploying to S3 bucket: ${{ secrets.S3_BUCKET }}"
 
           # Sync static assets with aggressive caching (1 year)
-          aws s3 sync dist/ s3://$S3_BUCKET \
+          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} \
             --delete \
             --cache-control "public, max-age=31536000, immutable" \
             --exclude "index.html" \
             --exclude "*.json"
 
           # Upload index.html with no-cache (always fetch latest)
-          aws s3 cp dist/index.html s3://$S3_BUCKET/index.html \
+          aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET }}/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
 
           # Upload any JSON files with no-cache (if they exist)
           if ls dist/*.json 1> /dev/null 2>&1; then
-            aws s3 sync dist/ s3://$S3_BUCKET \
+            aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} \
               --exclude "*" \
               --include "*.json" \
               --cache-control "no-cache, no-store, must-revalidate"
@@ -121,13 +101,11 @@ jobs:
           echo "✅ S3 sync complete"
 
       - name: Invalidate CloudFront cache
-        env:
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ needs.setup-dev.outputs.cloudfront_id }}
         run: |
-          echo "Invalidating CloudFront cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
+          echo "Invalidating CloudFront cache for distribution: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}"
 
           aws cloudfront create-invalidation \
-            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*" \
             --query 'Invalidation.Id' \
             --output text
@@ -135,9 +113,8 @@ jobs:
           echo "✅ CloudFront cache invalidation initiated"
 
       - name: Verify frontend health
-        env:
-          FRONTEND_URL: ${{ needs.setup-dev.outputs.frontend_url }}
         run: |
+          FRONTEND_URL="https://ait-dev.tratin.com"
           echo "Verifying frontend is accessible at $FRONTEND_URL..."
 
           for i in {1..10}; do
@@ -168,27 +145,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Dev deployment successful. Proceeding with prod build and deployment..." >> $GITHUB_STEP_SUMMARY
 
-  setup-prod:
-    name: Setup Prod Resources
-    needs: approval-gate
-    runs-on: ubuntu-latest
-    outputs:
-      s3_bucket: ${{ steps.set-resources.outputs.s3_bucket }}
-      cloudfront_id: ${{ steps.set-resources.outputs.cloudfront_id }}
-      frontend_url: ${{ steps.set-resources.outputs.frontend_url }}
-
-    steps:
-      - name: Set prod resources
-        id: set-resources
-        run: |
-          echo "s3_bucket=${{ secrets.S3_BUCKET_PROD }}" >> $GITHUB_OUTPUT
-          echo "cloudfront_id=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}" >> $GITHUB_OUTPUT
-          echo "frontend_url=https://ait.tratin.com" >> $GITHUB_OUTPUT
-          echo "✅ Prod resources configured"
-
   build-prod:
     name: Build Frontend (Prod)
-    needs: setup-prod
+    needs: approval-gate
     runs-on: ubuntu-latest
 
     steps:
@@ -227,7 +186,7 @@ jobs:
 
   deploy-prod:
     name: Deploy to Prod
-    needs: [setup-prod, build-prod]
+    needs: build-prod
     runs-on: ubuntu-latest
     environment: production
 
@@ -246,25 +205,23 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
-        env:
-          S3_BUCKET: ${{ needs.setup-prod.outputs.s3_bucket }}
         run: |
-          echo "Deploying to S3 bucket: $S3_BUCKET"
+          echo "Deploying to S3 bucket: ${{ secrets.S3_BUCKET_PROD }}"
 
           # Sync static assets with aggressive caching (1 year)
-          aws s3 sync dist/ s3://$S3_BUCKET \
+          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_PROD }} \
             --delete \
             --cache-control "public, max-age=31536000, immutable" \
             --exclude "index.html" \
             --exclude "*.json"
 
           # Upload index.html with no-cache (always fetch latest)
-          aws s3 cp dist/index.html s3://$S3_BUCKET/index.html \
+          aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET_PROD }}/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
 
           # Upload any JSON files with no-cache (if they exist)
           if ls dist/*.json 1> /dev/null 2>&1; then
-            aws s3 sync dist/ s3://$S3_BUCKET \
+            aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_PROD }} \
               --exclude "*" \
               --include "*.json" \
               --cache-control "no-cache, no-store, must-revalidate"
@@ -273,13 +230,11 @@ jobs:
           echo "✅ S3 sync complete"
 
       - name: Invalidate CloudFront cache
-        env:
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ needs.setup-prod.outputs.cloudfront_id }}
         run: |
-          echo "Invalidating CloudFront cache for distribution: $CLOUDFRONT_DISTRIBUTION_ID"
+          echo "Invalidating CloudFront cache for distribution: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}"
 
           INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
             --paths "/*" \
             --query 'Invalidation.Id' \
             --output text)
@@ -288,16 +243,15 @@ jobs:
 
           echo "Waiting for cache invalidation to complete..."
           aws cloudfront wait invalidation-completed \
-            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
             --id $INVALIDATION_ID \
             --cli-read-timeout 300 || echo "⚠️ Invalidation still in progress"
 
           echo "✅ CloudFront cache invalidation complete"
 
       - name: Verify frontend health
-        env:
-          FRONTEND_URL: ${{ needs.setup-prod.outputs.frontend_url }}
         run: |
+          FRONTEND_URL="https://ait.tratin.com"
           echo "Verifying frontend is accessible at $FRONTEND_URL..."
 
           for i in {1..10}; do
@@ -317,13 +271,11 @@ jobs:
 
       - name: Deployment summary
         if: success()
-        env:
-          FRONTEND_URL: ${{ needs.setup-prod.outputs.frontend_url }}
         run: |
           echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** production" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** $FRONTEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://ait.tratin.com" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ S3 sync complete" >> $GITHUB_STEP_SUMMARY
