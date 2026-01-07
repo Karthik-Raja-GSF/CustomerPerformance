@@ -59,7 +59,7 @@ export class McpClientService implements IMcpClientService {
       >`
         SELECT table_schema, table_name
         FROM information_schema.tables
-        WHERE table_schema IN ('ait', 'dw2_nav')
+        WHERE table_schema IN ('ait', 'dw2_nav', 'siq')
         AND table_type = 'BASE TABLE'
         ORDER BY table_schema, table_name
       `;

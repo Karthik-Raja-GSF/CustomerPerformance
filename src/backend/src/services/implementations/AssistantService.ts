@@ -32,6 +32,7 @@ import { getSqlGenerationDuration } from "@/telemetry/metrics";
 @injectable()
 export class AssistantService implements IAssistantService {
   private baseSystemPrompt: string;
+  private sqlGenerationPromptTemplate: string;
   private mcpInitialized = false;
   private cachedSchema: string | null = null;
 
@@ -48,6 +49,7 @@ export class AssistantService implements IAssistantService {
     this.promptService = promptService;
     this.mcpClient = mcpClient;
     this.baseSystemPrompt = this.loadBaseSystemPrompt();
+    this.sqlGenerationPromptTemplate = this.loadSqlGenerationPrompt();
   }
 
   private async ensureMcpInitialized(): Promise<void> {
@@ -66,49 +68,9 @@ export class AssistantService implements IAssistantService {
   }
 
   private buildSqlGenerationPrompt(schema: string, question: string): string {
-    return `You are a SQL query generator for a demand planning system.
-
-## Valid Tables (USE THESE)
-- sites - locations/warehouses
-- suppliers - vendor information
-- items - products
-- inventory_snapshots - stock levels
-- sales_actuals - historical sales
-- forecasts - demand predictions
-- customer_metrics - customer analysis
-
-## Database Schema
-${schema}
-
-## Query Building Rule
-When the user's question relates to allowed database tables, you MUST:
-1. Identify which tables contain relevant information for the question
-2. Review the table schema to understand column names, types, and relationships
-3. Include descriptive columns (name, description, title) in SELECT statements when they exist
-4. Use appropriate JOINs to get related entity names instead of returning just IDs
-5. Build a well-formed SQL query that retrieves all relevant details needed to answer the question
-6. When listing entities, always include identifying information like name, code, or description
-
-## When to Generate SQL
-Generate a query for questions about:
-- Sites, suppliers, items, inventory, sales, forecasts, customer metrics
-- Counting, listing, aggregating, or comparing data
-
-## When NOT to Generate SQL (return "NO_QUERY_NEEDED")
-- Questions about database schema or table structure
-- Questions about system tables: users, prompts, import_logs
-- Greetings or general conversation
-
-## SQL Rules
-- Generate ONLY SELECT queries
-- Return SQL in \`\`\`sql code blocks
-- Use JOINs when data spans tables
-- Limit to 100 rows unless aggregating
-
-## User Question
-${question}
-
-Generate the SQL query:`;
+    return this.sqlGenerationPromptTemplate
+      .replace("{{schema}}", schema)
+      .replace("{{question}}", question);
   }
 
   private extractSqlFromResponse(response: string): string | null {
@@ -199,6 +161,11 @@ ${queryResults}
 
   private loadBaseSystemPrompt(): string {
     const promptPath = join(__dirname, "../../config/system_prompt.md");
+    return readFileSync(promptPath, "utf-8");
+  }
+
+  private loadSqlGenerationPrompt(): string {
+    const promptPath = join(__dirname, "../../config/build_sql_prompt.md");
     return readFileSync(promptPath, "utf-8");
   }
 
