@@ -87,27 +87,47 @@ export default function StockiqSync() {
   const [history, setHistory] = useState<SyncLog[]>([]);
   const [latestStatus, setLatestStatus] = useState<SyncLog | null>(null);
   const [orphans, setOrphans] = useState<OrphanedRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isLoadingOrphans, setIsLoadingOrphans] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [historyData, statusData, orphansData] = await Promise.all([
-        getSyncHistory(20),
-        getLatestSyncStatus(),
-        getOrphanedRecords(),
-      ]);
-      setHistory(historyData);
-      setLatestStatus(statusData);
-      setOrphans(orphansData);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to fetch sync data"
-      );
-    } finally {
-      setIsLoading(false);
-    }
+  const fetchData = useCallback(() => {
+    // Fetch latest status
+    setIsLoadingStatus(true);
+    getLatestSyncStatus()
+      .then(setLatestStatus)
+      .catch((err) =>
+        toast.error(
+          err instanceof Error ? err.message : "Failed to fetch sync status"
+        )
+      )
+      .finally(() => setIsLoadingStatus(false));
+
+    // Fetch history
+    setIsLoadingHistory(true);
+    getSyncHistory(20)
+      .then(setHistory)
+      .catch((err) =>
+        toast.error(
+          err instanceof Error ? err.message : "Failed to fetch sync history"
+        )
+      )
+      .finally(() => setIsLoadingHistory(false));
+
+    // Fetch orphans
+    setIsLoadingOrphans(true);
+    getOrphanedRecords()
+      .then(setOrphans)
+      .catch((err) =>
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch orphaned records"
+        )
+      )
+      .finally(() => setIsLoadingOrphans(false));
   }, []);
 
   useEffect(() => {
@@ -133,7 +153,7 @@ export default function StockiqSync() {
     try {
       const result = await triggerSync();
       toast.success(`Sync started. ID: ${result.syncId.slice(0, 8)}...`);
-      await fetchData();
+      fetchData();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to trigger sync"
@@ -148,7 +168,7 @@ export default function StockiqSync() {
     try {
       const result = await deleteOrphanedRecords();
       toast.success(`Deleted ${result.deletedCount} orphaned records`);
-      await fetchData();
+      fetchData();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete orphans"
@@ -157,14 +177,6 @@ export default function StockiqSync() {
       setIsDeleting(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <RefreshCw className="h-6 w-6 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -190,51 +202,59 @@ export default function StockiqSync() {
       </div>
 
       {/* Latest Status Card */}
-      {latestStatus && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest Sync Status</CardTitle>
-            <CardDescription>
-              Most recent synchronization details
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <div className="mt-1">
-                  <StatusBadge status={latestStatus.status} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Latest Sync Status</CardTitle>
+          <CardDescription>Most recent synchronization details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingStatus ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            </div>
+          ) : latestStatus ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <div className="mt-1">
+                    <StatusBadge status={latestStatus.status} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Started</p>
+                  <p className="mt-1 font-medium">
+                    {formatDate(latestStatus.startedAt)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Records</p>
+                  <p className="mt-1 font-medium">
+                    {formatRecordCounts(latestStatus)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Duration</p>
+                  <p className="mt-1 font-medium">
+                    {formatDuration(latestStatus.durationMs)}
+                  </p>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Started</p>
-                <p className="mt-1 font-medium">
-                  {formatDate(latestStatus.startedAt)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Records</p>
-                <p className="mt-1 font-medium">
-                  {formatRecordCounts(latestStatus)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Duration</p>
-                <p className="mt-1 font-medium">
-                  {formatDuration(latestStatus.durationMs)}
-                </p>
-              </div>
-            </div>
-            {latestStatus.errorMessage && (
-              <div className="mt-4 rounded-md bg-destructive/10 p-3">
-                <p className="text-sm text-destructive">
-                  {latestStatus.errorMessage}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              {latestStatus.errorMessage && (
+                <div className="mt-4 rounded-md bg-destructive/10 p-3">
+                  <p className="text-sm text-destructive">
+                    {latestStatus.errorMessage}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              No sync data available
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Sync History Table */}
       <Card>
@@ -243,7 +263,11 @@ export default function StockiqSync() {
           <CardDescription>Recent synchronization operations</CardDescription>
         </CardHeader>
         <CardContent>
-          {history.length === 0 ? (
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            </div>
+          ) : history.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No sync history available
             </p>
@@ -283,12 +307,14 @@ export default function StockiqSync() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Orphaned Records ({orphans.length})</CardTitle>
+              <CardTitle>
+                Orphaned Records {!isLoadingOrphans && `(${orphans.length})`}
+              </CardTitle>
               <CardDescription>
                 Records in database but no longer in StockIQ API
               </CardDescription>
             </div>
-            {orphans.length > 0 && (
+            {!isLoadingOrphans && orphans.length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm" disabled={isDeleting}>
@@ -324,7 +350,11 @@ export default function StockiqSync() {
           </div>
         </CardHeader>
         <CardContent>
-          {orphans.length === 0 ? (
+          {isLoadingOrphans ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            </div>
+          ) : orphans.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No orphaned records found
             </p>
