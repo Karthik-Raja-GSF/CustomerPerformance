@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/shadcn/components/alert-dialog";
+import { ScrollArea } from "@/shadcn/components/scroll-area";
 import {
   getSyncHistory,
   getLatestSyncStatus,
@@ -179,9 +180,9 @@ export default function StockiqSync() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-2xl font-semibold">StockIQ Sync</h1>
           <p className="text-muted-foreground">
@@ -202,7 +203,7 @@ export default function StockiqSync() {
       </div>
 
       {/* Latest Status Card */}
-      <Card>
+      <Card className="shrink-0">
         <CardHeader>
           <CardTitle>Latest Sync Status</CardTitle>
           <CardDescription>Most recent synchronization details</CardDescription>
@@ -256,130 +257,148 @@ export default function StockiqSync() {
         </CardContent>
       </Card>
 
-      {/* Sync History Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sync History</CardTitle>
-          <CardDescription>Recent synchronization operations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoadingHistory ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-5 w-5 animate-spin" />
-            </div>
-          ) : history.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              No sync history available
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Records</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Triggered By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      <StatusBadge status={log.status} />
-                    </TableCell>
-                    <TableCell>{formatDate(log.startedAt)}</TableCell>
-                    <TableCell>{formatRecordCounts(log)}</TableCell>
-                    <TableCell>{formatDuration(log.durationMs)}</TableCell>
-                    <TableCell className="capitalize">
-                      {log.triggeredBy}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Orphaned Records Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>
-                Orphaned Records {!isLoadingOrphans && `(${orphans.length})`}
-              </CardTitle>
-              <CardDescription>
-                Records in database but no longer in StockIQ API
-              </CardDescription>
-            </div>
-            {!isLoadingOrphans && orphans.length > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={isDeleting}>
-                    {isDeleting ? (
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Delete All
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Delete Orphaned Records?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete {orphans.length} orphaned
-                      record(s) from the database. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => void handleDeleteOrphans()}
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+      {/* Scrollable sections container */}
+      <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-hidden">
+        {/* Sync History Table */}
+        <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <CardHeader className="shrink-0">
+            <CardTitle>Sync History</CardTitle>
+            <CardDescription>Recent synchronization operations</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              </div>
+            ) : history.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No sync history available
+              </p>
+            ) : (
+              <ScrollArea className="h-full">
+                <div className="px-6 pb-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Started</TableHead>
+                        <TableHead>Records</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Triggered By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {history.map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell>
+                            <StatusBadge status={log.status} />
+                          </TableCell>
+                          <TableCell>{formatDate(log.startedAt)}</TableCell>
+                          <TableCell>{formatRecordCounts(log)}</TableCell>
+                          <TableCell>
+                            {formatDuration(log.durationMs)}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {log.triggeredBy}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </ScrollArea>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingOrphans ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-5 w-5 animate-spin" />
+          </CardContent>
+        </Card>
+
+        {/* Orphaned Records Section */}
+        <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <CardHeader className="shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>
+                  Orphaned Records {!isLoadingOrphans && `(${orphans.length})`}
+                </CardTitle>
+                <CardDescription>
+                  Records in database but no longer in StockIQ API
+                </CardDescription>
+              </div>
+              {!isLoadingOrphans && orphans.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Delete All
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Delete Orphaned Records?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete {orphans.length} orphaned
+                        record(s) from the database. This action cannot be
+                        undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => void handleDeleteOrphans()}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
-          ) : orphans.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              No orphaned records found
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Site Code</TableHead>
-                  <TableHead>Item Code</TableHead>
-                  <TableHead>Last Synced</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orphans.map((orphan) => (
-                  <TableRow key={`${orphan.siteCode}-${orphan.itemCode}`}>
-                    <TableCell>{orphan.siteCode}</TableCell>
-                    <TableCell>{orphan.itemCode}</TableCell>
-                    <TableCell>{formatDate(orphan.syncedAt)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
+            {isLoadingOrphans ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              </div>
+            ) : orphans.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No orphaned records found
+              </p>
+            ) : (
+              <ScrollArea className="h-full">
+                <div className="px-6 pb-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Site Code</TableHead>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Last Synced</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orphans.map((orphan) => (
+                        <TableRow key={`${orphan.siteCode}-${orphan.itemCode}`}>
+                          <TableCell>{orphan.siteCode}</TableCell>
+                          <TableCell>{orphan.itemCode}</TableCell>
+                          <TableCell>{formatDate(orphan.syncedAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
