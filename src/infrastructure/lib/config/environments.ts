@@ -43,7 +43,7 @@ export interface VpcPeeringConfig {
  * DMS configuration.
  * CS 1/6/26
  * NOTE:
- * - sourceSchemaName is the schema name as it exists on SQL Server (DW2)
+ * - sourceSchemaName is the schema name as it exists on SQL Server (DW2/GUESTDATA)
  * - targetSchemaName is the schema name DMS should create/use on Aurora PostgreSQL
  * - startTaskOnDeploy will auto-run the replication task after CloudFormation creates it
  */
@@ -57,13 +57,19 @@ export interface DmsConfig {
   tableMappingsFile?: string;
   taskSettingsFile?: string;
 
-  // SCHEMA FIX: source is "nav", target must be "dw2_nav" CS 1/6/26
+  // SCHEMA FIX: target must be "dw2_nav" CS 1/6/26
   sourceSchemaName?: string; // default "nav"
   targetSchemaName?: string; // default "dw2_nav"
 
   // AUTO-START the replication task after deploy CS 1/6/26
   startTaskOnDeploy?: boolean; // default true
   startTaskType?: "start-replication" | "resume-processing" | "reload-target"; // default "start-replication"
+
+  useGuestdataSourceEndpoint?: boolean; // default false
+  guestdataDatabaseName?: string; // "GUESTDATA"
+
+  replicationTaskOrdinal?: string; // e.g. "02"
+  replicationTaskNumber?: string; // alias for replicationTaskOrdinal
 }
 
 export interface EnvironmentConfig {
@@ -113,17 +119,20 @@ export const environments: Record<string, EnvironmentConfig> = {
       multiAz: false,
       publiclyAccessible: false,
 
-      // POINTERS TO TABLE MAPPING AND TASK SETTING JSON CS 1/5/26
-      tableMappingsFile: "lib/config/dms/table-mappings.full-load.json",
+      // GUESTDATA VIEWS POINTERS TO TABLE MAPPING AND TASK SETTING JSON CS 1/6/26
+      tableMappingsFile: "lib/config/dms/table-mappings.full-load.guestdata_ait_views.json",
       taskSettingsFile: "lib/config/dms/task-settings.full-load.json",
 
-      // FIX: target schema must be dw2_nav CS 1/6/26
-      sourceSchemaName: "nav",
+      sourceSchemaName: "AIT",
       targetSchemaName: "dw2_nav",
 
+      useGuestdataSourceEndpoint: true,
+      guestdataDatabaseName: "GUESTDATA",
+
       // AUTO-RUN full load task after deploy CS 1/6/26
-      startTaskOnDeploy: false, // Temporarily disabled
+      startTaskOnDeploy: true,
       startTaskType: "start-replication",
+      replicationTaskOrdinal: "02",
     },
   },
 
@@ -169,16 +178,17 @@ export const environments: Record<string, EnvironmentConfig> = {
       multiAz: false, // Single AZ для экономии
       publiclyAccessible: false,
 
-      // USE SPECIFIC FILES IF THEY DIFFER CS 1/5/26
-      tableMappingsFile: "lib/config/dms/table-mappings.full-load.json",
+      tableMappingsFile: "lib/config/dms/table-mappings.full-load.guestdata_ait_views.json",
       taskSettingsFile: "lib/config/dms/task-settings.full-load.json",
 
-      // FIX: target schema must be dw2_nav
-      sourceSchemaName: "nav",
+      sourceSchemaName: "AIT",
       targetSchemaName: "dw2_nav",
 
-      // AUTO-RUN full load task after deploy
-      startTaskOnDeploy: false, // Temporarily disabled
+      // Use Guestdata endpoint in prod as well
+      useGuestdataSourceEndpoint: true,
+      guestdataDatabaseName: "GUESTDATA",
+
+      startTaskOnDeploy: true,
       startTaskType: "start-replication",
     },
   },

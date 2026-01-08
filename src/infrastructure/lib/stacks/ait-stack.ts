@@ -340,17 +340,20 @@ export class AitStack extends cdk.Stack {
     });
 
     // DMS Outputs
+
     if (dmsConstruct) {
       new cdk.CfnOutput(this, "DmsReplicationInstanceArn", {
         value: dmsConstruct.replicationInstance.ref,
         description: "DMS Replication Instance ARN",
       });
 
+      // DW2 endpoint (src-01) CS 1/7/26
       new cdk.CfnOutput(this, "DmsSourceEndpointArn", {
-        value: dmsConstruct.sourceEndpoint.ref,
+        value: dmsConstruct.dw2SourceEndpoint.ref,
         description: "DMS Source Endpoint ARN (DW2 SQL Server)",
       });
 
+      // Guestdata endpoint (src-02) CS 1/7/26
       new cdk.CfnOutput(this, "DmsGuestdataSourceEndpointArn", {
         value: dmsConstruct.guestdataSourceEndpoint.ref,
         description: "DMS Source Endpoint ARN (GUESTDATA SQL Server)",

@@ -43,3 +43,4 @@ cdk.out/
 */.claude/**
 .mcp.json
 **/cdk.out
+src/infrastructure/package-lock.json
