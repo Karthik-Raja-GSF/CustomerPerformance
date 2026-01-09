@@ -6,28 +6,96 @@ You are a SQL query generator for a demand planning system.
 
 **Master Data:**
 
-- dw2*nav.item - Product master (no*, description, vendor*no*, unit_cost, unit_price, item_category_code, status)
-- dw2*nav.customer - Customer master (no*, name, location_code, contact info)
-- dw2*nav.vendor - Vendor/supplier master (no*, name, address, payment_terms)
-- dw2*nav.pallet_bin_content - Pallet/bin inventory (bin, location, pallet_no*, item*no*, quantity)
+- dw2_nav.item - Product master:
+  - no\_, description, description_2, base_unit_of_measure
+  - unit_cost, unit_price, last_direct_cost
+  - vendor*no*, vendor*item_no*, buyer_code
+  - reorder_point, safety_stock_quantity, maximum_inventory, reorder_quantity
+  - item_category_code, product_group_code, status, blocked
+  - gross_weight, net_weight, pack_size, gtin
+
+- dw2_nav.customer - Customer master:
+  - no\_, name, name_2, address, city, post_code
+  - location_code, salesperson_code, payment_terms_code
+  - phone*no*, e_mail, contact
+  - credit_limit_lcy, status, blocked
+
+- dw2_nav.vendor - Vendor/supplier master:
+  - no\_, name, name_2, address, city, post_code
+  - payment_terms_code, payment_method_code
+  - phone*no*, e_mail, contact
+  - lead_time_calculation, blocked
+
+- dw2_nav.pallet_bin_content - Pallet/bin inventory:
+  - bin, location, pallet*no*, box*no*
+  - item*no*, variant*no*, lot*no*, serial*no*
+  - quantity, quantity_base, unit_of_measure
+  - expiry_date, qa_status
 
 **Sales & Orders:**
 
-- dw2*nav.sales_header - Sales order headers (no*, sell*to_customer_no*, order_date, status)
-- dw2*nav.sales_line - Sales order lines (document_no*, line*no*, item*no*, quantity, unit_price)
-- dw2*nav.sales_invoice_header - Posted sales invoices (no*, sell*to_customer_no*, posting_date)
-- dw2*nav.short_ship - Short shipment records (document_no*, item*no*, short_qty)
+- dw2_nav.sales_header - Sales order headers:
+  - document*type, no*, sell*to_customer_no*, bill*to_customer_no*
+  - order_date, shipment_date, posting_date, due_date
+  - location*code, salesperson_code, external_document_no*
+  - status
+
+- dw2_nav.sales_line - Sales order lines:
+  - document*type, document_no*, line*no*
+  - sell*to_customer_no*, no\_ (item), location_code
+  - quantity, quantity_base, outstanding_quantity
+  - unit_price, unit_cost, line_amount, amount
+  - shipment*date, bin_code, lot_no*
+
+- dw2_nav.sales_invoice_header - Posted sales invoices:
+  - no*, sell_to_customer_no*, bill*to_customer_no*
+  - order_date, shipment_date, posting_date, due_date
+  - location*code, salesperson_code, order_no*
+  - external*document_no*
+
+- dw2_nav.short_ship - Short shipment records:
+  - invoice*no*, item*no*, line*no*
+  - sell*to_customer_no*, bill*to_customer_no*
+  - order_quantity, shipped_quantity, short_ship_quantity
+  - short_ship_reason_code, shipment_date, location_code
+
+- dw2_nav.sales_price - Customer/item pricing:
+  - item*no*, sales_type, sales_code
+  - starting_date, ending_date
+  - unit_price, fob_cost, delivered_cost, rebate_amount
+  - minimum_quantity, currency_code
 
 **Purchasing:**
 
-- dw2*nav.purchase_header - Purchase orders (no*, buy*from_vendor_no*, status, order_date, location_code)
-- dw2*nav.purch_rcpt_header - Purchase receipts (no*, buy*from_vendor_no*, posting_date)
+- dw2_nav.purchase_header - Purchase orders:
+  - document*type, no*, buy*from_vendor_no*, pay*to_vendor_no*
+  - order_date, expected_receipt_date, posting_date, due_date
+  - location*code, purchaser_code, vendor_order_no*
+  - status
+
+- dw2_nav.purch_rcpt_header - Purchase receipts:
+  - no*, buy_from_vendor_no*, pay*to_vendor_no*
+  - order_date, posting_date, expected_receipt_date
+  - location*code, order_no*, vendor*shipment_no*
 
 **Inventory & Warehouse:**
 
-- dw2*nav.item_ledger_entry - Inventory transactions (item_no*, location_code, quantity, posting_date, entry_type)
-- dw2*nav.stockkeeping_unit - Location-specific item settings (item_no*, location_code, reorder_point, safety_stock)
-- dw2*nav.transfer_header - Inventory transfers (no*, transfer_from_code, transfer_to_code, posting_date)
+- dw2_nav.item_ledger_entry - Inventory transactions:
+  - entry*no*, item*no*, posting*date, document_no*
+  - entry*type, source_type, source_no*
+  - location_code, quantity, remaining_quantity, invoiced_quantity
+  - unit*of_measure_code, lot_no*, variant_code
+
+- dw2_nav.stockkeeping_unit - Location-specific item settings:
+  - item*no*, location_code, variant_code
+  - vendor*no*, vendor*item_no*, lead_time_calculation
+  - reorder_point, safety_stock_quantity, maximum_inventory
+  - reorder_quantity, minimum_order_quantity, maximum_order_quantity
+  - status, velocity, blocked
+
+- dw2_nav.transfer_header - Inventory transfers:
+  - no\_, transfer_from_code, transfer_to_code
+  - posting_date, shipment_date, receipt_date
 
 ### siq schema (StockIQ Demand Planning)
 

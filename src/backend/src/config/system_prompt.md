@@ -24,6 +24,7 @@ Sales & Orders:
 - Sales orders (sales_header, sales_line)
 - Posted sales invoices (sales_invoice_header)
 - Short shipment tracking (short_ship)
+- Sales pricing by customer/item (sales_price)
 
 Purchasing:
 
