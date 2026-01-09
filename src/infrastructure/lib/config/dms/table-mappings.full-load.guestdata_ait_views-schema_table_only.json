@@ -1,0 +1,239 @@
+{
+  "rules": [
+    {
+      "rule-type": "selection",
+      "rule-id": "1",
+      "rule-name": "include_customer",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Customer", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "2",
+      "rule-name": "include_item",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "3",
+      "rule-name": "include_item_ledger_entry",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item Ledger Entry", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "4",
+      "rule-name": "include_pallet_bin_content",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Pallet Bin Content", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "5",
+      "rule-name": "include_purch_rcpt_header",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purch[_] Rcpt[_] Header", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "6",
+      "rule-name": "include_purchase_header",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purchase Header", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "7",
+      "rule-name": "include_sales_header",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Header", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "8",
+      "rule-name": "include_sales_invoice_header",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Invoice Header", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "9",
+      "rule-name": "include_sales_line",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Line", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "10",
+      "rule-name": "include_sales_price",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Price", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "11",
+      "rule-name": "include_short_ship",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Short Ship", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "12",
+      "rule-name": "include_stockkeeping_unit",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Stockkeeping Unit", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "13",
+      "rule-name": "include_transfer_header",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Transfer Header", "table-type": "view" },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "14",
+      "rule-name": "include_vendor",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Vendor", "table-type": "view" },
+      "rule-action": "include"
+    },
+
+    {
+      "rule-type": "transformation",
+      "rule-id": "1001",
+      "rule-name": "rename_customer",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Customer" },
+      "rule-action": "rename",
+      "value": "customer"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1002",
+      "rule-name": "rename_item",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item" },
+      "rule-action": "rename",
+      "value": "item"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1003",
+      "rule-name": "rename_item_ledger_entry",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item Ledger Entry" },
+      "rule-action": "rename",
+      "value": "item_ledger_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1004",
+      "rule-name": "rename_pallet_bin_content",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Pallet Bin Content" },
+      "rule-action": "rename",
+      "value": "pallet_bin_content"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1005",
+      "rule-name": "rename_purch_rcpt_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purch[_] Rcpt[_] Header" },
+      "rule-action": "rename",
+      "value": "purch_rcpt_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1006",
+      "rule-name": "rename_purchase_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purchase Header" },
+      "rule-action": "rename",
+      "value": "purchase_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1007",
+      "rule-name": "rename_sales_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Header" },
+      "rule-action": "rename",
+      "value": "sales_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1008",
+      "rule-name": "rename_sales_invoice_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Invoice Header" },
+      "rule-action": "rename",
+      "value": "sales_invoice_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1009",
+      "rule-name": "rename_sales_line",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Line" },
+      "rule-action": "rename",
+      "value": "sales_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1010",
+      "rule-name": "rename_sales_price",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Price" },
+      "rule-action": "rename",
+      "value": "sales_price"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1011",
+      "rule-name": "rename_short_ship",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Short Ship" },
+      "rule-action": "rename",
+      "value": "short_ship"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1012",
+      "rule-name": "rename_stockkeeping_unit",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Stockkeeping Unit" },
+      "rule-action": "rename",
+      "value": "stockkeeping_unit"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1013",
+      "rule-name": "rename_transfer_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Transfer Header" },
+      "rule-action": "rename",
+      "value": "transfer_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1014",
+      "rule-name": "rename_vendor",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Vendor" },
+      "rule-action": "rename",
+      "value": "vendor"
+    },
+
+    {
+      "rule-type": "transformation",
+      "rule-id": "9000",
+      "rule-name": "rename_schema_ait_to_dw2_nav",
+      "rule-target": "schema",
+      "object-locator": { "schema-name": "AIT" },
+      "rule-action": "rename",
+      "value": "dw2_nav"
+    }
+  ]
+}
