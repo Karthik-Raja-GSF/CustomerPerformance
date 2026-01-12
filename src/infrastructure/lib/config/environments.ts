@@ -189,7 +189,8 @@ export const environments: Record<string, EnvironmentConfig> = {
       guestdataDatabaseName: "GUESTDATA",
 
       startTaskOnDeploy: true,
-      startTaskType: "start-replication",
+      // startTaskType: "start-replication", THIS IS FOR INIT LOAD ONLY
+      startTaskType: "reload-target", // THIS IS FOR EVENTBRIDGE SCHEDULER
     },
   },
 };
