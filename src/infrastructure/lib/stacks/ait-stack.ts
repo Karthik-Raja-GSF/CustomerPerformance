@@ -14,6 +14,7 @@ import { BackendConstruct } from "../constructs/backend-construct";
 import { BastionConstruct } from "../constructs/bastion-construct";
 import { SecretsConstruct } from "../constructs/secrets-construct";
 import { DmsConstruct } from "../constructs/dms-construct";
+import { EventBridgeConstruct } from "../constructs/eventbridge-construct";
 import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
 
@@ -250,6 +251,19 @@ export class AitStack extends cdk.Stack {
     }
 
     // ===================
+    // EventBridge (Schedulers)
+    // ===================
+    let eventBridgeConstruct: EventBridgeConstruct | undefined;
+    if (dmsConstruct && config.dms?.scheduler?.enabled) {
+      eventBridgeConstruct = new EventBridgeConstruct(this, "EventBridge", {
+        envName: config.envName,
+        naming,
+        dmsSchedulerConfig: config.dms.scheduler,
+        replicationTaskArn: dmsConstruct.replicationTask.ref,
+      });
+    }
+
+    // ===================
     // CloudWatch Dashboard
     // ===================
     const dashboardConstruct = new DashboardConstruct(this, "Dashboard", {
@@ -362,6 +376,19 @@ export class AitStack extends cdk.Stack {
       new cdk.CfnOutput(this, "DmsTargetEndpointArn", {
         value: dmsConstruct.targetEndpoint.ref,
         description: "DMS Target Endpoint ARN (Aurora PostgreSQL)",
+      });
+    }
+
+    // EventBridge Outputs
+    if (eventBridgeConstruct) {
+      new cdk.CfnOutput(this, "DmsSchedulerArn", {
+        value: eventBridgeConstruct.dmsScheduleArn,
+        description: "EventBridge Scheduler ARN for DMS replication task",
+      });
+
+      new cdk.CfnOutput(this, "DmsSchedulerRoleArn", {
+        value: eventBridgeConstruct.dmsScheduleRole.roleArn,
+        description: "IAM Role ARN for DMS EventBridge Scheduler",
       });
     }
 

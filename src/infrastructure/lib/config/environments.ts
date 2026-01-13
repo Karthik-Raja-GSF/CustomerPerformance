@@ -70,6 +70,20 @@ export interface DmsConfig {
 
   replicationTaskOrdinal?: string; // e.g. "02"
   replicationTaskNumber?: string; // alias for replicationTaskOrdinal
+
+  // EventBridge Scheduler for automated daily reload
+  scheduler?: DmsSchedulerConfig;
+}
+
+/**
+ * EventBridge Scheduler configuration for DMS replication tasks.
+ * Triggers StartReplicationTask API on schedule.
+ */
+export interface DmsSchedulerConfig {
+  enabled: boolean;
+  startTaskType: "start-replication" | "resume-processing" | "reload-target";
+  scheduleExpression?: string; // default: "cron(0 2 * * ? *)" = 2am daily
+  timezone?: string; // default: "America/Los_Angeles" (PST/PDT)
 }
 
 export interface EnvironmentConfig {
@@ -120,7 +134,8 @@ export const environments: Record<string, EnvironmentConfig> = {
       publiclyAccessible: false,
 
       // GUESTDATA VIEWS POINTERS TO TABLE MAPPING AND TASK SETTING JSON CS 1/6/26
-      tableMappingsFile: "lib/config/dms/table-mappings.full-load.guestdata_ait_views.json",
+      tableMappingsFile:
+        "lib/config/dms/table-mappings.full-load.guestdata_ait_views.json",
       taskSettingsFile: "lib/config/dms/task-settings.full-load.json",
 
       sourceSchemaName: "AIT",
@@ -133,6 +148,12 @@ export const environments: Record<string, EnvironmentConfig> = {
       startTaskOnDeploy: true,
       startTaskType: "start-replication",
       replicationTaskOrdinal: "02",
+
+      // EventBridge Scheduler: 2am PST daily reload
+      scheduler: {
+        enabled: true,
+        startTaskType: "reload-target",
+      },
     },
   },
 
@@ -178,7 +199,8 @@ export const environments: Record<string, EnvironmentConfig> = {
       multiAz: false, // Single AZ для экономии
       publiclyAccessible: false,
 
-      tableMappingsFile: "lib/config/dms/table-mappings.full-load.guestdata_ait_views.json",
+      tableMappingsFile:
+        "lib/config/dms/table-mappings.full-load.guestdata_ait_views.json",
       taskSettingsFile: "lib/config/dms/task-settings.full-load.json",
 
       sourceSchemaName: "AIT",
@@ -191,6 +213,12 @@ export const environments: Record<string, EnvironmentConfig> = {
       startTaskOnDeploy: true,
       // startTaskType: "start-replication", THIS IS FOR INIT LOAD ONLY
       startTaskType: "reload-target", // THIS IS FOR EVENTBRIDGE SCHEDULER
+
+      // EventBridge Scheduler: 2am PST daily reload
+      scheduler: {
+        enabled: true,
+        startTaskType: "reload-target",
+      },
     },
   },
 };

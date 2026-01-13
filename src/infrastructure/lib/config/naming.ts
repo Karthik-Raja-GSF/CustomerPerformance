@@ -72,6 +72,10 @@ export const ResourceTypes = {
   // Monitoring
   CLOUDWATCH: "cw",
   CLOUDWATCH_ALARM: "cw-alarm",
+
+  // Scheduling
+  SCHEDULER: "scheduler",
+  SCHEDULER_GROUP: "scheduler-grp",
 } as const;
 
 /**
