@@ -567,7 +567,7 @@ model TransferHeader {
 
 model SalesPrice {
   sourceDb               String    @map("source_db")
-  hash                   String?
+  hash                   String
   itemNo                 String    @map("item_no_")
   salesType              Int       @map("sales_type")
   salesCode              String    @map("sales_code")
@@ -601,7 +601,7 @@ model SalesPrice {
   contractSpec           Int?      @map("contract_spec")
   pricePerPound          Decimal?  @map("price_per_pound")
 
-  @@id([sourceDb, itemNo, salesType, salesCode, startingDate, currencyCode, variantCode, minimumQuantity])
+  @@id([sourceDb, itemNo, hash])
   @@map("sales_price")
   @@schema("dw2_nav")
 }
