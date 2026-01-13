@@ -35,7 +35,7 @@ model PalletBinContent {
   variantNo         String    @map("variant_no_")
   lotNo             String    @map("lot_no_")
   serialNo          String    @map("serial_no_")
-  unitOfMeasure     String    @map("unit_of_measure")
+  unitOfMeasure     String?   @map("unit_of_measure")
   description       String?
   quantityBase      Decimal?  @map("quantity_base")
   quantity          Decimal?
@@ -54,7 +54,7 @@ model PalletBinContent {
   palletHeight      Decimal?  @map("pallet_height")
   counted           Boolean?
 
-  @@id([sourceDb, bin, location, palletNo, boxNo, itemNo, variantNo, lotNo, serialNo, unitOfMeasure])
+  @@id([sourceDb, bin, location, palletNo, boxNo, itemNo, variantNo, lotNo, serialNo])
   @@map("pallet_bin_content")
   @@schema("dw2_nav")
 }
@@ -574,7 +574,7 @@ model SalesPrice {
   startingDate           DateTime  @map("starting_date")
   currencyCode           String    @map("currency_code")
   variantCode            String    @map("variant_code")
-  unitOfMeasureCode      String    @map("unit_of_measure_code")
+  unitOfMeasureCode      String?   @map("unit_of_measure_code")
   minimumQuantity        Decimal   @map("minimum_quantity")
   unitPrice              Decimal?  @map("unit_price")
   priceIncludesVat       Boolean?  @map("price_includes_vat")
@@ -601,7 +601,7 @@ model SalesPrice {
   contractSpec           Int?      @map("contract_spec")
   pricePerPound          Decimal?  @map("price_per_pound")
 
-  @@id([sourceDb, itemNo, salesType, salesCode, startingDate, currencyCode, variantCode, unitOfMeasureCode, minimumQuantity])
+  @@id([sourceDb, itemNo, salesType, salesCode, startingDate, currencyCode, variantCode, minimumQuantity])
   @@map("sales_price")
   @@schema("dw2_nav")
 }
