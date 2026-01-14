@@ -187,7 +187,8 @@ export const environments: Record<string, EnvironmentConfig> = {
     },
     vpcPeering: {
       enabled: true,
-      accepted: false, // Set to true after peering is accepted in AWS console
+      accepted: true, // Set to true after peering is accepted in AWS console pcx-016dbf30103212f69
+      peeringConnectionId: "pcx-016dbf30103212f69", // ait-prd-ue1-pcx-manual-01
       peerAccountId: "453645557030",
       peerVpcId: "vpc-08f53d4e5b55a8e67",
       peerVpcCidr: "10.200.0.0/20",
