@@ -44,8 +44,26 @@ export const LLM_MODELS = [
   },
 ] as const;
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface TokenUsageBreakdown {
+  sql: TokenUsage;
+  answer: TokenUsage;
+  total: TokenUsage;
+}
+
+/** @deprecated Use confidence (0-100) instead. Kept for backward compatibility. */
+export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
+
 export interface ChatResponseMeta {
-  confidence: number;
-  usage: { inputTokens: number; outputTokens: number };
+  confidence: number; // 0-100 percentage from AI's self-assessment
+  /** @deprecated Use confidence instead. Derived from percentage. */
+  confidenceLevel: ConfidenceLevel;
+  confidenceReasoning: string; // AI's explanation for the confidence percentage
+  accuracy: number;
+  usage: TokenUsageBreakdown;
   modelName: string;
 }

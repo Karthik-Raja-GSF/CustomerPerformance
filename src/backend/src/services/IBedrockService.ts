@@ -1,14 +1,27 @@
-export const BEDROCK_SERVICE_TOKEN = Symbol.for('BedrockService');
+import { ConfidenceLevel } from "@/utils/confidence-parser";
+
+export const BEDROCK_SERVICE_TOKEN = Symbol.for("BedrockService");
 
 export interface BedrockResponse {
   text: string;
   confidence: number;
+  confidenceLevel: ConfidenceLevel;
+  confidenceReasoning: string;
   usage: { inputTokens: number; outputTokens: number };
+}
+
+export interface ConfidenceData {
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+  confidenceReasoning: string;
 }
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
-  onComplete: (usage: { inputTokens: number; outputTokens: number }) => void;
+  onComplete: (
+    usage: { inputTokens: number; outputTokens: number },
+    confidenceData: ConfidenceData
+  ) => void;
   onError: (error: Error) => void;
 }
 

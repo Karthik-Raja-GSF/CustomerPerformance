@@ -21,6 +21,8 @@ import {
   ChatRequestDto,
   ChatResponseDto,
   ModelListDto,
+  TokenUsage,
+  SqlStatus,
 } from "@/contracts/dtos/assistant.dto";
 import { SUPPORTED_MODELS } from "@/contracts/models/assistant.model";
 import {
@@ -34,7 +36,6 @@ export class AssistantService implements IAssistantService {
   private baseSystemPrompt: string;
   private sqlGenerationPromptTemplate: string;
   private mcpInitialized = false;
-  private cachedSchema: string | null = null;
 
   private bedrockService: IBedrockService;
   private promptService: IPromptService;
@@ -59,18 +60,8 @@ export class AssistantService implements IAssistantService {
     }
   }
 
-  private async getSchemaInfo(): Promise<string> {
-    if (this.cachedSchema) {
-      return this.cachedSchema;
-    }
-    this.cachedSchema = await this.mcpClient.getSchemaInfo();
-    return this.cachedSchema;
-  }
-
-  private buildSqlGenerationPrompt(schema: string, question: string): string {
-    return this.sqlGenerationPromptTemplate
-      .replace("{{schema}}", schema)
-      .replace("{{question}}", question);
+  private buildSqlGenerationPrompt(question: string): string {
+    return this.sqlGenerationPromptTemplate.replace("{{question}}", question);
   }
 
   private extractSqlFromResponse(response: string): string | null {
@@ -169,6 +160,26 @@ ${queryResults}
     return readFileSync(promptPath, "utf-8");
   }
 
+  private calculateAccuracy(confidence: number, sqlStatus: SqlStatus): number {
+    // Accuracy is based on LLM confidence, adjusted by SQL execution status
+    switch (sqlStatus) {
+      case "success":
+        // SQL executed successfully with data - use full confidence
+        return confidence;
+      case "empty":
+        // SQL executed but returned no data - reduce confidence
+        return Math.round(confidence * 0.7);
+      case "failed":
+        // SQL execution failed - significant penalty
+        return Math.round(confidence * 0.5);
+      case "not_needed":
+        // No SQL required - use full confidence
+        return confidence;
+      default:
+        return confidence;
+    }
+  }
+
   async chat(request: ChatRequestDto): Promise<ChatResponseDto> {
     // Step 1: Get active prompt from database
     const activePrompt = await this.promptService.findActive();
@@ -183,17 +194,19 @@ ${queryResults}
     }
 
     let queryResults = "";
+    let sqlUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+    let sqlStatus: SqlStatus = "not_needed";
+    // SQL generation confidence (used as primary confidence indicator)
+    let sqlConfidence = 50; // Default middle of range
+    let sqlConfidenceLevel: "HIGH" | "MEDIUM" | "LOW" = "MEDIUM";
+    let sqlConfidenceReasoning = "SQL generation confidence not available";
 
     // Step 3: Try to initialize MCP and query database
     try {
       await this.ensureMcpInitialized();
-      const schemaInfo = await this.getSchemaInfo();
 
       // Step 3a: Ask LLM to generate SQL
-      const sqlPrompt = this.buildSqlGenerationPrompt(
-        schemaInfo,
-        request.question
-      );
+      const sqlPrompt = this.buildSqlGenerationPrompt(request.question);
       const sqlStartTime = Date.now();
       const sqlResponse = await this.bedrockService.invoke(
         sqlPrompt,
@@ -205,18 +218,39 @@ ${queryResults}
         model: activePrompt.model,
       });
 
+      // Track SQL generation tokens and confidence
+      sqlUsage = sqlResponse.usage;
+      sqlConfidence = sqlResponse.confidence;
+      sqlConfidenceLevel = sqlResponse.confidenceLevel;
+      sqlConfidenceReasoning = sqlResponse.confidenceReasoning;
+
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
+      console.log(
+        "[AssistantService] Generated SQL:",
+        sql || "NO_QUERY_NEEDED"
+      );
 
       if (sql) {
         if (!this.isSelectQuery(sql)) {
           console.warn(
             "Generated SQL was not a SELECT query, skipping execution"
           );
+          sqlStatus = "failed";
         } else {
           // Step 3c: Execute the generated SQL
-          const results = await this.mcpClient.executeQuery(sql);
-          queryResults = this.truncateResults(results);
+          try {
+            const results = await this.mcpClient.executeQuery(sql);
+            if (Array.isArray(results) && results.length > 0) {
+              sqlStatus = "success";
+              queryResults = this.truncateResults(results);
+            } else {
+              sqlStatus = "empty";
+            }
+          } catch (execError) {
+            console.error("SQL execution failed:", execError);
+            sqlStatus = "failed";
+          }
         }
       }
     } catch (error) {
@@ -225,6 +259,7 @@ ${queryResults}
         "MCP error (continuing without data):",
         error instanceof Error ? error.message : error
       );
+      sqlStatus = "failed";
     }
 
     // Step 4: Build final prompt with data (if available)
@@ -241,11 +276,24 @@ ${queryResults}
       activePrompt.model
     );
 
-    // Step 6: Return response
+    // Step 6: Calculate accuracy using SQL generation confidence
+    const answerUsage = response.usage;
+    const accuracy = this.calculateAccuracy(sqlConfidence, sqlStatus);
+
     return {
       answer: response.text,
-      confidence: response.confidence,
-      usage: response.usage,
+      confidence: sqlConfidence,
+      confidenceLevel: sqlConfidenceLevel,
+      confidenceReasoning: sqlConfidenceReasoning,
+      accuracy,
+      usage: {
+        sql: sqlUsage,
+        answer: answerUsage,
+        total: {
+          inputTokens: sqlUsage.inputTokens + answerUsage.inputTokens,
+          outputTokens: sqlUsage.outputTokens + answerUsage.outputTokens,
+        },
+      },
       modelId: activePrompt.model,
       modelName: modelInfo.name,
       promptId: activePrompt.id,
@@ -271,17 +319,19 @@ ${queryResults}
     }
 
     let queryResults = "";
+    let sqlUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+    let sqlStatus: SqlStatus = "not_needed";
+    // SQL generation confidence (used as primary confidence indicator)
+    let sqlConfidence = 50; // Default middle of range
+    let sqlConfidenceLevel: "HIGH" | "MEDIUM" | "LOW" = "MEDIUM";
+    let sqlConfidenceReasoning = "SQL generation confidence not available";
 
     // Step 3: Try to initialize MCP and query database
     try {
       await this.ensureMcpInitialized();
-      const schemaInfo = await this.getSchemaInfo();
 
       // Step 3a: Ask LLM to generate SQL (non-streaming for SQL generation)
-      const sqlPrompt = this.buildSqlGenerationPrompt(
-        schemaInfo,
-        request.question
-      );
+      const sqlPrompt = this.buildSqlGenerationPrompt(request.question);
       const sqlStartTime = Date.now();
       const sqlResponse = await this.bedrockService.invoke(
         sqlPrompt,
@@ -293,18 +343,39 @@ ${queryResults}
         model: activePrompt.model,
       });
 
+      // Track SQL generation tokens and confidence
+      sqlUsage = sqlResponse.usage;
+      sqlConfidence = sqlResponse.confidence;
+      sqlConfidenceLevel = sqlResponse.confidenceLevel;
+      sqlConfidenceReasoning = sqlResponse.confidenceReasoning;
+
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
+      console.log(
+        "[AssistantService] Generated SQL:",
+        sql || "NO_QUERY_NEEDED"
+      );
 
       if (sql) {
         if (!this.isSelectQuery(sql)) {
           console.warn(
             "Generated SQL was not a SELECT query, skipping execution"
           );
+          sqlStatus = "failed";
         } else {
           // Step 3c: Execute the generated SQL
-          const results = await this.mcpClient.executeQuery(sql);
-          queryResults = this.truncateResults(results);
+          try {
+            const results = await this.mcpClient.executeQuery(sql);
+            if (Array.isArray(results) && results.length > 0) {
+              sqlStatus = "success";
+              queryResults = this.truncateResults(results);
+            } else {
+              sqlStatus = "empty";
+            }
+          } catch (execError) {
+            console.error("SQL execution failed:", execError);
+            sqlStatus = "failed";
+          }
         }
       }
     } catch (error) {
@@ -313,6 +384,7 @@ ${queryResults}
         "MCP error (continuing without data):",
         error instanceof Error ? error.message : error
       );
+      sqlStatus = "failed";
     }
 
     // Step 4: Build final prompt with data (if available)
@@ -323,17 +395,30 @@ ${queryResults}
     );
 
     // Step 5: Stream response from Bedrock
+    // Use SQL generation confidence (captured above) for the response
     await this.bedrockService.invokeStream(
       finalPrompt,
       request.question,
       activePrompt.model,
       {
         onChunk: callbacks.onChunk,
-        onComplete: (usage) => {
+        onComplete: (answerUsage) => {
+          const accuracy = this.calculateAccuracy(sqlConfidence, sqlStatus);
           callbacks.onComplete({
             modelName: modelInfo.name,
             promptId: activePrompt.id,
-            usage,
+            confidence: sqlConfidence,
+            confidenceLevel: sqlConfidenceLevel,
+            confidenceReasoning: sqlConfidenceReasoning,
+            accuracy,
+            usage: {
+              sql: sqlUsage,
+              answer: answerUsage,
+              total: {
+                inputTokens: sqlUsage.inputTokens + answerUsage.inputTokens,
+                outputTokens: sqlUsage.outputTokens + answerUsage.outputTokens,
+              },
+            },
           });
         },
         onError: callbacks.onError,

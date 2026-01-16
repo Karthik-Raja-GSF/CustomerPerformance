@@ -1,7 +1,7 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { User, Copy, Check } from "lucide-react";
+import { User, Copy, Check, Info } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { cn } from "@/shadcn/lib/utils";
 import { markdownComponents } from "@/components/chat/markdown/MarkdownComponents";
@@ -85,9 +85,25 @@ export function ChatMessage({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{message.metadata.modelName}</span>
             <span>•</span>
-            <span>
-              {message.metadata.usage.inputTokens} →{" "}
-              {message.metadata.usage.outputTokens} tokens
+            <span
+              className="font-medium flex items-center gap-1"
+              title={`SQL Generation: ${message.metadata.confidenceReasoning}\n\nNote: LLM self-assessment is generally not reliable and should not be treated as ground truth.`}
+            >
+              {message.metadata.confidence}% SQL confidence
+              <Info className="h-3 w-3 text-muted-foreground/70 hover:text-muted-foreground cursor-pointer" />
+            </span>
+            <span>•</span>
+            <span title="SQL generation">
+              SQL: {message.metadata.usage.sql.inputTokens}→
+              {message.metadata.usage.sql.outputTokens}
+            </span>
+            <span title="Answer generation">
+              Answer: {message.metadata.usage.answer.inputTokens}→
+              {message.metadata.usage.answer.outputTokens}
+            </span>
+            <span className="font-medium" title="Total tokens">
+              Total: {message.metadata.usage.total.inputTokens}→
+              {message.metadata.usage.total.outputTokens}
             </span>
           </div>
         )}

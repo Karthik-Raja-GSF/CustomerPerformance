@@ -1,15 +1,35 @@
-import { ChatRequestDto, ChatResponseDto, ModelListDto } from '@/contracts/dtos/assistant.dto';
+import {
+  ChatRequestDto,
+  ChatResponseDto,
+  ModelListDto,
+  TokenUsageBreakdown,
+  ConfidenceLevelDto,
+} from "@/contracts/dtos/assistant.dto";
 
-export const ASSISTANT_SERVICE_TOKEN = Symbol.for('AssistantService');
+export const ASSISTANT_SERVICE_TOKEN = Symbol.for("AssistantService");
+
+export interface StreamChatMetadata {
+  modelName: string;
+  promptId: string;
+  confidence: number;
+  /** @deprecated Use confidence (0-100) instead. Derived from percentage. */
+  confidenceLevel: ConfidenceLevelDto;
+  confidenceReasoning: string;
+  accuracy: number;
+  usage: TokenUsageBreakdown;
+}
 
 export interface StreamChatCallbacks {
   onChunk: (chunk: string) => void;
-  onComplete: (metadata: { modelName: string; promptId: string; usage: { inputTokens: number; outputTokens: number } }) => void;
+  onComplete: (metadata: StreamChatMetadata) => void;
   onError: (error: Error) => void;
 }
 
 export interface IAssistantService {
   chat(request: ChatRequestDto): Promise<ChatResponseDto>;
-  chatStream(request: ChatRequestDto, callbacks: StreamChatCallbacks): Promise<void>;
+  chatStream(
+    request: ChatRequestDto,
+    callbacks: StreamChatCallbacks
+  ): Promise<void>;
   getAvailableModels(): ModelListDto[];
 }

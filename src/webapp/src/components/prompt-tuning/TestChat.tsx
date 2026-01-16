@@ -13,7 +13,7 @@ import {
 } from "@/shadcn/components/card";
 import { ScrollArea } from "@/shadcn/components/scroll-area";
 import { Badge } from "@/shadcn/components/badge";
-import { Send, Trash2, Bot, User, Loader2 } from "lucide-react";
+import { Send, Trash2, Bot, User, Loader2, Info } from "lucide-react";
 import type { ChatMessage, Prompt, ChatResponseMeta } from "@/types/prompts";
 import { cn } from "@/shadcn/lib/utils";
 
@@ -127,12 +127,34 @@ export function TestChat({
                 <Badge variant="secondary" className="text-xs">
                   {lastResponseMeta.modelName}
                 </Badge>
-                <Badge variant="outline" className="text-xs">
-                  {lastResponseMeta.confidence}% confident
+                <Badge
+                  variant="outline"
+                  className="text-xs flex items-center gap-1"
+                  title={`SQL Generation: ${lastResponseMeta.confidenceReasoning}\n\nNote: LLM self-assessment is generally not reliable and should not be treated as ground truth.`}
+                >
+                  {lastResponseMeta.confidence}% SQL confidence
+                  <Info className="h-3 w-3 opacity-70 hover:opacity-100 cursor-pointer" />
                 </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {lastResponseMeta.usage.inputTokens}→
-                  {lastResponseMeta.usage.outputTokens} tokens
+                <span
+                  className="text-xs text-muted-foreground"
+                  title="SQL generation tokens"
+                >
+                  SQL: {lastResponseMeta.usage.sql.inputTokens}→
+                  {lastResponseMeta.usage.sql.outputTokens}
+                </span>
+                <span
+                  className="text-xs text-muted-foreground"
+                  title="Answer generation tokens"
+                >
+                  Answer: {lastResponseMeta.usage.answer.inputTokens}→
+                  {lastResponseMeta.usage.answer.outputTokens}
+                </span>
+                <span
+                  className="text-xs font-medium text-muted-foreground"
+                  title="Total tokens"
+                >
+                  Total: {lastResponseMeta.usage.total.inputTokens}→
+                  {lastResponseMeta.usage.total.outputTokens}
                 </span>
               </>
             )}

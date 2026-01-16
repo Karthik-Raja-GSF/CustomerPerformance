@@ -10,7 +10,9 @@ import {
   IBedrockService,
   BedrockResponse,
   StreamCallbacks,
+  ConfidenceData,
 } from "@/services/IBedrockService";
+import { parseVerbalizedConfidence } from "@/utils/confidence-parser";
 import {
   UnsupportedModelError,
   BedrockInvocationError,
@@ -89,6 +91,7 @@ export class BedrockService implements IBedrockService {
           "bedrock.input_tokens": result.usage.inputTokens,
           "bedrock.output_tokens": result.usage.outputTokens,
           "bedrock.confidence": result.confidence,
+          "bedrock.confidence_level": result.confidenceLevel,
           "bedrock.duration_ms": duration,
         });
 
@@ -164,17 +167,17 @@ export class BedrockService implements IBedrockService {
   ): BedrockResponse {
     const body = JSON.parse(new TextDecoder().decode(response.body));
 
-    let text: string;
+    let rawText: string;
     let usage: { inputTokens: number; outputTokens: number };
 
     if (modelId.includes("anthropic")) {
-      text = body.content[0].text;
+      rawText = body.content[0].text;
       usage = {
         inputTokens: body.usage.input_tokens,
         outputTokens: body.usage.output_tokens,
       };
     } else if (modelId.includes("amazon.nova")) {
-      text = body.output.message.content[0].text;
+      rawText = body.output.message.content[0].text;
       usage = {
         inputTokens: body.usage.inputTokens,
         outputTokens: body.usage.outputTokens,
@@ -183,34 +186,25 @@ export class BedrockService implements IBedrockService {
       throw new UnsupportedModelError(modelId);
     }
 
+    // Parse verbalized confidence from response
+    const parsed = parseVerbalizedConfidence(rawText);
+
     return {
-      text,
-      confidence: this.calculateConfidence(text),
+      text: parsed.cleanedText,
+      confidence: parsed.score,
+      confidenceLevel: parsed.level,
+      confidenceReasoning: parsed.reasoning,
       usage,
     };
   }
 
-  private calculateConfidence(text: string): number {
-    let confidence = 85;
-    const textLower = text.toLowerCase();
-
-    const penalties = [
-      { phrase: "i'm not sure", penalty: 30 },
-      { phrase: "i don't know", penalty: 40 },
-      { phrase: "uncertain", penalty: 25 },
-      { phrase: "might be", penalty: 15 },
-      { phrase: "possibly", penalty: 10 },
-      { phrase: "i think", penalty: 5 },
-    ];
-
-    for (const { phrase, penalty } of penalties) {
-      if (textLower.includes(phrase)) confidence -= penalty;
-    }
-
-    const questionCount = (text.match(/\?/g) || []).length;
-    if (questionCount > 2) confidence -= 15;
-
-    return Math.max(0, Math.min(100, confidence));
+  private extractConfidenceData(fullResponseText: string): ConfidenceData {
+    const parsed = parseVerbalizedConfidence(fullResponseText);
+    return {
+      confidence: parsed.score,
+      confidenceLevel: parsed.level,
+      confidenceReasoning: parsed.reasoning,
+    };
   }
 
   async invokeStream(
@@ -253,6 +247,7 @@ export class BedrockService implements IBedrockService {
         let inputTokens = 0;
         let outputTokens = 0;
         let chunkCount = 0;
+        let fullResponseText = "";
 
         addSpanEvent("stream.started");
 
@@ -266,6 +261,7 @@ export class BedrockService implements IBedrockService {
             if (modelId.includes("anthropic")) {
               if (chunk.type === "content_block_delta" && chunk.delta?.text) {
                 callbacks.onChunk(chunk.delta.text);
+                fullResponseText += chunk.delta.text;
                 chunkCount++;
               } else if (chunk.type === "message_delta" && chunk.usage) {
                 outputTokens = chunk.usage.output_tokens;
@@ -280,6 +276,7 @@ export class BedrockService implements IBedrockService {
             else if (modelId.includes("amazon.nova")) {
               if (chunk.contentBlockDelta?.delta?.text) {
                 callbacks.onChunk(chunk.contentBlockDelta.delta.text);
+                fullResponseText += chunk.contentBlockDelta.delta.text;
                 chunkCount++;
               } else if (chunk.metadata?.usage) {
                 inputTokens = chunk.metadata.usage.inputTokens;
@@ -310,6 +307,9 @@ export class BedrockService implements IBedrockService {
 
         addSpanEvent("stream.completed", { chunkCount });
 
+        // Extract confidence data from accumulated response text
+        const confidenceData = this.extractConfidenceData(fullResponseText);
+
         logger.info(
           {
             event: "bedrock.stream.complete",
@@ -318,11 +318,13 @@ export class BedrockService implements IBedrockService {
             inputTokens,
             outputTokens,
             chunkCount,
+            confidence: confidenceData.confidence,
+            confidenceLevel: confidenceData.confidenceLevel,
           },
           "Bedrock stream completed"
         );
 
-        callbacks.onComplete({ inputTokens, outputTokens });
+        callbacks.onComplete({ inputTokens, outputTokens }, confidenceData);
       } catch (error) {
         const duration = Date.now() - startTime;
         getBedrockErrors().add(1, { model: modelId, operation: "stream" });
