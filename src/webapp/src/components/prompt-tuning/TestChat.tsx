@@ -11,19 +11,211 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shadcn/components/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shadcn/components/table";
 import { ScrollArea } from "@/shadcn/components/scroll-area";
 import { Badge } from "@/shadcn/components/badge";
-import { Send, Trash2, Bot, User, Loader2, Info } from "lucide-react";
-import type { ChatMessage, Prompt, ChatResponseMeta } from "@/types/prompts";
+import { Send, Trash2, Bot, User, Loader2, Copy, Check } from "lucide-react";
+import type {
+  ChatMessage,
+  Prompt,
+  ChatResponseMeta,
+  SqlStatus,
+} from "@/types/prompts";
 import { cn } from "@/shadcn/lib/utils";
+import { toast } from "sonner";
 
 interface TestChatProps {
   messages: ChatMessage[];
   activePrompt: Prompt | undefined;
   isLoading?: boolean;
-  lastResponseMeta?: ChatResponseMeta | null;
   onSendMessage: (message: string) => void;
   onClearChat: () => void;
+}
+
+function getSqlStatusConfig(status: SqlStatus): {
+  label: string;
+  variant: "default" | "secondary" | "destructive" | "outline";
+  className: string;
+} {
+  switch (status) {
+    case "success":
+      return {
+        label: "Success",
+        variant: "default",
+        className: "bg-green-600 hover:bg-green-600/80",
+      };
+    case "empty":
+      return {
+        label: "Empty Result",
+        variant: "secondary",
+        className: "bg-amber-500 hover:bg-amber-500/80 text-white",
+      };
+    case "failed":
+      return {
+        label: "Failed",
+        variant: "destructive",
+        className: "",
+      };
+    case "not_needed":
+      return {
+        label: "Not Needed",
+        variant: "outline",
+        className: "text-muted-foreground",
+      };
+    default:
+      return {
+        label: status,
+        variant: "outline",
+        className: "",
+      };
+  }
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success(`${label} copied to clipboard`);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleCopy}
+      className="h-6 gap-1 text-xs"
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      Copy
+    </Button>
+  );
+}
+
+function formatCellValue(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function ResultsTable({ data }: { data: unknown }) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return <p className="text-xs text-muted-foreground italic">No data</p>;
+  }
+
+  const rows = data as Record<string, unknown>[];
+  const columns = Object.keys(rows[0] || {});
+  const displayRows = rows.slice(0, 50);
+
+  return (
+    <div className="overflow-auto max-h-[300px] rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {columns.map((col) => (
+              <TableHead key={col} className="text-xs bg-muted/50">
+                {col}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {displayRows.map((row, i) => (
+            <TableRow key={i}>
+              {columns.map((col) => (
+                <TableCell key={col} className="text-xs font-mono">
+                  {formatCellValue(row[col])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {rows.length > 50 && (
+        <p className="text-xs text-muted-foreground p-2 border-t bg-muted/30">
+          Showing 50 of {rows.length} rows
+        </p>
+      )}
+    </div>
+  );
+}
+
+function InlineDebugInfo({ meta }: { meta: ChatResponseMeta }) {
+  const statusConfig = getSqlStatusConfig(meta.sqlStatus);
+  const resultRowCount = Array.isArray(meta.rawResult)
+    ? meta.rawResult.length
+    : 0;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
+      {/* Status badge + SQL */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge
+          variant={statusConfig.variant}
+          className={cn("text-xs", statusConfig.className)}
+        >
+          {statusConfig.label}
+        </Badge>
+        <Badge variant="secondary" className="text-xs">
+          {meta.modelName}
+        </Badge>
+        <Badge variant="outline" className="text-xs">
+          {meta.confidence}% confidence
+        </Badge>
+        {meta.rawSql && <CopyButton text={meta.rawSql} label="SQL" />}
+      </div>
+
+      {/* Token usage */}
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span title="SQL generation tokens">
+          SQL: {meta.usage.sql.inputTokens}→{meta.usage.sql.outputTokens}
+        </span>
+        <span title="Answer generation tokens">
+          Answer: {meta.usage.answer.inputTokens}→
+          {meta.usage.answer.outputTokens}
+        </span>
+        <span className="font-medium" title="Total tokens">
+          Total: {meta.usage.total.inputTokens}→{meta.usage.total.outputTokens}
+        </span>
+      </div>
+
+      {meta.rawSql && (
+        <pre className="text-xs font-mono bg-background/50 p-2 rounded whitespace-pre-wrap break-words">
+          {meta.rawSql}
+        </pre>
+      )}
+
+      {/* Results table */}
+      {meta.rawResult !== null && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {resultRowCount > 0 ? `${resultRowCount} rows` : "No rows"}
+            </span>
+            <CopyButton
+              text={JSON.stringify(meta.rawResult, null, 2)}
+              label="JSON"
+            />
+          </div>
+          <ResultsTable data={meta.rawResult} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ChatMessageBubble({ message }: { message: ChatMessage }) {
@@ -42,7 +234,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
 
       <div
         className={cn(
-          "flex max-w-[80%] flex-col gap-1 rounded-lg px-4 py-2",
+          "flex max-w-[98%] flex-col gap-1 rounded-lg px-4 py-2",
           isUser ? "bg-primary text-primary-foreground" : "bg-muted"
         )}
       >
@@ -69,6 +261,9 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
             minute: "2-digit",
           })}
         </span>
+
+        {/* Debug section for assistant messages - always visible */}
+        {!isUser && message.meta && <InlineDebugInfo meta={message.meta} />}
       </div>
     </div>
   );
@@ -78,7 +273,6 @@ export function TestChat({
   messages,
   activePrompt,
   isLoading = false,
-  lastResponseMeta,
   onSendMessage,
   onClearChat,
 }: TestChatProps) {
@@ -120,43 +314,6 @@ export function TestChat({
               <span className="text-xs text-amber-600">
                 No active prompt selected
               </span>
-            )}
-            {lastResponseMeta && (
-              <>
-                <span className="text-xs text-muted-foreground">|</span>
-                <Badge variant="secondary" className="text-xs">
-                  {lastResponseMeta.modelName}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="text-xs flex items-center gap-1"
-                  title={`SQL Generation: ${lastResponseMeta.confidenceReasoning}\n\nNote: LLM self-assessment is generally not reliable and should not be treated as ground truth.`}
-                >
-                  {lastResponseMeta.confidence}% SQL confidence
-                  <Info className="h-3 w-3 opacity-70 hover:opacity-100 cursor-pointer" />
-                </Badge>
-                <span
-                  className="text-xs text-muted-foreground"
-                  title="SQL generation tokens"
-                >
-                  SQL: {lastResponseMeta.usage.sql.inputTokens}→
-                  {lastResponseMeta.usage.sql.outputTokens}
-                </span>
-                <span
-                  className="text-xs text-muted-foreground"
-                  title="Answer generation tokens"
-                >
-                  Answer: {lastResponseMeta.usage.answer.inputTokens}→
-                  {lastResponseMeta.usage.answer.outputTokens}
-                </span>
-                <span
-                  className="text-xs font-medium text-muted-foreground"
-                  title="Total tokens"
-                >
-                  Total: {lastResponseMeta.usage.total.inputTokens}→
-                  {lastResponseMeta.usage.total.outputTokens}
-                </span>
-              </>
             )}
           </div>
         </div>

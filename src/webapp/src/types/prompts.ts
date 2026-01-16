@@ -13,6 +13,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  meta?: ChatResponseMeta; // Debug metadata for assistant messages
 }
 
 export interface CreatePromptInput {
@@ -58,6 +59,8 @@ export interface TokenUsageBreakdown {
 /** @deprecated Use confidence (0-100) instead. Kept for backward compatibility. */
 export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
 
+export type SqlStatus = "success" | "empty" | "failed" | "not_needed";
+
 export interface ChatResponseMeta {
   confidence: number; // 0-100 percentage from AI's self-assessment
   /** @deprecated Use confidence instead. Derived from percentage. */
@@ -66,4 +69,8 @@ export interface ChatResponseMeta {
   accuracy: number;
   usage: TokenUsageBreakdown;
   modelName: string;
+  // Debug fields for troubleshooting
+  rawSql: string | null;
+  rawResult: unknown;
+  sqlStatus: SqlStatus;
 }

@@ -61,7 +61,6 @@ export default function Prompts() {
   const {
     messages,
     isLoading: isChatLoading,
-    lastResponseMeta,
     sendMessage,
     clearChat,
   } = useTestChat();
@@ -147,7 +146,6 @@ export default function Prompts() {
           messages={messages}
           activePrompt={activePrompt}
           isLoading={isChatLoading}
-          lastResponseMeta={lastResponseMeta}
           onSendMessage={sendMessage}
           onClearChat={clearChat}
         />

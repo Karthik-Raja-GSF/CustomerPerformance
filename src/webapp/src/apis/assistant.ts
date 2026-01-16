@@ -20,6 +20,8 @@ export interface TokenUsageBreakdown {
 /** @deprecated Use confidence (0-100) instead. Kept for backward compatibility. */
 export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
 
+export type SqlStatus = "success" | "empty" | "failed" | "not_needed";
+
 export interface ChatResponse {
   answer: string;
   confidence: number; // 0-100 percentage from AI's self-assessment
@@ -31,6 +33,10 @@ export interface ChatResponse {
   modelId: string;
   modelName: string;
   promptId: string;
+  // Debug fields for troubleshooting
+  rawSql: string | null;
+  rawResult: unknown;
+  sqlStatus: SqlStatus;
 }
 
 export interface ChatStreamMetadata {
@@ -42,6 +48,10 @@ export interface ChatStreamMetadata {
   confidenceReasoning: string; // AI's explanation for the confidence percentage
   accuracy: number;
   usage: TokenUsageBreakdown;
+  // Debug fields for troubleshooting
+  rawSql: string | null;
+  rawResult: unknown;
+  sqlStatus: SqlStatus;
 }
 
 export interface ModelInfo {

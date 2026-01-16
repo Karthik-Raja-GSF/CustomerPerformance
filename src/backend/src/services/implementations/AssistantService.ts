@@ -200,6 +200,9 @@ ${queryResults}
     let sqlConfidence = 50; // Default middle of range
     let sqlConfidenceLevel: "HIGH" | "MEDIUM" | "LOW" = "MEDIUM";
     let sqlConfidenceReasoning = "SQL generation confidence not available";
+    // Debug fields for troubleshooting
+    let rawSql: string | null = null;
+    let rawResult: unknown = null;
 
     // Step 3: Try to initialize MCP and query database
     try {
@@ -226,6 +229,7 @@ ${queryResults}
 
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
+      rawSql = sql; // Capture extracted SQL for debug output
       console.log(
         "[AssistantService] Generated SQL:",
         sql || "NO_QUERY_NEEDED"
@@ -241,6 +245,7 @@ ${queryResults}
           // Step 3c: Execute the generated SQL
           try {
             const results = await this.mcpClient.executeQuery(sql);
+            rawResult = results; // Capture raw results before truncation
             if (Array.isArray(results) && results.length > 0) {
               sqlStatus = "success";
               queryResults = this.truncateResults(results);
@@ -297,6 +302,9 @@ ${queryResults}
       modelId: activePrompt.model,
       modelName: modelInfo.name,
       promptId: activePrompt.id,
+      rawSql,
+      rawResult,
+      sqlStatus,
     };
   }
 
@@ -325,6 +333,9 @@ ${queryResults}
     let sqlConfidence = 50; // Default middle of range
     let sqlConfidenceLevel: "HIGH" | "MEDIUM" | "LOW" = "MEDIUM";
     let sqlConfidenceReasoning = "SQL generation confidence not available";
+    // Debug fields for troubleshooting
+    let rawSql: string | null = null;
+    let rawResult: unknown = null;
 
     // Step 3: Try to initialize MCP and query database
     try {
@@ -351,6 +362,7 @@ ${queryResults}
 
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
+      rawSql = sql; // Capture extracted SQL for debug output
       console.log(
         "[AssistantService] Generated SQL:",
         sql || "NO_QUERY_NEEDED"
@@ -366,6 +378,7 @@ ${queryResults}
           // Step 3c: Execute the generated SQL
           try {
             const results = await this.mcpClient.executeQuery(sql);
+            rawResult = results; // Capture raw results before truncation
             if (Array.isArray(results) && results.length > 0) {
               sqlStatus = "success";
               queryResults = this.truncateResults(results);
@@ -419,6 +432,9 @@ ${queryResults}
                 outputTokens: sqlUsage.outputTokens + answerUsage.outputTokens,
               },
             },
+            rawSql,
+            rawResult,
+            sqlStatus,
           });
         },
         onError: callbacks.onError,

@@ -4,6 +4,7 @@ import {
   ModelListDto,
   TokenUsageBreakdown,
   ConfidenceLevelDto,
+  SqlStatus,
 } from "@/contracts/dtos/assistant.dto";
 
 export const ASSISTANT_SERVICE_TOKEN = Symbol.for("AssistantService");
@@ -17,6 +18,10 @@ export interface StreamChatMetadata {
   confidenceReasoning: string;
   accuracy: number;
   usage: TokenUsageBreakdown;
+  // Debug fields for troubleshooting
+  rawSql: string | null;
+  rawResult: unknown;
+  sqlStatus: SqlStatus;
 }
 
 export interface StreamChatCallbacks {
