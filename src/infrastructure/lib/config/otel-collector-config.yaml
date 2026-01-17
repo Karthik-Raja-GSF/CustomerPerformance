@@ -118,7 +118,6 @@ service:
         - batch
       exporters:
         - awsxray
-        - logging
 
     # Metrics pipeline -> CloudWatch EMF
     metrics:
@@ -129,7 +128,6 @@ service:
         - batch
       exporters:
         - awsemf
-        - logging
 
     # Logs pipeline -> CloudWatch Logs
     logs:
@@ -143,4 +141,4 @@ service:
 
   telemetry:
     logs:
-      level: debug
+      level: warn

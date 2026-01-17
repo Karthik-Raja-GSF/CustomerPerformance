@@ -14,6 +14,9 @@ import {
   McpConnectionError,
 } from "@/utils/errors/assistant-errors";
 import { getChatRequests, getChatStreamEvents } from "@/telemetry/metrics";
+import { createChildLogger } from "@/telemetry/logger";
+
+const logger = createChildLogger("assistant");
 
 const router: IRouter = Router();
 
@@ -163,7 +166,10 @@ router.post(
         onError: (error: Error) => {
           clearInterval(keepAliveInterval);
           if (isConnectionAlive) {
-            console.error("[Stream] Error:", error.message);
+            logger.error(
+              { event: "stream.error", error: error.message },
+              "Stream error"
+            );
             res.write(
               `data: ${JSON.stringify({ type: "error", message: error.message })}\n\n`
             );
@@ -174,7 +180,13 @@ router.post(
       });
     } catch (error) {
       clearInterval(keepAliveInterval);
-      console.error("[Stream] Error:", error);
+      logger.error(
+        {
+          event: "stream.error",
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        "Stream error"
+      );
       if (isConnectionAlive) {
         res.write(
           `data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : "Unknown error" })}\n\n`

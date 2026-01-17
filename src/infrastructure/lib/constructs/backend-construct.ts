@@ -133,7 +133,10 @@ export class BackendConstruct extends Construct {
     // CloudWatch Log Group
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       logGroupName,
-      retention: logs.RetentionDays.ONE_MONTH,
+      retention:
+        naming.env === "prd"
+          ? logs.RetentionDays.ONE_MONTH
+          : logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 

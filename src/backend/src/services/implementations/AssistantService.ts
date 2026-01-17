@@ -30,6 +30,9 @@ import {
   UnsupportedModelError,
 } from "@/utils/errors/assistant-errors";
 import { getSqlGenerationDuration } from "@/telemetry/metrics";
+import { createChildLogger } from "@/telemetry/logger";
+
+const logger = createChildLogger("assistant-service");
 
 @injectable()
 export class AssistantService implements IAssistantService {
@@ -230,14 +233,15 @@ ${queryResults}
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
       rawSql = sql; // Capture extracted SQL for debug output
-      console.log(
-        "[AssistantService] Generated SQL:",
-        sql || "NO_QUERY_NEEDED"
+      logger.info(
+        { event: "sql.generated", sql: sql || "NO_QUERY_NEEDED" },
+        "Generated SQL"
       );
 
       if (sql) {
         if (!this.isSelectQuery(sql)) {
-          console.warn(
+          logger.warn(
+            { event: "sql.invalid", reason: "not_select_query" },
             "Generated SQL was not a SELECT query, skipping execution"
           );
           sqlStatus = "failed";
@@ -253,16 +257,28 @@ ${queryResults}
               sqlStatus = "empty";
             }
           } catch (execError) {
-            console.error("SQL execution failed:", execError);
+            logger.error(
+              {
+                event: "sql.execution_failed",
+                error:
+                  execError instanceof Error
+                    ? execError.message
+                    : "Unknown error",
+              },
+              "SQL execution failed"
+            );
             sqlStatus = "failed";
           }
         }
       }
     } catch (error) {
       // Log MCP errors but continue without database data
-      console.error(
-        "MCP error (continuing without data):",
-        error instanceof Error ? error.message : error
+      logger.error(
+        {
+          event: "mcp.error",
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        "MCP error (continuing without data)"
       );
       sqlStatus = "failed";
     }
@@ -363,14 +379,15 @@ ${queryResults}
       // Step 3b: Extract and validate SQL
       const sql = this.extractSqlFromResponse(sqlResponse.text);
       rawSql = sql; // Capture extracted SQL for debug output
-      console.log(
-        "[AssistantService] Generated SQL:",
-        sql || "NO_QUERY_NEEDED"
+      logger.info(
+        { event: "sql.generated", sql: sql || "NO_QUERY_NEEDED" },
+        "Generated SQL"
       );
 
       if (sql) {
         if (!this.isSelectQuery(sql)) {
-          console.warn(
+          logger.warn(
+            { event: "sql.invalid", reason: "not_select_query" },
             "Generated SQL was not a SELECT query, skipping execution"
           );
           sqlStatus = "failed";
@@ -386,16 +403,28 @@ ${queryResults}
               sqlStatus = "empty";
             }
           } catch (execError) {
-            console.error("SQL execution failed:", execError);
+            logger.error(
+              {
+                event: "sql.execution_failed",
+                error:
+                  execError instanceof Error
+                    ? execError.message
+                    : "Unknown error",
+              },
+              "SQL execution failed"
+            );
             sqlStatus = "failed";
           }
         }
       }
     } catch (error) {
       // Log MCP errors but continue without database data
-      console.error(
-        "MCP error (continuing without data):",
-        error instanceof Error ? error.message : error
+      logger.error(
+        {
+          event: "mcp.error",
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        "MCP error (continuing without data)"
       );
       sqlStatus = "failed";
     }

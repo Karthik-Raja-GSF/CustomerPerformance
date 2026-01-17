@@ -38,6 +38,11 @@ export function telemetryMiddleware(
   req.requestId = requestId;
   req.startTime = Date.now();
 
+  // Skip telemetry for health checks (high frequency, low value)
+  if (req.path === "/health") {
+    return next();
+  }
+
   // Track active connections
   const activeConnections = getActiveConnections();
   activeConnections.add(1);
@@ -69,7 +74,6 @@ export function telemetryMiddleware(
     requestId,
     method: req.method,
     path: req.path,
-    query: req.query,
     userAgent: req.headers["user-agent"],
   });
 
