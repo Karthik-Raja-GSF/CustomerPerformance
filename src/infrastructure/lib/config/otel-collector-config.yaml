@@ -30,6 +30,27 @@ processors:
     timeout: 5s
     override: false
 
+  # Transform logs for CloudWatch-friendly flat JSON format
+  # Flattens OTLP log structure so fields are directly queryable in CloudWatch Logs Insights
+  transform/logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Move key attributes to resource level for flatter CloudWatch output
+          - set(resource.attributes["event"], attributes["event"])
+          - set(resource.attributes["requestId"], attributes["requestId"])
+          - set(resource.attributes["method"], attributes["method"])
+          - set(resource.attributes["path"], attributes["path"])
+          - set(resource.attributes["statusCode"], attributes["statusCode"])
+          - set(resource.attributes["component"], attributes["component"])
+          - set(resource.attributes["traceId"], attributes["traceId"])
+          - set(resource.attributes["spanId"], attributes["spanId"])
+          - set(resource.attributes["duration"], attributes["duration"])
+          - set(resource.attributes["userId"], attributes["userId"])
+          - set(resource.attributes["level"], severity_text)
+          - set(resource.attributes["message"], body)
+
 exporters:
   # AWS X-Ray for distributed tracing
   awsxray:
@@ -130,11 +151,13 @@ service:
         - awsemf
 
     # Logs pipeline -> CloudWatch Logs
+    # Transform processor flattens attributes for CloudWatch Logs Insights queryability
     logs:
       receivers:
         - otlp
       processors:
         - resourcedetection
+        - transform/logs
         - batch
       exporters:
         - awscloudwatchlogs

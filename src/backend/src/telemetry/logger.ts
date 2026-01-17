@@ -69,8 +69,10 @@ function createLoggerImpl(bindings: Record<string, unknown> = {}): Logger {
       body = objOrMsg;
       rawAttributes = { ...bindings };
     } else {
-      body = msg || "";
-      rawAttributes = { ...bindings, ...objOrMsg };
+      // Use msg if provided, otherwise fall back to event attribute for meaningful body
+      const attrs = objOrMsg as Record<string, unknown>;
+      body = msg || (typeof attrs.event === "string" ? attrs.event : "log");
+      rawAttributes = { ...bindings, ...attrs };
     }
 
     // Get trace context
