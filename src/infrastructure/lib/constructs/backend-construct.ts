@@ -106,7 +106,7 @@ export class BackendConstruct extends Construct {
     this.cluster = new ecs.Cluster(this, "Cluster", {
       vpc,
       clusterName,
-      containerInsights: true,
+      containerInsightsV2: ecs.ContainerInsights.ENABLED,
     });
 
     // Task Definition
@@ -473,7 +473,7 @@ export class BackendConstruct extends Construct {
       });
 
       // HTTP 5xx Errors Alarm
-      const http5xxMetric = targetGroup.metricHttpCodeTarget(
+      const http5xxMetric = targetGroup.metrics.httpCodeTarget(
         elbv2.HttpCodeTarget.TARGET_5XX_COUNT,
         {
           period: cdk.Duration.minutes(1),
@@ -492,7 +492,7 @@ export class BackendConstruct extends Construct {
       });
 
       // Unhealthy Target Count Alarm
-      const unhealthyHostMetric = targetGroup.metricUnhealthyHostCount({
+      const unhealthyHostMetric = targetGroup.metrics.unhealthyHostCount({
         period: cdk.Duration.minutes(2),
       });
 
