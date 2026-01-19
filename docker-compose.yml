@@ -34,7 +34,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # DISABLED - Use adot_collector for local OTEL testing
+  # DISABLED - Use otel_collector for local OTEL testing
   # aspire_dashboard:
   #   image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
   #   restart: always
@@ -45,10 +45,11 @@ services:
   #     - Dashboard:ApplicationName=GSF
   #     - Dashboard:Frontend:BrowserToken=password
 
-  # ADOT Collector for local telemetry testing
-  adot_collector:
-    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
-    container_name: adot-collector
+  # OTEL Collector Contrib for local telemetry testing
+  # Uses Contrib for transform processor support (flattens logs for CloudWatch queries)
+  otel_collector:
+    image: otel/opentelemetry-collector-contrib:0.140.0
+    container_name: otel-collector
     restart: unless-stopped
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:

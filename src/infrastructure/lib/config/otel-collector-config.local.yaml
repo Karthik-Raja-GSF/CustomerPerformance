@@ -1,9 +1,12 @@
-# ADOT Collector Configuration for Local Development
+# OpenTelemetry Collector Contrib Configuration for Local Development
 # Mirrors production config but exports to console instead of AWS services.
 #
-# Usage: Mount this file into ADOT collector container
-#   docker-compose up -d adot_collector
-#   docker logs -f adot-collector
+# Uses OTEL Collector Contrib (otel/opentelemetry-collector-contrib) for
+# transform processor support - enabling CloudWatch-friendly flattened logs.
+#
+# Usage: Mount this file into OTEL Collector container
+#   docker-compose up -d otel_collector
+#   docker logs -f otel-collector
 
 receivers:
   otlp:
@@ -26,6 +29,24 @@ processors:
       - env
     timeout: 5s
     override: false
+
+  # Transform processor for CloudWatch-friendly flattened logs
+  # This constructs a flat JSON body containing all important fields at the top level.
+  # Combined with raw_log: true on the exporter (in production), this makes CloudWatch
+  # Logs Insights queries simple (e.g., `filter level = "INFO"`)
+  transform/logs:
+    log_statements:
+      - context: log
+        statements:
+          # Copy body (message string) to attributes before overwriting body
+          - set(attributes["message"], body) where body != nil
+          # Add level from severity_text for standard log level filtering
+          - set(attributes["level"], severity_text) where severity_text != ""
+          # Flatten any nested maps within attributes
+          - flatten(attributes, "")
+          # Replace body with the flat attributes map
+          # This makes all attributes top-level fields when raw_log exports it
+          - set(body, attributes)
 
 exporters:
   # Console/debug exporter - outputs all telemetry to stdout
@@ -62,11 +83,13 @@ service:
         - debug
 
     # Logs pipeline -> Console
+    # Uses transform/logs processor to flatten attributes (matches production behavior)
     logs:
       receivers:
         - otlp
       processors:
         - resourcedetection
+        - transform/logs
         - batch
       exporters:
         - debug

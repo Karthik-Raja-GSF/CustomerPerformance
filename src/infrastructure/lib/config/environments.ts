@@ -170,7 +170,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     ecs: {
       cpu: 2048, // 2 vCPU
       memory: 4096, // 4 GB
-      desiredCount: 2, // Start with 2 tasks for HA
+      desiredCount: 0, // Start with 2 tasks for HA
       autoScaling: {
         minCount: 2, // Always at least 2 tasks (high availability)
         maxCount: 4,

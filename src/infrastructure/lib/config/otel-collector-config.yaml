@@ -1,6 +1,13 @@
-# ADOT Collector Configuration for ECS Fargate
-# This config is used by the ADOT Collector sidecar to receive OTLP data
+# OpenTelemetry Collector Contrib Configuration for ECS Fargate
+# This config is used by the OTEL Collector Contrib sidecar to receive OTLP data
 # and export to AWS X-Ray, CloudWatch Metrics, and CloudWatch Logs.
+#
+# Uses OTEL Collector Contrib (otel/opentelemetry-collector-contrib) for
+# transform processor support - enabling CloudWatch-friendly flattened logs.
+#
+# Traces and logs are exported via AWS native OTLP endpoints:
+#   - Traces: https://xray.{region}.amazonaws.com/v1/traces
+#   - Logs: https://logs.{region}.amazonaws.com/v1/logs
 #
 # Environment variables (set by ECS task definition):
 #   - AWS_REGION: AWS region for exporters
@@ -30,38 +37,40 @@ processors:
     timeout: 5s
     override: false
 
-  # Transform logs for CloudWatch-friendly flat JSON format
-  # Flattens OTLP log structure so fields are directly queryable in CloudWatch Logs Insights
+  # Transform processor - add level and message fields to attributes
+  # These fields are preserved when logs are sent to CloudWatch via native OTLP endpoint
   transform/logs:
-    error_mode: ignore
     log_statements:
       - context: log
         statements:
-          # Move key attributes to resource level for flatter CloudWatch output
-          - set(resource.attributes["event"], attributes["event"])
-          - set(resource.attributes["requestId"], attributes["requestId"])
-          - set(resource.attributes["method"], attributes["method"])
-          - set(resource.attributes["path"], attributes["path"])
-          - set(resource.attributes["statusCode"], attributes["statusCode"])
-          - set(resource.attributes["component"], attributes["component"])
-          - set(resource.attributes["traceId"], attributes["traceId"])
-          - set(resource.attributes["spanId"], attributes["spanId"])
-          - set(resource.attributes["duration"], attributes["duration"])
-          - set(resource.attributes["userId"], attributes["userId"])
-          - set(resource.attributes["level"], severity_text)
-          - set(resource.attributes["message"], body)
+          # Add level from severity_text for standard log level filtering
+          - set(attributes["level"], severity_text) where severity_text != ""
+          # Copy body (message string) to attributes for easier querying
+          - set(attributes["message"], body) where body != nil
+          # Flatten any nested maps within attributes
+          - flatten(attributes, "")
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # SigV4 authentication for CloudWatch Logs OTLP endpoint
+  sigv4auth/logs:
+    region: ${env:AWS_REGION}
+    service: "logs"
+
+  # SigV4 authentication for X-Ray OTLP endpoint
+  sigv4auth/xray:
+    region: ${env:AWS_REGION}
+    service: "xray"
 
 exporters:
-  # AWS X-Ray for distributed tracing
-  awsxray:
-    region: ${env:AWS_REGION}
-    indexed_attributes:
-      - "http.method"
-      - "http.route"
-      - "http.status_code"
-      - "db.system"
-      - "db.operation"
-      - "bedrock.model"
+  # AWS X-Ray for distributed tracing via native OTLP endpoint
+  otlphttp/xray:
+    compression: gzip
+    traces_endpoint: https://xray.${env:AWS_REGION}.amazonaws.com/v1/traces
+    auth:
+      authenticator: sigv4auth/xray
 
   # AWS CloudWatch EMF for metrics
   awsemf:
@@ -74,63 +83,59 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
     metric_declarations:
-      # HTTP metrics - use regex to match histogram variants
+      # HTTP metrics - aggregate only (removed route/status_code for cost optimization)
       - dimensions:
           - - service.name
           - - service.name
             - method
-          - - service.name
-            - method
-            - route
-            - status_code
         metric_name_selectors:
           - "^http\\.server\\..*"
-      # Database metrics - use regex to match all db.* metrics
+      # Database metrics - aggregate only (removed db.operation.name for cost optimization)
       - dimensions:
           - - service.name
           - - service.name
             - db.system
-          - - service.name
-            - db.system
-            - db.operation.name
         metric_name_selectors:
           - "^db\\..*"
-      # Bedrock/LLM metrics
+      # Bedrock/LLM metrics - keep model dimension (low cardinality)
       - dimensions:
           - - service.name
           - - service.name
             - bedrock.model
         metric_name_selectors:
           - "^bedrock\\..*"
-      # Assistant metrics
+      # Assistant metrics - unchanged
       - dimensions:
           - - service.name
         metric_name_selectors:
           - "^assistant\\..*"
 
-  # AWS CloudWatch Logs for application logs
-  awscloudwatchlogs:
-    region: ${env:AWS_REGION}
-    log_group_name: /ait/${env:ENVIRONMENT}/backend/otel-logs
-    log_stream_name: ${env:OTEL_SERVICE_NAME}
-    log_retention: 30
+  # CloudWatch Logs via native OTLP endpoint
+  # Uses AWS SigV4 authentication and sends logs in OTLP format
+  # CloudWatch handles the log formatting natively
+  otlphttp/cloudwatch-logs:
+    compression: gzip
+    logs_endpoint: https://logs.${env:AWS_REGION}.amazonaws.com/v1/logs
+    headers:
+      x-aws-log-group: /ait/${env:ENVIRONMENT}/backend/otel-logs
+      x-aws-log-stream: ${env:OTEL_SERVICE_NAME}
+    auth:
+      authenticator: sigv4auth/logs
 
-  # Logging exporter for troubleshooting (ADOT uses 'logging' instead of 'debug')
-  logging:
+  # Debug exporter for troubleshooting (standard OTEL Contrib naming)
+  debug:
     verbosity: detailed
     sampling_initial: 10
     sampling_thereafter: 100
 
-extensions:
-  health_check:
-    endpoint: 0.0.0.0:13133
-
 service:
   extensions:
     - health_check
+    - sigv4auth/logs
+    - sigv4auth/xray
 
   pipelines:
-    # Traces pipeline -> AWS X-Ray
+    # Traces pipeline -> AWS X-Ray via native OTLP endpoint
     traces:
       receivers:
         - otlp
@@ -138,7 +143,7 @@ service:
         - resourcedetection
         - batch
       exporters:
-        - awsxray
+        - otlphttp/xray
 
     # Metrics pipeline -> CloudWatch EMF
     metrics:
@@ -150,8 +155,8 @@ service:
       exporters:
         - awsemf
 
-    # Logs pipeline -> CloudWatch Logs
-    # Transform processor flattens attributes for CloudWatch Logs Insights queryability
+    # Logs pipeline -> CloudWatch Logs via native OTLP endpoint
+    # Uses transform/logs processor to add level and message attributes
     logs:
       receivers:
         - otlp
@@ -160,7 +165,7 @@ service:
         - transform/logs
         - batch
       exporters:
-        - awscloudwatchlogs
+        - otlphttp/cloudwatch-logs
 
   telemetry:
     logs:

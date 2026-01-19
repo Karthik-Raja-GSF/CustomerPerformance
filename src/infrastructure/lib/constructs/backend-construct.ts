@@ -89,14 +89,15 @@ export class BackendConstruct extends Construct {
     );
     const otelConfigContent = fs.readFileSync(otelConfigPath, "utf-8");
 
-    // Store OTEL config in SSM Parameter Store (ADOT reads from AOT_CONFIG_CONTENT)
+    // Store OTEL config in SSM Parameter Store
+    // OTEL Contrib reads from OTEL_CONFIG env var via startup command
     const otelConfigParam = new ssm.StringParameter(
       this,
       "OtelCollectorConfig",
       {
         parameterName: `/ait/${naming.env}/otel-collector-config`,
         stringValue: otelConfigContent,
-        description: `ADOT Collector configuration for AIT ${naming.env} backend`,
+        description: `OTEL Collector Contrib configuration for AIT ${naming.env} backend`,
         tier: ssm.ParameterTier.ADVANCED, // Required for configs > 4KB
       }
     );
@@ -186,10 +187,11 @@ export class BackendConstruct extends Construct {
       protocol: ecs.Protocol.TCP,
     });
 
-    // ADOT Collector Sidecar for OpenTelemetry export to AWS
+    // OTEL Collector Contrib Sidecar for OpenTelemetry export to AWS
+    // Uses OTEL Contrib for transform processor support (flattens logs for CloudWatch)
     const otelCollector = taskDefinition.addContainer("otel-collector", {
       image: ecs.ContainerImage.fromRegistry(
-        "public.ecr.aws/aws-observability/aws-otel-collector:v0.40.0"
+        "otel/opentelemetry-collector-contrib:0.140.0"
       ),
       containerName: `${containerName}-otel`,
       essential: false, // Allow task to continue if collector fails
@@ -203,19 +205,16 @@ export class BackendConstruct extends Construct {
         OTEL_SERVICE_NAME: otelServiceName,
       },
       secrets: {
-        // Load config from SSM - ADOT reads from AOT_CONFIG_CONTENT automatically
-        AOT_CONFIG_CONTENT: ecs.Secret.fromSsmParameter(otelConfigParam),
+        // Load config from SSM - passed directly to collector via --config=env:
+        OTEL_CONFIG: ecs.Secret.fromSsmParameter(otelConfigParam),
       },
+      // Read config directly from OTEL_CONFIG env var (no shell needed)
+      // The collector supports env: URI scheme for config
+      command: ["--config=env:OTEL_CONFIG"],
       cpu: 256,
       memoryLimitMiB: 512,
-      // Health check using ADOT's built-in healthcheck binary
-      healthCheck: {
-        command: ["CMD", "/healthcheck"],
-        interval: cdk.Duration.seconds(5),
-        timeout: cdk.Duration.seconds(3),
-        retries: 2,
-        startPeriod: cdk.Duration.seconds(5),
-      },
+      // Note: Container health check removed - distroless image has no shell/wget
+      // ECS service deployment circuit breaker handles unhealthy task detection
     });
 
     otelCollector.addPortMappings(
@@ -227,12 +226,13 @@ export class BackendConstruct extends Construct {
     // Grant execution role permission to read SSM parameter for OTEL config
     otelConfigParam.grantRead(taskDefinition.executionRole!);
 
-    // Grant ADOT Collector permissions for X-Ray, CloudWatch Logs, and CloudWatch Metrics
+    // Grant OTEL Collector permissions for X-Ray, CloudWatch Logs, and CloudWatch Metrics
     taskDefinition.taskRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
-          // X-Ray permissions
+          // X-Ray permissions (PutSpans for OTLP, PutTraceSegments for legacy)
+          "xray:PutSpans",
           "xray:PutTraceSegments",
           "xray:PutTelemetryRecords",
           "xray:GetSamplingRules",

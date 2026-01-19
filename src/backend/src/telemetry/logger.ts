@@ -25,7 +25,7 @@ const severityMap: Record<LogLevel, { number: SeverityNumber; text: string }> =
   };
 
 // Get the minimum log level
-const minLevel = config.nodeEnv === "development" ? "debug" : "info";
+const minLevel = config.nodeEnv === "development" ? "debug" : "warn";
 const levelPriority: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
