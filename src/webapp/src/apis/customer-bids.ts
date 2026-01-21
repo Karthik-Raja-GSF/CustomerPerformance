@@ -23,9 +23,11 @@ export async function getCustomerBids(
     if (filters.page !== undefined) params.page = String(filters.page);
     if (filters.limit !== undefined) params.limit = String(filters.limit);
     if (filters.siteCode) params.siteCode = filters.siteCode;
-    if (filters.customerNo) params.customerNo = filters.customerNo;
+    if (filters.customerBillTo) params.customerBillTo = filters.customerBillTo;
+    if (filters.customerName) params.customerName = filters.customerName;
     if (filters.salesRep) params.salesRep = filters.salesRep;
     if (filters.itemCode) params.itemCode = filters.itemCode;
+    if (filters.erpStatus) params.erpStatus = filters.erpStatus;
   }
 
   return apiClient.get<CustomerBidListResponse>("/customer-bids", {

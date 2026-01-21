@@ -47,16 +47,14 @@ export default function CustomerBids() {
 
   // Local filter inputs (before applying)
   const [siteCodeInput, setSiteCodeInput] = useState("");
-  const [customerNoInput, setCustomerNoInput] = useState("");
+  const [customerBillToInput, setCustomerBillToInput] = useState("");
+  const [customerNameInput, setCustomerNameInput] = useState("");
   const [salesRepInput, setSalesRepInput] = useState("");
   const [itemCodeInput, setItemCodeInput] = useState("");
+  const [erpStatusInput, setErpStatusInput] = useState("");
 
   // Column visibility state
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
-    contactPhone: false,
-    customerBillTo: false,
-    erpStatus: false,
-  });
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [tableInstance, setTableInstance] =
     useState<Table<CustomerBidDto> | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -87,9 +85,11 @@ export default function CustomerBids() {
       page: 1,
       limit: filters.limit,
       siteCode: siteCodeInput || undefined,
-      customerNo: customerNoInput || undefined,
+      customerBillTo: customerBillToInput || undefined,
+      customerName: customerNameInput || undefined,
       salesRep: salesRepInput || undefined,
       itemCode: itemCodeInput || undefined,
+      erpStatus: erpStatusInput || undefined,
     };
     setFilters(newFilters);
     setFilterSheetOpen(false);
@@ -97,9 +97,11 @@ export default function CustomerBids() {
 
   const handleClearFilters = () => {
     setSiteCodeInput("");
-    setCustomerNoInput("");
+    setCustomerBillToInput("");
+    setCustomerNameInput("");
     setSalesRepInput("");
     setItemCodeInput("");
+    setErpStatusInput("");
     setFilters({ page: 1, limit: filters.limit });
   };
 
@@ -112,14 +114,21 @@ export default function CustomerBids() {
   };
 
   const hasActiveFilters = Boolean(
-    siteCodeInput || customerNoInput || salesRepInput || itemCodeInput
+    siteCodeInput ||
+      customerBillToInput ||
+      customerNameInput ||
+      salesRepInput ||
+      itemCodeInput ||
+      erpStatusInput
   );
 
   const activeFilterCount = [
     siteCodeInput,
-    customerNoInput,
+    customerBillToInput,
+    customerNameInput,
     salesRepInput,
     itemCodeInput,
+    erpStatusInput,
   ].filter(Boolean).length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -185,16 +194,32 @@ export default function CustomerBids() {
               </div>
               <div className="space-y-3">
                 <Label
-                  htmlFor="customerNo"
+                  htmlFor="customerBillTo"
                   className="text-sm font-medium text-foreground"
                 >
-                  Customer Number
+                  Customer Bill To
                 </Label>
                 <Input
-                  id="customerNo"
-                  placeholder="e.g. 123456"
-                  value={customerNoInput}
-                  onChange={(e) => setCustomerNoInput(e.target.value)}
+                  id="customerBillTo"
+                  placeholder="e.g. CUST001"
+                  value={customerBillToInput}
+                  onChange={(e) => setCustomerBillToInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label
+                  htmlFor="customerName"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Customer Name
+                </Label>
+                <Input
+                  id="customerName"
+                  placeholder="e.g. School District"
+                  value={customerNameInput}
+                  onChange={(e) => setCustomerNameInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="h-11"
                 />
@@ -227,6 +252,22 @@ export default function CustomerBids() {
                   placeholder="e.g. SKU-12345"
                   value={itemCodeInput}
                   onChange={(e) => setItemCodeInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label
+                  htmlFor="erpStatus"
+                  className="text-sm font-medium text-foreground"
+                >
+                  ERP Status
+                </Label>
+                <Input
+                  id="erpStatus"
+                  placeholder="e.g. Active, Blocked"
+                  value={erpStatusInput}
+                  onChange={(e) => setErpStatusInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="h-11"
                 />

@@ -72,14 +72,14 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
   {
     accessorKey: "contactName",
     header: () => (
-      <span className="text-muted-foreground font-medium">Contact</span>
+      <span className="text-muted-foreground font-medium">Contact Name</span>
     ),
     cell: ({ row }) => row.getValue("contactName") ?? "-",
   },
   {
     accessorKey: "contactEmail",
     header: () => (
-      <span className="text-muted-foreground font-medium">Email</span>
+      <span className="text-muted-foreground font-medium">Contact Email</span>
     ),
     cell: ({ row }) => {
       const email = row.getValue<string | null>("contactEmail");
@@ -93,7 +93,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
   {
     accessorKey: "contactPhone",
     header: () => (
-      <span className="text-muted-foreground font-medium">Phone</span>
+      <span className="text-muted-foreground font-medium">Contact Phone</span>
     ),
     cell: ({ row }) => row.getValue("contactPhone") ?? "-",
   },
@@ -107,7 +107,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
   {
     accessorKey: "wonLost",
     header: () => (
-      <span className="text-muted-foreground font-medium">Status</span>
+      <span className="text-muted-foreground font-medium">Won/Lost</span>
     ),
     cell: ({ row }) => {
       const status = row.getValue<string | null>("wonLost");
@@ -185,6 +185,58 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
     cell: ({ row }) => (
       <div className="text-right font-medium tabular-nums">
         {formatNumber(row.getValue("lastYearBidQty"))}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "lastYearActual",
+    header: () => (
+      <div className="text-right text-muted-foreground font-medium">
+        LY Actual
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-right font-medium tabular-nums">
+        {formatNumber(row.getValue("lastYearActual"))}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "lastYearAugust",
+    header: () => (
+      <div className="text-right text-muted-foreground font-medium">
+        LY August
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-right font-medium tabular-nums">
+        {formatNumber(row.getValue("lastYearAugust"))}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "lastYearSeptember",
+    header: () => (
+      <div className="text-right text-muted-foreground font-medium">
+        LY September
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-right font-medium tabular-nums">
+        {formatNumber(row.getValue("lastYearSeptember"))}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "lastYearOctober",
+    header: () => (
+      <div className="text-right text-muted-foreground font-medium">
+        LY October
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-right font-medium tabular-nums">
+        {formatNumber(row.getValue("lastYearOctober"))}
       </div>
     ),
   },

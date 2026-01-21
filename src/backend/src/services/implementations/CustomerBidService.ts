@@ -52,6 +52,17 @@ interface PreviousYearBid {
 }
 
 /**
+ * Result from sales invoice lookup (aggregated by location/item/customer)
+ */
+interface SalesLookupResult {
+  source_db: string;
+  location_code: string;
+  item_no_: string;
+  bill_to_customer_no_: string;
+  total_amount: Prisma.Decimal | null;
+}
+
+/**
  * Customer Bid Service Implementation
  *
  * Retrieves customer bid data from NAV database tables with
@@ -110,8 +121,16 @@ export class CustomerBidService implements ICustomerBidService {
         whereConditions.push(Prisma.sql`sku.location_code = ${query.siteCode}`);
       }
 
-      if (query.customerNo) {
-        whereConditions.push(Prisma.sql`c.no_ = ${query.customerNo}`);
+      if (query.customerBillTo) {
+        whereConditions.push(
+          Prisma.sql`c.bill_to_customer_no_ ILIKE ${"%" + query.customerBillTo + "%"}`
+        );
+      }
+
+      if (query.customerName) {
+        whereConditions.push(
+          Prisma.sql`c.name ILIKE ${"%" + query.customerName + "%"}`
+        );
       }
 
       if (query.salesRep) {
@@ -122,6 +141,12 @@ export class CustomerBidService implements ICustomerBidService {
 
       if (query.itemCode) {
         whereConditions.push(Prisma.sql`sp.item_no_ = ${query.itemCode}`);
+      }
+
+      if (query.erpStatus) {
+        whereConditions.push(
+          Prisma.sql`sku.status ILIKE ${"%" + query.erpStatus + "%"}`
+        );
       }
 
       if (query.sourceDb) {
@@ -187,15 +212,45 @@ export class CustomerBidService implements ICustomerBidService {
         customerNo: r.billToCustomerNo,
       }));
 
-      // Step 3: Run lookup queries in parallel for won/lost calculation
-      const [currentYearItems, previousYearBids] = await Promise.all([
+      // Tuples with siteCode for sales lookup (location-specific)
+      const salesTuples = trimmedRows.map((r) => ({
+        sourceDb: r.sourceDb,
+        siteCode: r.siteCode,
+        itemNo: r.itemCode,
+        customerNo: r.billToCustomerNo,
+      }));
+
+      // Calculate month boundaries for previous school year
+      // Previous school year starts in August of (currentYear - 1)
+      const prevYearCalendarYear = previousYearStart.getFullYear();
+      const augustStart = new Date(prevYearCalendarYear, 7, 1); // Aug 1
+      const augustEnd = new Date(prevYearCalendarYear, 8, 1); // Sep 1
+      const septemberStart = new Date(prevYearCalendarYear, 8, 1); // Sep 1
+      const septemberEnd = new Date(prevYearCalendarYear, 9, 1); // Oct 1
+      const octoberStart = new Date(prevYearCalendarYear, 9, 1); // Oct 1
+      const octoberEnd = new Date(prevYearCalendarYear, 10, 1); // Nov 1
+
+      // Step 3: Run lookup queries in parallel for won/lost calculation and sales
+      const [
+        currentYearItems,
+        previousYearBids,
+        lastYearActualSales,
+        lastYearAugustSales,
+        lastYearSeptemberSales,
+        lastYearOctoberSales,
+      ] = await Promise.all([
         this.getCurrentYearItems(tuples, currentYearStart, currentYearEnd),
         this.getPreviousYearBids(tuples, previousYearStart, previousYearEnd),
+        this.getSalesAmounts(salesTuples, previousYearStart, previousYearEnd),
+        this.getSalesAmounts(salesTuples, augustStart, augustEnd),
+        this.getSalesAmounts(salesTuples, septemberStart, septemberEnd),
+        this.getSalesAmounts(salesTuples, octoberStart, octoberEnd),
       ]);
 
       // Step 4: Calculate won/lost and build DTOs
       const data: CustomerBidDto[] = trimmedRows.map((row) => {
         const key = `${row.sourceDb}|${row.itemCode}|${row.billToCustomerNo}`;
+        const salesKey = `${row.sourceDb}|${row.siteCode}|${row.itemCode}|${row.billToCustomerNo}`;
         const inCurrentYear = currentYearItems.has(key);
         const prevYearBid = previousYearBids.get(key);
         const inPreviousYear = !!prevYearBid;
@@ -220,6 +275,10 @@ export class CustomerBidService implements ICustomerBidService {
           erpStatus: row.erpStatus,
           bidQuantity: row.bidQuantity ? Number(row.bidQuantity) : null,
           lastYearBidQty: prevYearBid ? Number(prevYearBid) : null,
+          lastYearActual: lastYearActualSales.get(salesKey) ?? null,
+          lastYearAugust: lastYearAugustSales.get(salesKey) ?? null,
+          lastYearSeptember: lastYearSeptemberSales.get(salesKey) ?? null,
+          lastYearOctober: lastYearOctoberSales.get(salesKey) ?? null,
         };
       });
 
@@ -348,6 +407,63 @@ export class CustomerBidService implements ICustomerBidService {
     for (const r of results) {
       const key = `${r.source_db}|${r.item_no_}|${r.bill_to_customer_no_}`;
       map.set(key, r.customer_bid_qty_ ? Number(r.customer_bid_qty_) : 0);
+    }
+    return map;
+  }
+
+  /**
+   * Get sales amounts from SalesInvoiceHeader/SalesLine for given tuples and date range
+   * Returns a Map of key (sourceDb|siteCode|itemNo|customerNo) -> total amount
+   */
+  private async getSalesAmounts(
+    tuples: Array<{
+      sourceDb: string;
+      siteCode: string | null;
+      itemNo: string;
+      customerNo: string | null;
+    }>,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Map<string, number>> {
+    if (tuples.length === 0) return new Map();
+
+    // Build tuple conditions for IN clause (handle NULL values correctly)
+    const tupleConditions = tuples.map((t) => {
+      const siteCondition =
+        t.siteCode === null
+          ? Prisma.sql`sih.location_code IS NULL`
+          : Prisma.sql`sih.location_code = ${t.siteCode}`;
+      const customerCondition =
+        t.customerNo === null
+          ? Prisma.sql`sih.bill_to_customer_no_ IS NULL`
+          : Prisma.sql`sih.bill_to_customer_no_ = ${t.customerNo}`;
+
+      return Prisma.sql`(sih.source_db = ${t.sourceDb} AND ${siteCondition} AND sl.no_ = ${t.itemNo} AND ${customerCondition})`;
+    });
+
+    const query = Prisma.sql`
+      SELECT
+        sih.source_db,
+        sih.location_code,
+        sl.no_ as item_no_,
+        sih.bill_to_customer_no_,
+        SUM(sl.amount) as total_amount
+      FROM dw2_nav.sales_invoice_header sih
+      INNER JOIN dw2_nav.sales_line sl
+        ON sih.source_db = sl.source_db
+        AND sih.no_ = sl.document_no_
+      WHERE sih.posting_date >= ${startDate}::date
+        AND sih.posting_date < ${endDate}::date
+        AND (${Prisma.join(tupleConditions, " OR ")})
+      GROUP BY sih.source_db, sih.location_code, sl.no_, sih.bill_to_customer_no_
+    `;
+
+    const results = await this.prisma.$queryRaw<SalesLookupResult[]>(query);
+
+    const map = new Map<string, number>();
+    for (const r of results) {
+      const key = `${r.source_db}|${r.location_code}|${r.item_no_}|${r.bill_to_customer_no_}`;
+      map.set(key, r.total_amount ? Number(r.total_amount) : 0);
     }
     return map;
   }

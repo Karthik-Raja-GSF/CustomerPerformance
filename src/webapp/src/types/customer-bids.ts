@@ -23,6 +23,14 @@ export interface CustomerBidDto {
   erpStatus: string | null;
   bidQuantity: number | null;
   lastYearBidQty: number | null;
+  /** Last year school year total sales amount */
+  lastYearActual: number | null;
+  /** Last year August sales amount */
+  lastYearAugust: number | null;
+  /** Last year September sales amount */
+  lastYearSeptember: number | null;
+  /** Last year October sales amount */
+  lastYearOctober: number | null;
 }
 
 /**
@@ -42,9 +50,11 @@ export interface CustomerBidFilters {
   page?: number;
   limit?: number;
   siteCode?: string;
-  customerNo?: string;
+  customerBillTo?: string;
+  customerName?: string;
   salesRep?: string;
   itemCode?: string;
+  erpStatus?: string;
 }
 
 /**
