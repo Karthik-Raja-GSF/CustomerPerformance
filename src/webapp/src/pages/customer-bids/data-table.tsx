@@ -126,7 +126,7 @@ export function DataTable<TData, TValue>({
       {/* Table */}
       <div className="flex-1 min-h-0 overflow-hidden rounded-lg border [&_[data-slot=table-container]]:overflow-auto [&_[data-slot=table-container]]:h-full">
         <Table className="relative">
-          <TableHeader className="sticky top-0 z-10 bg-muted/60">
+          <TableHeader className="sticky top-0 z-10 bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
