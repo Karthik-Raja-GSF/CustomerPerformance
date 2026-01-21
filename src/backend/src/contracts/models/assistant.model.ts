@@ -20,6 +20,11 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     tier: "standard",
     description: "Balanced performance and cost",
   },
+  "us.amazon.nova-premier-v1:0": {
+    name: "Amazon Nova Premier",
+    tier: "premium",
+    description: "Highest quality Amazon Nova model for complex tasks",
+  },
   "global.anthropic.claude-sonnet-4-5-20250929-v1:0": {
     name: "Claude Sonnet 4.5",
     tier: "premium",

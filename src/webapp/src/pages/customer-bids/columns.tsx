@@ -82,7 +82,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
       <span className="text-muted-foreground font-medium">Email</span>
     ),
     cell: ({ row }) => {
-      const email = row.getValue("contactEmail");
+      const email = row.getValue<string | null>("contactEmail");
       return (
         <div className="max-w-[180px] truncate" title={email ?? undefined}>
           {email ?? "-"}
@@ -110,7 +110,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
       <span className="text-muted-foreground font-medium">Status</span>
     ),
     cell: ({ row }) => {
-      const status = row.getValue("wonLost");
+      const status = row.getValue<string | null>("wonLost");
       return (
         <Badge variant={status === "WON" ? "default" : "destructive"}>
           {status}
@@ -147,7 +147,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
       </span>
     ),
     cell: ({ row }) => {
-      const desc = row.getValue("itemDescription");
+      const desc = row.getValue<string | null>("itemDescription");
       return (
         <div className="max-w-[200px] truncate" title={desc ?? undefined}>
           {desc ?? "-"}

@@ -36,6 +36,10 @@ export const LLM_MODELS = [
   },
   { value: "amazon.nova-pro-v1:0", label: "Amazon Nova Pro (Standard)" },
   {
+    value: "us.amazon.nova-premier-v1:0",
+    label: "Amazon Nova Premier (Premium)",
+  },
+  {
     value: "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
     label: "Claude Sonnet 4.5 (Premium)",
   },

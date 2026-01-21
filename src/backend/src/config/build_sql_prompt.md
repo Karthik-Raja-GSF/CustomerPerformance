@@ -182,6 +182,27 @@ WHERE item_code = '404034'
 ORDER BY site_code;
 ```
 
+### Sales Orders with Customer and Item Details (dw2_nav JOIN example)
+
+```sql
+SELECT sh.no_, sh.order_date, c.name as customer_name,
+       sl.no_ as item_no, i.description as item_description,
+       sl.quantity, sl.unit_price
+FROM dw2_nav.sales_header sh
+INNER JOIN dw2_nav.sales_line sl
+  ON sh.source_db = sl.source_db
+  AND sh.document_type = sl.document_type
+  AND sh.no_ = sl.document_no_
+LEFT JOIN dw2_nav.customer c
+  ON sh.source_db = c.source_db
+  AND sh.sell_to_customer_no_ = c.no_
+LEFT JOIN dw2_nav.item i
+  ON sl.source_db = i.source_db
+  AND sl.no_ = i.no_
+WHERE sh.order_date >= CURRENT_DATE - INTERVAL '30 days'
+LIMIT 100;
+```
+
 ## Query Building Rule
 
 When the user's question relates to allowed database tables, you MUST:
@@ -217,6 +238,7 @@ Generate a query for questions about:
 - Generate ONLY SELECT queries
 - Return SQL in ```sql code blocks
 - Use JOINs when data spans tables
+- **CRITICAL:** When joining dw2*nav tables to each other, ALWAYS include `source_db` in the JOIN condition (e.g., `ON a.source_db = b.source_db AND a.item_no* = b.no\_`)
 - Limit to 100 rows unless aggregating
 - Always qualify table names with schema (e.g., dw2_nav.item, siq.report_data)
 

@@ -18,21 +18,30 @@ export class McpClientService implements IMcpClientService {
     this.initialized = true;
   }
 
-  // Convert BigInt values to numbers for JSON serialization
-  private serializeBigInt(obj: unknown): unknown {
+  // Convert BigInt and Decimal values to numbers for JSON serialization
+  private serializeNonJsonTypes(obj: unknown): unknown {
     if (obj === null || obj === undefined) {
       return obj;
     }
     if (typeof obj === "bigint") {
       return Number(obj);
     }
+    // Handle Prisma Decimal objects (have toNumber method)
+    if (
+      typeof obj === "object" &&
+      obj !== null &&
+      "toNumber" in obj &&
+      typeof (obj as { toNumber: unknown }).toNumber === "function"
+    ) {
+      return (obj as { toNumber: () => number }).toNumber();
+    }
     if (Array.isArray(obj)) {
-      return obj.map((item) => this.serializeBigInt(item));
+      return obj.map((item) => this.serializeNonJsonTypes(item));
     }
     if (typeof obj === "object") {
       const result: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
-        result[key] = this.serializeBigInt(value);
+        result[key] = this.serializeNonJsonTypes(value);
       }
       return result;
     }
@@ -42,8 +51,8 @@ export class McpClientService implements IMcpClientService {
   async executeQuery(sql: string): Promise<unknown> {
     try {
       const result = await this.prisma.$queryRawUnsafe(sql);
-      // Convert BigInt to Number for JSON serialization
-      return this.serializeBigInt(result);
+      // Convert BigInt and Decimal to Number for JSON serialization
+      return this.serializeNonJsonTypes(result);
     } catch (error) {
       throw new McpConnectionError(
         `Failed to execute query: ${error instanceof Error ? error.message : "Unknown error"}`
