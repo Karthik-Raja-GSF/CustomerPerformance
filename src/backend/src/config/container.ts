@@ -33,6 +33,11 @@ import {
   SCHEDULER_SERVICE_TOKEN,
 } from "@/services/ISchedulerService";
 import { SchedulerService } from "@/services/implementations/SchedulerService";
+import {
+  ICustomerBidService,
+  CUSTOMER_BID_SERVICE_TOKEN,
+} from "@/services/ICustomerBidService";
+import { CustomerBidService } from "@/services/implementations/CustomerBidService";
 
 /**
  * DI Container Configuration
@@ -83,6 +88,11 @@ export function setupContainer(prisma: PrismaClient): void {
   // Register StockIqService for StockIQ API integration
   container.register<IStockIqService>(STOCKIQ_SERVICE_TOKEN, {
     useClass: StockIqService,
+  });
+
+  // Register CustomerBidService for customer bid data retrieval
+  container.register<ICustomerBidService>(CUSTOMER_BID_SERVICE_TOKEN, {
+    useClass: CustomerBidService,
   });
 
   // Register SchedulerService for in-app scheduled tasks

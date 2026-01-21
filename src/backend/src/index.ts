@@ -22,6 +22,7 @@ import { telemetryMiddleware } from "./middleware/telemetry";
 import promptsRouter from "./routes/prompts";
 import assistantRouter from "./routes/assistant";
 import stockiqRouter from "./routes/stockiq";
+import customerBidsRouter from "./routes/customer-bids";
 
 const serverLogger = createChildLogger("server");
 
@@ -94,6 +95,7 @@ class Server {
     this.app.use("/prompts", promptsRouter);
     this.app.use("/assistant", assistantRouter);
     this.app.use("/stockiq", stockiqRouter);
+    this.app.use("/customer-bids", customerBidsRouter);
   }
 
   private initializeErrorHandling(): void {

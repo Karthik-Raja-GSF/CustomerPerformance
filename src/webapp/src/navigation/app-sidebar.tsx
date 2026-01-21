@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Settings2 } from "lucide-react";
+import { Settings2, GraduationCap } from "lucide-react";
 import { StarqIcon } from "@/components/icons/starq-icon";
 
 import { Branding } from "@/navigation/branding";
@@ -20,6 +20,11 @@ const data = {
       title: "StarQ",
       url: "/",
       icon: StarqIcon,
+    },
+    {
+      title: "Back to School",
+      url: "/back-to-school",
+      icon: GraduationCap,
     },
     {
       title: "Settings",
