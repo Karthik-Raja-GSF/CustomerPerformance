@@ -3,6 +3,21 @@
  */
 
 /**
+ * School year filter options
+ */
+export type SchoolYear = "current" | "previous" | "next";
+
+/**
+ * Date range for queried data
+ */
+export interface DateRangeDto {
+  /** ISO8601 date string (YYYY-MM-DD) */
+  startDate: string;
+  /** ISO8601 date string (YYYY-MM-DD) */
+  endDate: string;
+}
+
+/**
  * Single customer bid record
  */
 export interface CustomerBidDto {
@@ -13,7 +28,7 @@ export interface CustomerBidDto {
   contactEmail: string | null;
   contactPhone: string | null;
   salesRep: string | null;
-  wonLost: "WON" | "LOST";
+  wonLost: string;
   /** ISO8601 UTC timestamp */
   bidStartDate: string;
   /** ISO8601 UTC timestamp */
@@ -22,15 +37,16 @@ export interface CustomerBidDto {
   itemDescription: string | null;
   erpStatus: string | null;
   bidQuantity: number | null;
-  lastYearBidQty: number | null;
-  /** Last year school year total sales amount */
-  lastYearActual: number | null;
-  /** Last year August sales amount */
-  lastYearAugust: number | null;
-  /** Last year September sales amount */
-  lastYearSeptember: number | null;
-  /** Last year October sales amount */
-  lastYearOctober: number | null;
+  /** Last year bid quantity - "Coming Soon.." when not available */
+  lastYearBidQty: number | string | null;
+  /** Last year school year total sales amount - "Coming Soon.." when not available */
+  lastYearActual: number | string | null;
+  /** Last year August sales amount - "Coming Soon.." when not available */
+  lastYearAugust: number | string | null;
+  /** Last year September sales amount - "Coming Soon.." when not available */
+  lastYearSeptember: number | string | null;
+  /** Last year October sales amount - "Coming Soon.." when not available */
+  lastYearOctober: number | string | null;
 }
 
 /**
@@ -55,6 +71,8 @@ export interface CustomerBidFilters {
   salesRep?: string;
   itemCode?: string;
   erpStatus?: string;
+  /** School year filter - defaults to "next" */
+  schoolYear?: SchoolYear;
 }
 
 /**
@@ -63,4 +81,6 @@ export interface CustomerBidFilters {
 export interface CustomerBidListResponse {
   data: CustomerBidDto[];
   pagination: PaginationDto;
+  /** Date range used for the query */
+  dateRange: DateRangeDto;
 }

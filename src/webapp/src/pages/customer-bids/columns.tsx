@@ -1,3 +1,4 @@
+import type React from "react";
 import { type Column, type ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
@@ -40,8 +41,11 @@ function formatDate(dateString: string | null): string {
   return new Date(dateString).toLocaleDateString();
 }
 
-function formatNumber(value: number | null): string {
+function formatNumber(value: number | string | null): React.ReactNode {
   if (value === null) return "-";
+  if (typeof value === "string") {
+    return <span className="text-muted-foreground italic">{value}</span>;
+  }
   return value.toLocaleString();
 }
 
@@ -51,14 +55,14 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
     header: ({ column }) => (
       <SortableHeader column={column} title="Site Code" />
     ),
-    cell: ({ row }) => row.getValue("siteCode") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("siteCode") ?? "-",
   },
   {
     accessorKey: "customerName",
     header: ({ column }) => (
       <SortableHeader column={column} title="Customer Name" />
     ),
-    cell: ({ row }) => row.getValue("customerName") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("customerName") ?? "-",
   },
   {
     accessorKey: "customerBillTo",
@@ -67,14 +71,14 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
         Customer Bill To
       </span>
     ),
-    cell: ({ row }) => row.getValue("customerBillTo") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("customerBillTo") ?? "-",
   },
   {
     accessorKey: "contactName",
     header: () => (
       <span className="text-muted-foreground font-medium">Contact Name</span>
     ),
-    cell: ({ row }) => row.getValue("contactName") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("contactName") ?? "-",
   },
   {
     accessorKey: "contactEmail",
@@ -95,14 +99,14 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
     header: () => (
       <span className="text-muted-foreground font-medium">Contact Phone</span>
     ),
-    cell: ({ row }) => row.getValue("contactPhone") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("contactPhone") ?? "-",
   },
   {
     accessorKey: "salesRep",
     header: ({ column }) => (
       <SortableHeader column={column} title="Sales Rep" />
     ),
-    cell: ({ row }) => row.getValue("salesRep") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("salesRep") ?? "-",
   },
   {
     accessorKey: "wonLost",
@@ -110,7 +114,10 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
       <span className="text-muted-foreground font-medium">Won/Lost</span>
     ),
     cell: ({ row }) => {
-      const status = row.getValue<string | null>("wonLost");
+      const status = row.getValue<string>("wonLost");
+      if (status === "Coming Soon..") {
+        return <span className="text-muted-foreground italic">{status}</span>;
+      }
       return (
         <Badge variant={status === "WON" ? "default" : "destructive"}>
           {status}
@@ -137,7 +144,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
     header: ({ column }) => (
       <SortableHeader column={column} title="Item Code" />
     ),
-    cell: ({ row }) => row.getValue("itemCode"),
+    cell: ({ row }) => row.getValue<string>("itemCode"),
   },
   {
     accessorKey: "itemDescription",
@@ -160,7 +167,7 @@ export const columns: ColumnDef<CustomerBidDto>[] = [
     header: () => (
       <span className="text-muted-foreground font-medium">ERP Status</span>
     ),
-    cell: ({ row }) => row.getValue("erpStatus") ?? "-",
+    cell: ({ row }) => row.getValue<string | null>("erpStatus") ?? "-",
   },
   {
     accessorKey: "bidQuantity",

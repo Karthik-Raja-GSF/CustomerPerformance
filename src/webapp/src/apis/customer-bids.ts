@@ -22,6 +22,7 @@ export async function getCustomerBids(
   if (filters) {
     if (filters.page !== undefined) params.page = String(filters.page);
     if (filters.limit !== undefined) params.limit = String(filters.limit);
+    if (filters.schoolYear) params.schoolYear = filters.schoolYear;
     if (filters.siteCode) params.siteCode = filters.siteCode;
     if (filters.customerBillTo) params.customerBillTo = filters.customerBillTo;
     if (filters.customerName) params.customerName = filters.customerName;

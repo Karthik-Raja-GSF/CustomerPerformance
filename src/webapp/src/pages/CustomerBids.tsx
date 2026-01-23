@@ -18,11 +18,20 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/shadcn/components/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shadcn/components/select";
 import { getCustomerBids } from "@/apis/customer-bids";
 import type {
   CustomerBidDto,
   CustomerBidFilters,
   PaginationDto,
+  SchoolYear,
+  DateRangeDto,
 } from "@/types/customer-bids";
 import {
   DataTable,
@@ -36,6 +45,7 @@ const DEFAULT_LIMIT = 50;
 export default function CustomerBids() {
   const [bids, setBids] = useState<CustomerBidDto[]>([]);
   const [pagination, setPagination] = useState<PaginationDto | null>(null);
+  const [dateRange, setDateRange] = useState<DateRangeDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,9 +53,11 @@ export default function CustomerBids() {
   const [filters, setFilters] = useState<CustomerBidFilters>({
     page: 1,
     limit: DEFAULT_LIMIT,
+    schoolYear: "next",
   });
 
   // Local filter inputs (before applying)
+  const [schoolYearInput, setSchoolYearInput] = useState<SchoolYear>("next");
   const [siteCodeInput, setSiteCodeInput] = useState("");
   const [customerBillToInput, setCustomerBillToInput] = useState("");
   const [customerNameInput, setCustomerNameInput] = useState("");
@@ -66,6 +78,7 @@ export default function CustomerBids() {
       const response = await getCustomerBids(currentFilters);
       setBids(response.data);
       setPagination(response.pagination);
+      setDateRange(response.dateRange);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to fetch customer bids";
@@ -84,6 +97,7 @@ export default function CustomerBids() {
     const newFilters: CustomerBidFilters = {
       page: 1,
       limit: filters.limit,
+      schoolYear: schoolYearInput,
       siteCode: siteCodeInput || undefined,
       customerBillTo: customerBillToInput || undefined,
       customerName: customerNameInput || undefined,
@@ -96,13 +110,14 @@ export default function CustomerBids() {
   };
 
   const handleClearFilters = () => {
+    setSchoolYearInput("next");
     setSiteCodeInput("");
     setCustomerBillToInput("");
     setCustomerNameInput("");
     setSalesRepInput("");
     setItemCodeInput("");
     setErpStatusInput("");
-    setFilters({ page: 1, limit: filters.limit });
+    setFilters({ page: 1, limit: filters.limit, schoolYear: "next" });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -114,7 +129,8 @@ export default function CustomerBids() {
   };
 
   const hasActiveFilters = Boolean(
-    siteCodeInput ||
+    schoolYearInput !== "next" ||
+      siteCodeInput ||
       customerBillToInput ||
       customerNameInput ||
       salesRepInput ||
@@ -123,6 +139,7 @@ export default function CustomerBids() {
   );
 
   const activeFilterCount = [
+    schoolYearInput !== "next" ? schoolYearInput : "",
     siteCodeInput,
     customerBillToInput,
     customerNameInput,
@@ -146,6 +163,11 @@ export default function CustomerBids() {
         </h1>
         <p className="text-muted-foreground">
           View and filter customer bid data
+          {dateRange && (
+            <span className="ml-2">
+              ({dateRange.startDate} to {dateRange.endDate})
+            </span>
+          )}
         </p>
       </div>
 
@@ -176,6 +198,27 @@ export default function CustomerBids() {
               </p>
             </SheetHeader>
             <div className="space-y-6">
+              <div className="space-y-3">
+                <Label
+                  htmlFor="schoolYear"
+                  className="text-sm font-medium text-foreground"
+                >
+                  School Year
+                </Label>
+                <Select
+                  value={schoolYearInput}
+                  onValueChange={(v) => setSchoolYearInput(v as SchoolYear)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="previous">Previous Year</SelectItem>
+                    <SelectItem value="current">Current Year</SelectItem>
+                    <SelectItem value="next">Next Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-3">
                 <Label
                   htmlFor="siteCode"

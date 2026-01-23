@@ -27,6 +27,7 @@ const querySchema = z.object({
   erpStatus: z.string().optional(),
   wonLost: z.enum(["WON", "LOST"]).optional(),
   sourceDb: z.string().optional(),
+  schoolYear: z.enum(["current", "previous", "next"]).default("next"),
 });
 
 /**
@@ -63,14 +64,18 @@ function handleCustomerBidError(
  * Query Parameters:
  * - page: Page number (default: 1)
  * - limit: Records per page (default: 50, max: 200)
- * - siteCode: Filter by site/location code
- * - customerBillTo: Filter by customer bill-to number (partial match, case-insensitive)
+ * - schoolYear: School year filter - "previous", "current", or "next" (default: "next")
+ * - siteCode: Filter by site/location code (matches customer location_code)
+ * - customerBillTo: Filter by customer number (partial match, case-insensitive)
  * - customerName: Filter by customer name (partial match, case-insensitive)
  * - salesRep: Filter by sales rep code
  * - itemCode: Filter by item code
  * - erpStatus: Filter by ERP status (partial match, case-insensitive)
- * - wonLost: Filter by WON or LOST status
+ * - wonLost: Filter by WON or LOST status (deprecated - returns "Coming Soon..")
  * - sourceDb: Filter by source database
+ *
+ * Response includes:
+ * - dateRange: The date range used for querying based on schoolYear
  */
 router.get(
   "/",
