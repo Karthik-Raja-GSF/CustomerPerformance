@@ -1003,3 +1003,9 @@ CREATE TABLE dw2_nav.sales_line (
     outstanding_quantity DECIMAL,
     PRIMARY KEY (source_db, document_type, document_no_, line_no_)
 );
+
+-- =============================================================================
+-- Performance Indexes
+-- =============================================================================
+CREATE INDEX IF NOT EXISTS idx_sales_price_dates ON dw2_nav.sales_price (starting_date, ending_date);
+CREATE INDEX IF NOT EXISTS idx_sku_item_source_lastmod ON dw2_nav.stockkeeping_unit (item_no_, source_db, last_date_modified DESC) INCLUDE (status);

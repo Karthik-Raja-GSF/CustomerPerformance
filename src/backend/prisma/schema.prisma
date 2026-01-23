@@ -602,6 +602,7 @@ model SalesPrice {
   pricePerPound          Decimal?  @map("price_per_pound")
 
   @@id([sourceDb, itemNo, hash])
+  @@index([startingDate, endingDate], map: "idx_sales_price_dates")
   @@map("sales_price")
   @@schema("dw2_nav")
 }
@@ -687,6 +688,8 @@ model StockkeepingUnit {
   siqOrderPolicy       String?   @map("siq_order_policy")
 
   @@id([sourceDb, locationCode, itemNo, variantCode])
+  // Note: Raw SQL migration adds DESC ordering and INCLUDE(status) - Prisma can't express these
+  @@index([itemNo, sourceDb, lastDateModified], map: "idx_sku_item_source_lastmod")
   @@map("stockkeeping_unit")
   @@schema("dw2_nav")
 }

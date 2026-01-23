@@ -46,11 +46,23 @@ export class DatabaseConstruct extends Construct {
       allowAllOutbound: true,
     });
 
+    // Custom parameter group for Aurora PostgreSQL
+    const parameterGroup = new rds.ParameterGroup(this, "ParameterGroup", {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_16_4,
+      }),
+      description: `Custom parameter group for AIT ${envName} Aurora PostgreSQL`,
+      parameters: {
+        work_mem: "65536", // 64MB for sort/hash operations
+      },
+    });
+
     // Aurora Serverless v2 PostgreSQL cluster
     this.cluster = new rds.DatabaseCluster(this, "Cluster", {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
         version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
+      parameterGroup,
       clusterIdentifier: clusterName,
       defaultDatabaseName: config.databaseName,
       credentials: rds.Credentials.fromGeneratedSecret("postgres", {

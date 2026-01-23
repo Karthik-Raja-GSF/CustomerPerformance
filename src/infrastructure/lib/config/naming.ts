@@ -76,6 +76,10 @@ export const ResourceTypes = {
   // Scheduling
   SCHEDULER: "scheduler",
   SCHEDULER_GROUP: "scheduler-grp",
+
+  // WAF
+  WAF: "waf",
+  WAF_RULE: "waf-rule",
 } as const;
 
 /**

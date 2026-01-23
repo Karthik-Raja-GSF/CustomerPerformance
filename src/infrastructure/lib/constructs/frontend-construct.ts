@@ -27,6 +27,7 @@ export interface FrontendConstructProps {
   certificateArn?: string; // Use existing cert if hostedZone not available
   naming: NamingConfig;
   crossAccountRoute53?: CrossAccountRoute53Config; // For cross-account DNS
+  webAclId?: string; // WAF WebACL ARN for CloudFront protection
 }
 
 export class FrontendConstruct extends Construct {
@@ -44,6 +45,7 @@ export class FrontendConstruct extends Construct {
       certificateArn,
       naming,
       crossAccountRoute53,
+      webAclId,
     } = props;
 
     // Generate resource names (S3, CloudFront are global resources)
@@ -122,6 +124,7 @@ export class FrontendConstruct extends Construct {
       domainNames: [domainName],
       certificate: this.certificate,
       defaultRootObject: "index.html",
+      webAclId, // WAF protection
       errorResponses: [
         {
           httpStatus: 403,

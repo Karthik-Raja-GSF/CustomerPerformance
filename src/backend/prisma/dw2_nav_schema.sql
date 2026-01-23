@@ -2782,6 +2782,10 @@ CREATE INDEX IF NOT EXISTS idx_bin_description_gin ON dw2_nav.bin USING gin (to_
 CREATE INDEX IF NOT EXISTS idx_item_ledger_entry_description_gin ON dw2_nav.item_ledger_entry USING gin (to_tsvector('english', coalesce(description, '')));
 CREATE INDEX IF NOT EXISTS idx_purch_inv_header_posting_description_gin ON dw2_nav.purch_inv_header USING gin (to_tsvector('english', coalesce(posting_description, '')));
 
+-- Performance indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_sales_price_dates ON dw2_nav.sales_price (starting_date, ending_date);
+CREATE INDEX IF NOT EXISTS idx_sku_item_source_lastmod ON dw2_nav.stockkeeping_unit (item_no_, source_db, last_date_modified DESC) INCLUDE (status);
+
 
 -- =============================================================================
 -- END OF SCHEMA DEFINITION

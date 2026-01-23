@@ -1,5 +1,7 @@
 // src/infastructure/lib/config/environments.ts
 
+import { WafConfig, defaultWafConfigs } from "./waf-config";
+
 export interface AuroraConfig {
   minCapacity: number; // ACU (0.5 - 128)
   maxCapacity: number; // ACU
@@ -95,6 +97,7 @@ export interface EnvironmentConfig {
   vpc: VpcConfig;
   vpcPeering?: VpcPeeringConfig;
   dms?: DmsConfig;
+  waf?: WafConfig;
 }
 
 export const environments: Record<string, EnvironmentConfig> = {
@@ -155,6 +158,7 @@ export const environments: Record<string, EnvironmentConfig> = {
         startTaskType: "reload-target",
       },
     },
+    waf: defaultWafConfigs.dev,
   },
 
   prd: {
@@ -221,6 +225,7 @@ export const environments: Record<string, EnvironmentConfig> = {
         startTaskType: "reload-target",
       },
     },
+    waf: defaultWafConfigs.prd,
   },
 };
 

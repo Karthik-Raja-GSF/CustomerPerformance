@@ -17,6 +17,8 @@ import { DmsConstruct } from "../constructs/dms-construct";
 import { EventBridgeConstruct } from "../constructs/eventbridge-construct";
 import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
+import { WafConstruct } from "../constructs/waf-construct";
+import { defaultWafConfigs } from "../config/waf-config";
 
 export interface CrossAccountRoute53Config {
   roleArn: string; // ARN of IAM role in dev account that can manage Route53
@@ -165,6 +167,22 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
+    // WAF (Web Application Firewall) - CloudFront
+    // Must be created before Frontend to pass WebACL ARN
+    // ===================
+    const wafConfig = config.waf || defaultWafConfigs[envCode];
+    let cloudfrontWaf: WafConstruct | undefined;
+
+    if (wafConfig.enabled && wafConfig.cloudfront.enabled) {
+      cloudfrontWaf = new WafConstruct(this, "CloudFrontWaf", {
+        naming,
+        config: wafConfig,
+        scope: "CLOUDFRONT",
+        scopeId: "frontend",
+      });
+    }
+
+    // ===================
     // Frontend (S3 + CloudFront)
     // ===================
     const frontendConstruct = new FrontendConstruct(this, "Frontend", {
@@ -173,6 +191,7 @@ export class AitStack extends cdk.Stack {
       hostedZone,
       naming,
       crossAccountRoute53,
+      webAclId: cloudfrontWaf?.getWebAclArn(),
     });
 
     // ===================
@@ -212,6 +231,23 @@ export class AitStack extends cdk.Stack {
       backendConstruct.getSecurityGroup(),
       "Allow Fargate to connect to Aurora"
     );
+
+    // ===================
+    // WAF (Web Application Firewall) - ALB
+    // ===================
+    let albWaf: WafConstruct | undefined;
+
+    if (wafConfig.enabled && wafConfig.alb.enabled) {
+      albWaf = new WafConstruct(this, "AlbWaf", {
+        naming,
+        config: wafConfig,
+        scope: "REGIONAL",
+        scopeId: "backend",
+      });
+
+      // Associate WAF with ALB
+      albWaf.associateWithAlb(backendConstruct.loadBalancer);
+    }
 
     // ===================
     // Bastion Host (for database SSH tunnel access)
@@ -396,5 +432,20 @@ export class AitStack extends cdk.Stack {
       value: `https://${cdk.Aws.REGION}.console.aws.amazon.com/cloudwatch/home?region=${cdk.Aws.REGION}#dashboards:name=${dashboardConstruct.dashboard.dashboardName}`,
       description: "CloudWatch Dashboard URL",
     });
+
+    // WAF Outputs
+    if (cloudfrontWaf) {
+      new cdk.CfnOutput(this, "CloudFrontWafArn", {
+        value: cloudfrontWaf.getWebAclArn(),
+        description: "CloudFront WAF WebACL ARN",
+      });
+    }
+
+    if (albWaf) {
+      new cdk.CfnOutput(this, "AlbWafArn", {
+        value: albWaf.getWebAclArn(),
+        description: "ALB WAF WebACL ARN",
+      });
+    }
   }
 }
