@@ -6,6 +6,7 @@ import Prompts from "@/pages/settings/Prompts";
 import StockiqSync from "@/pages/StockiqSync";
 import CustomerBids from "@/pages/CustomerBids";
 import Login from "@/pages/Login";
+import AuthCallback from "@/pages/AuthCallback";
 import ForceChangePassword from "@/pages/ForceChangePassword";
 import { ProtectedLayout } from "@/components/protected-layout";
 
@@ -22,6 +23,7 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route
           path="/force-change-password"
           element={<ForceChangePassword />}

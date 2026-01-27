@@ -1,7 +1,10 @@
 import { injectable } from "tsyringe";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { ITokenService } from "@/services/ITokenService";
-import { TokenPayload } from "@/contracts/models/token-payload.model";
+import {
+  TokenPayload,
+  FederatedIdentity,
+} from "@/contracts/models/token-payload.model";
 import {
   TokenExpiredError,
   InvalidTokenError,
@@ -59,12 +62,39 @@ export class TokenService implements ITokenService {
   private parseCognitoPayload(
     cognitoPayload: Record<string, unknown>
   ): TokenPayload {
+    // Standard claims
     const userId = cognitoPayload.sub as string;
     const email = cognitoPayload.email as string;
     const firstName = (cognitoPayload.given_name as string) || "";
     const lastName = (cognitoPayload.family_name as string) || "";
     const iat = cognitoPayload.iat as number;
     const exp = cognitoPayload.exp as number;
+
+    // Federated user detection
+    const identitiesRaw = cognitoPayload.identities as string | undefined;
+    const cognitoUsername = cognitoPayload["cognito:username"] as
+      | string
+      | undefined;
+    const idpEmail = cognitoPayload["custom:idp_email"] as string | undefined;
+
+    // Parse identities JSON to detect federated users
+    let isFederated = false;
+    let federatedProvider: string | undefined;
+    let federatedProviderType: string | undefined;
+
+    if (identitiesRaw) {
+      try {
+        const identities = JSON.parse(identitiesRaw) as FederatedIdentity[];
+        const primaryIdentity = identities[0];
+        if (primaryIdentity) {
+          isFederated = true;
+          federatedProvider = primaryIdentity.providerName;
+          federatedProviderType = primaryIdentity.providerType;
+        }
+      } catch {
+        // Invalid JSON, treat as non-federated
+      }
+    }
 
     if (!userId || !email) {
       throw new InvalidTokenError(
@@ -79,6 +109,11 @@ export class TokenService implements ITokenService {
       lastName,
       iat,
       exp,
+      isFederated,
+      federatedProvider,
+      federatedProviderType,
+      idpEmail,
+      cognitoUsername,
     };
   }
 }

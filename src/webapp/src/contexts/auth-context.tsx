@@ -16,6 +16,8 @@ import {
   changePassword as cognitoChangePassword,
   CognitoAuthError,
   CognitoAuthResult,
+  federatedSignOutFull,
+  isFederatedUser,
 } from "@/services/cognito";
 
 interface AuthContextValue {
@@ -168,6 +170,7 @@ export function AuthProvider({
       logout();
       throw error;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- logout called via closure intentionally to avoid circular dependency
   }, [setAuthData, onRefresh]);
 
   /**
@@ -215,13 +218,12 @@ export function AuthProvider({
 
   /**
    * Logout user
+   * For federated users (Azure AD SSO), redirects to Cognito logout to end SSO session
+   * For native Cognito users, just clears local session
    */
   const logout = useCallback(() => {
-    // Sign out from Cognito (clears Cognito's local storage)
-    cognitoSignOut();
-
-    // Clear our tokens
-    clearTokens();
+    // Check if user is federated before clearing tokens (need id_token for check)
+    const isFederated = isFederatedUser();
 
     // Clear refresh timer
     if (refreshTimerRef.current) {
@@ -229,10 +231,22 @@ export function AuthProvider({
       refreshTimerRef.current = null;
     }
 
+    // Clear our tokens
+    clearTokens();
+
     // Clear user data
     setUser(null);
 
+    // Trigger callback
     onLogout?.();
+
+    // For federated users, redirect to Cognito + Azure AD logout to end SSO session
+    if (isFederated) {
+      federatedSignOutFull();
+    } else {
+      // For native Cognito users, just clear Cognito SDK storage
+      cognitoSignOut();
+    }
   }, [clearTokens, onLogout]);
 
   /**

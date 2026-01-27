@@ -152,10 +152,15 @@ export class AitStack extends cdk.Stack {
     // ===================
     // Auth (Cognito)
     // ===================
+    // Azure AD federation metadata URL (same for all environments)
+    const azureAdMetadataUrl =
+      "https://login.microsoftonline.com/7760617a-f510-47d2-acec-31e328b33785/federationmetadata/2007-06/federationmetadata.xml?appid=4b806a35-c7a1-4cfc-bf92-896c8a5da703";
+
     const authConstruct = new AuthConstruct(this, "Auth", {
       envName: config.envName,
       frontendUrl: `https://${domains.frontend}`,
       naming,
+      azureAdMetadataUrl,
     });
 
     // ===================
@@ -332,6 +337,11 @@ export class AitStack extends cdk.Stack {
     new cdk.CfnOutput(this, "CognitoClientId", {
       value: authConstruct.userPoolClient.userPoolClientId,
       description: "Cognito Client ID",
+    });
+
+    new cdk.CfnOutput(this, "CognitoDomain", {
+      value: `${authConstruct.userPoolDomain.domainName}.auth.${cdk.Aws.REGION}.amazoncognito.com`,
+      description: "Cognito User Pool Domain (Hosted UI)",
     });
 
     new cdk.CfnOutput(this, "EcrRepositoryUri", {

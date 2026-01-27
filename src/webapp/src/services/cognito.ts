@@ -78,9 +78,43 @@ function getUserPool(): CognitoUserPool {
     userPool = new CognitoUserPool({
       UserPoolId: cognitoConfig.userPoolId,
       ClientId: cognitoConfig.clientId,
-    });
+    } as const);
   }
   return userPool;
+}
+
+/**
+ * Extract first/last name from email as fallback when SAML claims are missing
+ * Handles formats: "firstname.lastname@domain", "firstname_lastname@domain", "username@domain"
+ */
+function extractNameFromEmail(email: string): {
+  firstName: string;
+  lastName: string;
+} {
+  const localPart = email.split("@")[0] || "";
+  // Handle formats: "firstname.lastname", "firstname_lastname"
+  const parts = localPart.split(/[._]/);
+
+  if (parts.length >= 2 && parts[0] && parts[parts.length - 1]) {
+    return {
+      firstName:
+        parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase(),
+      lastName:
+        parts[parts.length - 1].charAt(0).toUpperCase() +
+        parts[parts.length - 1].slice(1).toLowerCase(),
+    };
+  }
+
+  // Single name fallback
+  if (localPart) {
+    return {
+      firstName:
+        localPart.charAt(0).toUpperCase() + localPart.slice(1).toLowerCase(),
+      lastName: "",
+    };
+  }
+
+  return { firstName: "", lastName: "" };
 }
 
 /**
@@ -89,18 +123,21 @@ function getUserPool(): CognitoUserPool {
 function extractUserFromIdToken(idToken: CognitoIdToken): CognitoUserInfo {
   const payload = idToken.payload;
 
+  const email =
+    (payload.email as string) || (payload["custom:email"] as string) || "";
+  const fallbackName = extractNameFromEmail(email);
+
   return {
     userId: payload.sub as string,
-    email:
-      (payload.email as string) || (payload["custom:email"] as string) || "",
+    email,
     firstName:
       (payload.given_name as string) ||
       (payload["custom:firstName"] as string) ||
-      "",
+      fallbackName.firstName,
     lastName:
       (payload.family_name as string) ||
       (payload["custom:lastName"] as string) ||
-      "",
+      fallbackName.lastName,
   };
 }
 
@@ -175,7 +212,7 @@ export function signIn(
             new CognitoAuthError(message, error.code || "UnknownError", err)
           );
         },
-        newPasswordRequired: (userAttributes) => {
+        newPasswordRequired: (userAttributes: Record<string, string>) => {
           // Store the challenge context for later use
           pendingPasswordChallenge = {
             cognitoUser,
@@ -192,7 +229,7 @@ export function signIn(
         },
       });
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
 }
@@ -227,13 +264,16 @@ export function refreshSession(): Promise<CognitoAuthResult> {
           // Always force refresh to get new tokens
           cognitoUser.refreshSession(
             session.getRefreshToken(),
-            (refreshErr, newSession) => {
+            (
+              refreshErr: Error | null,
+              newSession: CognitoUserSession | null
+            ) => {
               if (refreshErr || !newSession) {
                 reject(
                   new CognitoAuthError(
                     "Failed to refresh token",
                     "TokenRefreshFailed",
-                    refreshErr
+                    refreshErr instanceof Error ? refreshErr : undefined
                   )
                 );
                 return;
@@ -254,17 +294,61 @@ export function refreshSession(): Promise<CognitoAuthResult> {
         }
       );
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
 }
 
 /**
  * Get the current session if valid
+ * For OAuth/federated users: Restore from localStorage tokens
+ * For native Cognito users: Use Cognito SDK session
  */
 export function getCurrentSession(): Promise<CognitoAuthResult | null> {
   return new Promise((resolve) => {
     try {
+      // First, check localStorage for tokens (OAuth/federated users)
+      const storedIdToken = localStorage.getItem("id_token");
+      const storedAccessToken = localStorage.getItem("access_token");
+
+      if (storedIdToken && storedAccessToken) {
+        try {
+          // Validate token is not expired
+          const payload = parseJwtPayload(storedIdToken);
+          const exp = payload.exp as number;
+          const now = Math.floor(Date.now() / 1000);
+
+          if (exp > now) {
+            // Token is still valid, restore session from localStorage
+            const email = (payload.email as string) || "";
+            const fallbackName = extractNameFromEmail(email);
+
+            resolve({
+              idToken: storedIdToken,
+              accessToken: storedAccessToken,
+              refreshToken: "", // OAuth doesn't store refresh token in localStorage
+              expiresIn: exp - now,
+              user: {
+                userId: payload.sub as string,
+                email,
+                firstName:
+                  (payload.given_name as string) ||
+                  (payload["custom:firstName"] as string) ||
+                  fallbackName.firstName,
+                lastName:
+                  (payload.family_name as string) ||
+                  (payload["custom:lastName"] as string) ||
+                  fallbackName.lastName,
+              },
+            });
+            return;
+          }
+        } catch {
+          // Token parsing failed, continue to Cognito SDK fallback
+        }
+      }
+
+      // Fall back to Cognito SDK for native users
       const pool = getUserPool();
       const cognitoUser = pool.getCurrentUser();
 
@@ -356,7 +440,7 @@ export function globalSignOut(): Promise<void> {
         }
       );
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
 }
@@ -511,13 +595,16 @@ export function changePassword(
           if (!session.isValid()) {
             cognitoUser.refreshSession(
               session.getRefreshToken(),
-              (refreshErr, newSession) => {
+              (
+                refreshErr: Error | null,
+                newSession: CognitoUserSession | null
+              ) => {
                 if (refreshErr || !newSession) {
                   reject(
                     new CognitoAuthError(
                       "Session expired. Please log in again",
                       "SessionExpired",
-                      refreshErr
+                      refreshErr instanceof Error ? refreshErr : undefined
                     )
                   );
                   return;
@@ -531,7 +618,218 @@ export function changePassword(
         }
       );
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
+}
+
+// ============================================================================
+// Federated Sign-In (Azure AD via Cognito Hosted UI)
+// ============================================================================
+
+/**
+ * Redirect to Cognito Hosted UI for federated sign-in with Entra ID (Azure AD)
+ *
+ * This initiates the OAuth 2.0 Authorization Code flow:
+ * 1. User is redirected to Cognito Hosted UI
+ * 2. Cognito redirects to Entra ID for authentication
+ * 3. After Entra ID auth, user is redirected back with authorization code
+ */
+export function federatedSignIn(): void {
+  const { domain, clientId, azureAdIdpName } = cognitoConfig;
+
+  if (!domain) {
+    throw new CognitoAuthError(
+      "Cognito domain not configured. Set VITE_COGNITO_DOMAIN.",
+      "ConfigurationError"
+    );
+  }
+
+  if (!azureAdIdpName) {
+    throw new CognitoAuthError(
+      "Azure AD IdP name not configured. Set VITE_COGNITO_AZURE_AD_IDP_NAME.",
+      "ConfigurationError"
+    );
+  }
+
+  const redirectUri = `${window.location.origin}/auth/callback`;
+
+  // Build Cognito Hosted UI authorization URL
+  const url = new URL(`https://${domain}/oauth2/authorize`);
+  url.searchParams.set("identity_provider", azureAdIdpName);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", "openid email profile");
+  // Force Azure AD to always prompt for credentials (no SSO auto-login)
+  url.searchParams.set("prompt", "login");
+
+  // Redirect to Cognito Hosted UI
+  window.location.href = url.toString();
+}
+
+/**
+ * Token response from Cognito OAuth token endpoint
+ */
+interface CognitoTokenResponse {
+  id_token: string;
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+}
+
+/**
+ * Parse JWT token payload without verification (client-side only)
+ */
+function parseJwtPayload(token: string): Record<string, unknown> {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !parts[1]) {
+    throw new CognitoAuthError("Invalid JWT token format", "InvalidToken");
+  }
+  const base64Url = parts[1];
+  const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+  const jsonPayload = decodeURIComponent(
+    atob(base64)
+      .split("")
+      .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+      .join("")
+  );
+  return JSON.parse(jsonPayload) as Record<string, unknown>;
+}
+
+/**
+ * Exchange authorization code for tokens after OAuth callback
+ *
+ * This completes the OAuth 2.0 Authorization Code flow by exchanging
+ * the authorization code for Cognito tokens.
+ */
+export async function handleAuthCallback(
+  code: string
+): Promise<CognitoAuthResult> {
+  const { domain, clientId } = cognitoConfig;
+
+  if (!domain) {
+    throw new CognitoAuthError(
+      "Cognito domain not configured. Set VITE_COGNITO_DOMAIN.",
+      "ConfigurationError"
+    );
+  }
+
+  const redirectUri = `${window.location.origin}/auth/callback`;
+
+  // Exchange authorization code for tokens
+  const response = await fetch(`https://${domain}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: clientId,
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new CognitoAuthError(
+      `Token exchange failed: ${errorText}`,
+      "TokenExchangeFailed"
+    );
+  }
+
+  const tokens = (await response.json()) as CognitoTokenResponse;
+
+  // Parse ID token to extract user information
+  const idTokenPayload = parseJwtPayload(tokens.id_token);
+
+  const email =
+    (idTokenPayload.email as string) ||
+    (idTokenPayload["custom:email"] as string) ||
+    "";
+  const fallbackName = extractNameFromEmail(email);
+
+  const user: CognitoUserInfo = {
+    userId: idTokenPayload.sub as string,
+    email,
+    firstName:
+      (idTokenPayload.given_name as string) ||
+      (idTokenPayload["custom:firstName"] as string) ||
+      fallbackName.firstName,
+    lastName:
+      (idTokenPayload.family_name as string) ||
+      (idTokenPayload["custom:lastName"] as string) ||
+      fallbackName.lastName,
+  };
+
+  return {
+    idToken: tokens.id_token,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresIn: tokens.expires_in,
+    user,
+  };
+}
+
+/**
+ * Check if current user was authenticated via federated identity (Azure AD/Entra ID)
+ * Federated users have an 'identities' claim in their ID token from the SAML provider
+ */
+export function isFederatedUser(): boolean {
+  try {
+    const idToken = localStorage.getItem("id_token");
+    if (!idToken) return false;
+
+    const payload = parseJwtPayload(idToken);
+    // Federated users have 'identities' claim from SAML/OIDC provider
+    return Array.isArray(payload.identities) && payload.identities.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sign out via Cognito logout endpoint, then Azure AD logout (for federated users)
+ * This ends both Cognito Hosted UI session and Azure AD SSO session
+ *
+ * Flow:
+ * 1. Clear local tokens and Cognito SDK storage
+ * 2. Set flag for Login page to know we need Azure AD logout
+ * 3. Redirect to Cognito logout endpoint (clears Hosted UI session cookies)
+ * 4. Cognito redirects to /login with sso_logout param
+ * 5. Login page detects param and redirects to Azure AD logout
+ * 6. Azure AD ends session and redirects back to /login
+ */
+export function federatedSignOutFull(): void {
+  const { domain, clientId } = cognitoConfig;
+
+  // Clear local tokens and Cognito SDK storage
+  signOut();
+
+  // Redirect to Cognito logout endpoint to clear Hosted UI session
+  // Add sso_logout param so Login page knows to redirect to Azure AD logout
+  const logoutUri = `${window.location.origin}/login?sso_logout=1`;
+  const cognitoLogoutUrl = new URL(`https://${domain}/logout`);
+  cognitoLogoutUrl.searchParams.set("client_id", clientId);
+  cognitoLogoutUrl.searchParams.set("logout_uri", logoutUri);
+
+  window.location.href = cognitoLogoutUrl.toString();
+}
+
+/**
+ * Redirect to Azure AD logout endpoint
+ * Called from Login page after Cognito logout completes
+ */
+export function azureAdLogout(): void {
+  const { azureAdTenantId } = cognitoConfig;
+
+  const finalRedirectUri = `${window.location.origin}/login`;
+  const azureLogoutUrl = new URL(
+    `https://login.microsoftonline.com/${azureAdTenantId}/oauth2/v2.0/logout`
+  );
+  azureLogoutUrl.searchParams.set("post_logout_redirect_uri", finalRedirectUri);
+
+  window.location.href = azureLogoutUrl.toString();
 }
