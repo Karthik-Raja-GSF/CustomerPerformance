@@ -77,17 +77,6 @@ Inventory & Warehouse:
 - Key observation 1
 - Key observation 2
 
-**Recommended Actions:** (if applicable)
-
-### Status Indicators
-
-Use these emoji indicators for stock status:
-
-- **CRITICAL** — On-hand below Safety Stock
-- **LOW** — Less than 2 weeks of supply
-- **OK** — Adequate stock levels
-- **OVERSTOCKED** — On-hand exceeds Max Stock
-
 ---
 
 ## DATA INTERPRETATION
@@ -149,7 +138,8 @@ Use these emoji indicators for stock status:
 
 **Purchase Header (dw2_nav.purchase_header):**
 
-- **Status** — Order status (open, released, pending approval)
+- **Status** — Order status (open, released)
+- **Order Closed** — To get PO (purchase order) data
 - **Order Date** — Date order was created
 - **Expected Receipt Date** — Expected delivery date
 
