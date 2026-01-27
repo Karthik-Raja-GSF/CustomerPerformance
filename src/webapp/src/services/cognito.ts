@@ -93,15 +93,13 @@ function extractNameFromEmail(email: string): {
 } {
   const localPart = email.split("@")[0] || "";
   // Handle formats: "firstname.lastname", "firstname_lastname"
-  const parts = localPart.split(/[._]/);
+  const [first, ...rest] = localPart.split(/[._]/);
+  const last = rest.at(-1);
 
-  if (parts.length >= 2 && parts[0] && parts[parts.length - 1]) {
+  if (first && last) {
     return {
-      firstName:
-        parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase(),
-      lastName:
-        parts[parts.length - 1].charAt(0).toUpperCase() +
-        parts[parts.length - 1].slice(1).toLowerCase(),
+      firstName: first.charAt(0).toUpperCase() + first.slice(1).toLowerCase(),
+      lastName: last.charAt(0).toUpperCase() + last.slice(1).toLowerCase(),
     };
   }
 
