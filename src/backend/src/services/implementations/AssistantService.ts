@@ -63,8 +63,13 @@ export class AssistantService implements IAssistantService {
     }
   }
 
-  private buildSqlGenerationPrompt(question: string): string {
-    return this.sqlGenerationPromptTemplate.replace("{{question}}", question);
+  private buildSqlGenerationPrompt(
+    question: string,
+    additionalContext: string
+  ): string {
+    return this.sqlGenerationPromptTemplate
+      .replace("{{additional_context}}", additionalContext)
+      .replace("{{question}}", question);
   }
 
   private extractSqlFromResponse(response: string): string | null {
@@ -212,7 +217,10 @@ ${queryResults}
       await this.ensureMcpInitialized();
 
       // Step 3a: Ask LLM to generate SQL
-      const sqlPrompt = this.buildSqlGenerationPrompt(request.question);
+      const sqlPrompt = this.buildSqlGenerationPrompt(
+        request.question,
+        activePrompt.content
+      );
       const sqlStartTime = Date.now();
       const sqlResponse = await this.bedrockService.invoke(
         sqlPrompt,
@@ -358,7 +366,10 @@ ${queryResults}
       await this.ensureMcpInitialized();
 
       // Step 3a: Ask LLM to generate SQL (non-streaming for SQL generation)
-      const sqlPrompt = this.buildSqlGenerationPrompt(request.question);
+      const sqlPrompt = this.buildSqlGenerationPrompt(
+        request.question,
+        activePrompt.content
+      );
       const sqlStartTime = Date.now();
       const sqlResponse = await this.bedrockService.invoke(
         sqlPrompt,
