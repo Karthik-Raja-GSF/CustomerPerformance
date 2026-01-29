@@ -98,6 +98,7 @@ export default function CustomerBids() {
   const [tableInstance, setTableInstance] =
     useState<Table<CustomerBidDto> | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [columnsDropdownOpen, setColumnsDropdownOpen] = useState(false);
 
   const fetchData = useCallback(async (currentFilters: CustomerBidFilters) => {
     setIsLoading(true);
@@ -411,22 +412,35 @@ export default function CustomerBids() {
         </Sheet>
 
         {/* Column visibility dropdown */}
-        <DropdownMenu>
+        <DropdownMenu
+          open={columnsDropdownOpen}
+          onOpenChange={setColumnsDropdownOpen}
+        >
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-9">
               Columns <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent
+            align="end"
+            className="w-48"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
             {tableInstance
               ?.getAllColumns()
               .filter((column) => column.getCanHide())
               .map((column) => (
                 <DropdownMenuCheckboxItem
                   key={column.id}
-                  className="capitalize"
+                  className="capitalize cursor-pointer"
                   checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  onCheckedChange={(checked) =>
+                    column.toggleVisibility(checked)
+                  }
+                  onSelect={() => {
+                    // Re-open menu after it closes
+                    setTimeout(() => setColumnsDropdownOpen(true), 0);
+                  }}
                 >
                   {column.id.replace(/([A-Z])/g, " $1").trim()}
                 </DropdownMenuCheckboxItem>
