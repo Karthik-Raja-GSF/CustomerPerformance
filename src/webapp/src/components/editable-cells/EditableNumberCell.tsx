@@ -76,6 +76,9 @@ export function EditableNumberCell({
     } else if (e.key === "Escape") {
       setInputValue(value?.toString() ?? "");
       setIsEditing(false);
+    } else if (e.key === "Tab") {
+      // Save and let Tab naturally move focus to next element
+      void handleSave();
     }
   };
 
@@ -108,8 +111,15 @@ export function EditableNumberCell({
 
   return (
     <div
+      tabIndex={disabled ? -1 : 0}
       onClick={handleClick}
-      className={`text-right cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 ${
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !disabled && !isSaving) {
+          e.preventDefault();
+          setIsEditing(true);
+        }
+      }}
+      className={`text-right cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ${
         disabled ? "cursor-not-allowed opacity-50" : ""
       }`}
     >
