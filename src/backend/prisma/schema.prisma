@@ -1048,6 +1048,62 @@ model Prompt {
   @@schema("ait")
 }
 
+model CustomerBidData {
+  // Composite primary key
+  sourceDb       String @map("source_db")
+  siteCode       String @map("site_code")
+  customerBillTo String @map("customer_bill_to")
+  itemNo         String @map("item_no")
+  schoolYear     String @map("school_year") // "2025-2026"
+
+  // Pre-calculated fields (populated by sync job)
+  lastYearBidQty Decimal? @map("last_year_bid_qty")
+  lastYearActual Decimal? @map("last_year_actual")
+  lyAugust       Decimal? @map("ly_august")
+  lySeptember    Decimal? @map("ly_september")
+  lyOctober      Decimal? @map("ly_october")
+  isLost         Boolean  @default(false) @map("is_lost")
+
+  // User-editable fields
+  confirmed       Boolean  @default(false)
+  augustDemand    Decimal? @map("august_demand")
+  septemberDemand Decimal? @map("september_demand")
+  octoberDemand   Decimal? @map("october_demand")
+
+  // Audit fields
+  confirmedBy String?   @map("confirmed_by")
+  confirmedAt DateTime? @map("confirmed_at")
+  syncedAt    DateTime? @map("synced_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@id([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
+  @@index([schoolYear])
+  @@index([confirmed])
+  @@index([isLost])
+  @@map("customer_bid_data")
+  @@schema("ait")
+}
+
+model CustomerBidSyncLog {
+  id              String    @id @default(uuid())
+  status          String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, FAILED
+  schoolYear      String    @map("school_year")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  recordsTotal    Int?      @map("records_total")
+  recordsInserted Int?      @map("records_inserted")
+  recordsUpdated  Int?      @map("records_updated")
+  errorMessage    String?   @map("error_message") @db.Text
+  durationMs      Int?      @map("duration_ms")
+  triggeredBy     String    @map("triggered_by") // "manual" | "scheduled"
+
+  @@index([schoolYear])
+  @@index([status])
+  @@map("customer_bid_sync_log")
+  @@schema("ait")
+}
+
 // ============================================
 // SIQ SCHEMA - StockIQ Integration Tables
 // ============================================

@@ -158,6 +158,8 @@ export class BackendConstruct extends Construct {
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317",
         // StockIQ scheduled sync - daily at 3:30 AM PST (11:30 UTC)
         STOCKIQ_SYNC_CRON: "30 11 * * *",
+        // Customer Bid scheduled sync - daily at 5:00 AM PST (13:00 UTC)
+        CUSTOMER_BID_SYNC_CRON: "0 13 * * *",
       },
       secrets: {
         // Pass Aurora secret fields individually - backend builds DATABASE_URL from these

@@ -9,6 +9,8 @@ import { authenticate } from "@/middleware/authenticate";
 import {
   CustomerBidQueryError,
   CustomerBidDatabaseError,
+  CustomerBidNotFoundError,
+  CustomerBidSyncInProgressError,
 } from "@/utils/errors/customer-bid-errors";
 
 const router: IRouter = Router();
@@ -25,9 +27,75 @@ const querySchema = z.object({
   salesRep: z.string().optional(),
   itemCode: z.string().optional(),
   erpStatus: z.string().optional(),
-  wonLost: z.enum(["WON", "LOST"]).optional(),
+  isLost: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  confirmed: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
   sourceDb: z.string().optional(),
   schoolYear: z.enum(["current", "previous", "next"]).default("next"),
+});
+
+/**
+ * Path parameters schema for single record operations
+ */
+const pathParamsSchema = z.object({
+  sourceDb: z.string().min(1),
+  siteCode: z.string().min(1),
+  customerBillTo: z.string().min(1),
+  itemNo: z.string().min(1),
+  schoolYear: z
+    .string()
+    .regex(/^\d{4}-\d{4}$/, "School year must be in format YYYY-YYYY"),
+});
+
+/**
+ * Update DTO schema for PATCH requests
+ */
+const updateBidSchema = z.object({
+  confirmed: z.boolean().optional(),
+  augustDemand: z.number().nullable().optional(),
+  septemberDemand: z.number().nullable().optional(),
+  octoberDemand: z.number().nullable().optional(),
+});
+
+/**
+ * Bulk update schema
+ */
+const bulkUpdateSchema = z.object({
+  records: z
+    .array(
+      z.object({
+        sourceDb: z.string().min(1),
+        siteCode: z.string().min(1),
+        customerBillTo: z.string().min(1),
+        itemNo: z.string().min(1),
+        schoolYear: z.string().regex(/^\d{4}-\d{4}$/),
+        confirmed: z.boolean().optional(),
+        augustDemand: z.number().nullable().optional(),
+        septemberDemand: z.number().nullable().optional(),
+        octoberDemand: z.number().nullable().optional(),
+      })
+    )
+    .min(1)
+    .max(1000),
+});
+
+/**
+ * Sync request schema
+ */
+const syncRequestSchema = z.object({
+  schoolYear: z.enum(["current", "previous", "next"]).default("next"),
+});
+
+/**
+ * Sync history query schema
+ */
+const syncHistoryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 /**
@@ -54,6 +122,22 @@ function handleCustomerBidError(
     return;
   }
 
+  if (error instanceof CustomerBidNotFoundError) {
+    res.status(error.statusCode).json({
+      status: "error",
+      message: error.message,
+    });
+    return;
+  }
+
+  if (error instanceof CustomerBidSyncInProgressError) {
+    res.status(error.statusCode).json({
+      status: "error",
+      message: error.message,
+    });
+    return;
+  }
+
   next(error);
 }
 
@@ -71,11 +155,14 @@ function handleCustomerBidError(
  * - salesRep: Filter by sales rep code
  * - itemCode: Filter by item code
  * - erpStatus: Filter by ERP status (partial match, case-insensitive)
- * - wonLost: Filter by WON or LOST status (deprecated - returns "Coming Soon..")
+ * - isLost: Filter by lost status (true = items in previous year but not current)
+ * - confirmed: Filter by user confirmation status
  * - sourceDb: Filter by source database
  *
  * Response includes:
  * - dateRange: The date range used for querying based on schoolYear
+ * - Pre-calculated fields: lastYearBidQty, lastYearActual, lyAugust, lySeptember, lyOctober, isLost
+ * - User-editable fields: confirmed, augustDemand, septemberDemand, octoberDemand
  */
 router.get(
   "/",
@@ -100,6 +187,229 @@ router.get(
       res.json({
         status: "success",
         ...result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * PATCH /customer-bids/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear
+ * Update user-editable fields on a customer bid record
+ *
+ * Path Parameters:
+ * - sourceDb: Source database identifier
+ * - siteCode: Site/location code
+ * - customerBillTo: Customer bill-to number
+ * - itemNo: Item number
+ * - schoolYear: School year in format YYYY-YYYY (e.g., "2025-2026")
+ *
+ * Request Body:
+ * - confirmed?: boolean - User confirmation flag
+ * - augustDemand?: number | null - August demand forecast
+ * - septemberDemand?: number | null - September demand forecast
+ * - octoberDemand?: number | null - October demand forecast
+ */
+router.patch(
+  "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate path parameters
+      const pathParsed = pathParamsSchema.safeParse(req.params);
+      if (!pathParsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid path parameters: ${pathParsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      // Validate request body
+      const bodyParsed = updateBidSchema.safeParse(req.body);
+      if (!bodyParsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid request body: ${bodyParsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const userId = req.user?.userId || "unknown";
+
+      const result = await customerBidService.updateBid(
+        pathParsed.data,
+        bodyParsed.data,
+        userId
+      );
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * POST /customer-bids/bulk-update
+ * Bulk update multiple customer bid records
+ *
+ * Request Body:
+ * - records: Array of objects containing:
+ *   - sourceDb, siteCode, customerBillTo, itemNo, schoolYear (required)
+ *   - confirmed, augustDemand, septemberDemand, octoberDemand (optional)
+ *
+ * Response:
+ * - updated: Number of successfully updated records
+ * - failed: Number of failed updates
+ * - errors: Array of error details for failed records
+ */
+router.post(
+  "/bulk-update",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const parsed = bulkUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid request body: ${parsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const userId = req.user?.userId || "unknown";
+
+      const result = await customerBidService.bulkUpdateBids(
+        parsed.data,
+        userId
+      );
+
+      res.json({
+        status: "success",
+        ...result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * POST /customer-bids/sync
+ * Trigger a sync operation to populate/refresh calculated fields
+ *
+ * Request Body:
+ * - schoolYear: "current" | "previous" | "next" (default: "next")
+ *
+ * Response:
+ * - syncId: Unique identifier for the sync operation
+ * - status: "COMPLETED" | "FAILED"
+ * - schoolYear: The school year that was synced (e.g., "2025-2026")
+ * - recordsTotal: Total records processed
+ * - recordsInserted: New records created
+ * - recordsUpdated: Existing records updated
+ * - durationMs: Time taken in milliseconds
+ */
+router.post(
+  "/sync",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const parsed = syncRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid request body: ${parsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.sync(
+        parsed.data.schoolYear,
+        "manual"
+      );
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * GET /customer-bids/sync/status
+ * Get the latest sync status
+ *
+ * Response:
+ * - Latest sync log entry or null if no syncs have run
+ */
+router.get(
+  "/sync/status",
+  authenticate,
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.getSyncStatus();
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * GET /customer-bids/sync/history
+ * Get sync history
+ *
+ * Query Parameters:
+ * - limit: Maximum number of entries to return (default: 10, max: 100)
+ *
+ * Response:
+ * - Array of sync log entries
+ */
+router.get(
+  "/sync/history",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate query parameters
+      const parsed = syncHistoryQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid query parameters: ${parsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.getSyncHistory(parsed.data.limit);
+
+      res.json({
+        status: "success",
+        data: result,
       });
     } catch (error) {
       handleCustomerBidError(error, res, next);

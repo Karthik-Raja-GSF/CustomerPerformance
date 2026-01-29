@@ -32,3 +32,31 @@ export class CustomerBidDatabaseError extends Error {
     Object.setPrototypeOf(this, CustomerBidDatabaseError.prototype);
   }
 }
+
+/**
+ * Customer bid not found error
+ */
+export class CustomerBidNotFoundError extends Error {
+  public readonly statusCode = 404;
+
+  constructor(message: string = "Customer bid record not found") {
+    super(message);
+    this.name = "CustomerBidNotFoundError";
+    Object.setPrototypeOf(this, CustomerBidNotFoundError.prototype);
+  }
+}
+
+/**
+ * Customer bid sync already in progress error
+ */
+export class CustomerBidSyncInProgressError extends Error {
+  public readonly statusCode = 409;
+
+  constructor(
+    message: string = "A sync operation is already in progress. Please wait for it to complete."
+  ) {
+    super(message);
+    this.name = "CustomerBidSyncInProgressError";
+    Object.setPrototypeOf(this, CustomerBidSyncInProgressError.prototype);
+  }
+}

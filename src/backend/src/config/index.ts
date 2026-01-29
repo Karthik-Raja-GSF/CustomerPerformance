@@ -60,4 +60,10 @@ export const config = {
     // Examples: "0 6 * * *" (6 AM daily), "0 */4 * * *" (every 4 hours)
     syncCronExpression: process.env.STOCKIQ_SYNC_CRON || "",
   },
+  // Customer Bid Sync Configuration
+  customerBid: {
+    // Cron expression for scheduled sync (empty string disables scheduling)
+    // Production: "0 13 * * *" (5 AM PST / 1 PM UTC) - syncs Current + Next school years
+    syncCronExpression: process.env.CUSTOMER_BID_SYNC_CRON || "",
+  },
 };

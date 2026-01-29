@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { ChevronDown, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
@@ -18,27 +18,56 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/shadcn/components/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/shadcn/components/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shadcn/components/select";
-import { getCustomerBids } from "@/apis/customer-bids";
+  getCustomerBids,
+  updateCustomerBid,
+  buildBidKey,
+} from "@/apis/customer-bids";
 import type {
   CustomerBidDto,
   CustomerBidFilters,
   PaginationDto,
   SchoolYear,
   DateRangeDto,
+  UpdateCustomerBidDto,
 } from "@/types/customer-bids";
 import {
   DataTable,
   type VisibilityState,
 } from "@/pages/customer-bids/data-table";
-import { columns } from "@/pages/customer-bids/columns";
+import { createColumns } from "@/pages/customer-bids/columns";
 import type { Table } from "@tanstack/react-table";
+
+/**
+ * Calculate school year string from SchoolYear enum
+ * e.g., "next" → "2026-2027" (assuming current date is in 2025-2026 school year)
+ */
+function getSchoolYearString(schoolYear: SchoolYear): string {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+
+  // School year starts in August (month 7)
+  // If we're in Jan-Jul, current school year started previous calendar year
+  const schoolYearStartYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+
+  let startYear: number;
+  switch (schoolYear) {
+    case "previous":
+      startYear = schoolYearStartYear - 1;
+      break;
+    case "current":
+      startYear = schoolYearStartYear;
+      break;
+    case "next":
+    default:
+      startYear = schoolYearStartYear + 1;
+      break;
+  }
+
+  return `${startYear}-${startYear + 1}`;
+}
 
 const DEFAULT_LIMIT = 50;
 
@@ -57,7 +86,6 @@ export default function CustomerBids() {
   });
 
   // Local filter inputs (before applying)
-  const [schoolYearInput, setSchoolYearInput] = useState<SchoolYear>("next");
   const [siteCodeInput, setSiteCodeInput] = useState("");
   const [customerBillToInput, setCustomerBillToInput] = useState("");
   const [customerNameInput, setCustomerNameInput] = useState("");
@@ -97,7 +125,7 @@ export default function CustomerBids() {
     const newFilters: CustomerBidFilters = {
       page: 1,
       limit: filters.limit,
-      schoolYear: schoolYearInput,
+      schoolYear: filters.schoolYear,
       siteCode: siteCodeInput || undefined,
       customerBillTo: customerBillToInput || undefined,
       customerName: customerNameInput || undefined,
@@ -110,14 +138,17 @@ export default function CustomerBids() {
   };
 
   const handleClearFilters = () => {
-    setSchoolYearInput("next");
     setSiteCodeInput("");
     setCustomerBillToInput("");
     setCustomerNameInput("");
     setSalesRepInput("");
     setItemCodeInput("");
     setErpStatusInput("");
-    setFilters({ page: 1, limit: filters.limit, schoolYear: "next" });
+    setFilters((prev) => ({
+      page: 1,
+      limit: prev.limit,
+      schoolYear: prev.schoolYear,
+    }));
   };
 
   const handlePageChange = (newPage: number) => {
@@ -129,8 +160,7 @@ export default function CustomerBids() {
   };
 
   const hasActiveFilters = Boolean(
-    schoolYearInput !== "next" ||
-      siteCodeInput ||
+    siteCodeInput ||
       customerBillToInput ||
       customerNameInput ||
       salesRepInput ||
@@ -139,7 +169,6 @@ export default function CustomerBids() {
   );
 
   const activeFilterCount = [
-    schoolYearInput !== "next" ? schoolYearInput : "",
     siteCodeInput,
     customerBillToInput,
     customerNameInput,
@@ -153,6 +182,52 @@ export default function CustomerBids() {
       handleSearch();
     }
   };
+
+  // Handle cell updates for editable columns
+  const handleCellUpdate = useCallback(
+    async (bid: CustomerBidDto, updates: UpdateCustomerBidDto) => {
+      const schoolYearString = getSchoolYearString(
+        filters.schoolYear || "next"
+      );
+      const key = buildBidKey(bid, schoolYearString);
+
+      try {
+        const updated = await updateCustomerBid(key, updates);
+
+        // Update local state with only the editable fields
+        // (API returns partial DTO with nulls for non-editable fields)
+        setBids((prev) =>
+          prev.map((b) =>
+            b.sourceDb === bid.sourceDb &&
+            b.siteCode === bid.siteCode &&
+            b.customerBillTo === bid.customerBillTo &&
+            b.itemCode === bid.itemCode
+              ? {
+                  ...b,
+                  confirmed: updated.confirmed,
+                  augustDemand: updated.augustDemand,
+                  septemberDemand: updated.septemberDemand,
+                  octoberDemand: updated.octoberDemand,
+                }
+              : b
+          )
+        );
+
+        toast.success("Updated successfully");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to update";
+        toast.error(message);
+        throw err; // Re-throw so the cell component can revert
+      }
+    },
+    [filters.schoolYear]
+  );
+
+  // Create columns with the cell update handler
+  const tableColumns = useMemo(
+    () => createColumns({ onCellUpdate: handleCellUpdate }),
+    [handleCellUpdate]
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8 min-h-0 overflow-hidden">
@@ -171,8 +246,31 @@ export default function CustomerBids() {
         </p>
       </div>
 
-      {/* Toolbar */}
+      {/* School Year Tabs + Toolbar */}
       <div className="shrink-0 flex items-center gap-3">
+        <Tabs
+          value={filters.schoolYear || "next"}
+          onValueChange={(value) => {
+            setFilters((prev) => ({
+              ...prev,
+              page: 1,
+              schoolYear: value as SchoolYear,
+            }));
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="previous" className="cursor-pointer">
+              Previous Year
+            </TabsTrigger>
+            <TabsTrigger value="current" className="cursor-pointer">
+              Current Year
+            </TabsTrigger>
+            <TabsTrigger value="next" className="cursor-pointer">
+              Next Year
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <div className="flex-1" />
 
         {/* Filter Sheet */}
@@ -198,27 +296,6 @@ export default function CustomerBids() {
               </p>
             </SheetHeader>
             <div className="space-y-6">
-              <div className="space-y-3">
-                <Label
-                  htmlFor="schoolYear"
-                  className="text-sm font-medium text-foreground"
-                >
-                  School Year
-                </Label>
-                <Select
-                  value={schoolYearInput}
-                  onValueChange={(v) => setSchoolYearInput(v as SchoolYear)}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="previous">Previous Year</SelectItem>
-                    <SelectItem value="current">Current Year</SelectItem>
-                    <SelectItem value="next">Next Year</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="space-y-3">
                 <Label
                   htmlFor="siteCode"
@@ -377,7 +454,7 @@ export default function CustomerBids() {
       {/* Data Table - no card wrapper */}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <DataTable
-          columns={columns}
+          columns={tableColumns}
           data={bids}
           isLoading={isLoading}
           error={error}

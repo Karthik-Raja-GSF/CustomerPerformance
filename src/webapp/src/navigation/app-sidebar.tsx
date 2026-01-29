@@ -40,6 +40,10 @@ const data = {
           title: "StockIQ Sync",
           url: "/stockiq-sync",
         },
+        {
+          title: "Customer Bids Sync",
+          url: "/customer-bids-sync",
+        },
       ],
     },
   ],
