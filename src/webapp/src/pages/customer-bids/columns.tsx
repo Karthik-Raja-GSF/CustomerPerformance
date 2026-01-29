@@ -284,7 +284,17 @@ export function createColumns(
         <EditableCheckboxCell
           value={row.original.confirmed}
           onSave={async (value) => {
-            await onCellUpdate(row.original, { confirmed: value });
+            if (value) {
+              // When confirming, copy LY values to demand fields
+              await onCellUpdate(row.original, {
+                confirmed: value,
+                augustDemand: row.original.lyAugust ?? 0,
+                septemberDemand: row.original.lySeptember ?? 0,
+                octoberDemand: row.original.lyOctober ?? 0,
+              });
+            } else {
+              await onCellUpdate(row.original, { confirmed: value });
+            }
           }}
         />
       ),
