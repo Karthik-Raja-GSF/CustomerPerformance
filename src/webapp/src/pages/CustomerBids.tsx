@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronDown, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
@@ -71,30 +72,93 @@ function getSchoolYearString(schoolYear: SchoolYear): string {
 
 const DEFAULT_LIMIT = 50;
 
+/**
+ * Parse URL search params to CustomerBidFilters
+ */
+function parseFiltersFromURL(
+  searchParams: URLSearchParams
+): CustomerBidFilters {
+  return {
+    page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
+    limit: searchParams.get("limit")
+      ? Number(searchParams.get("limit"))
+      : DEFAULT_LIMIT,
+    schoolYear: (searchParams.get("schoolYear") as SchoolYear) || "next",
+    siteCode: searchParams.get("siteCode") || undefined,
+    customerBillTo: searchParams.get("customerBillTo") || undefined,
+    customerName: searchParams.get("customerName") || undefined,
+    salesRep: searchParams.get("salesRep") || undefined,
+    itemCode: searchParams.get("itemCode") || undefined,
+    erpStatus: searchParams.get("erpStatus") || undefined,
+  };
+}
+
+/**
+ * Convert filters to URL params (only include non-default values)
+ */
+function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (filters.page && filters.page !== 1)
+    params.set("page", filters.page.toString());
+  if (filters.limit && filters.limit !== DEFAULT_LIMIT)
+    params.set("limit", filters.limit.toString());
+  // Always include schoolYear in URL for clarity
+  if (filters.schoolYear) params.set("schoolYear", filters.schoolYear);
+  if (filters.siteCode) params.set("siteCode", filters.siteCode);
+  if (filters.customerBillTo)
+    params.set("customerBillTo", filters.customerBillTo);
+  if (filters.customerName) params.set("customerName", filters.customerName);
+  if (filters.salesRep) params.set("salesRep", filters.salesRep);
+  if (filters.itemCode) params.set("itemCode", filters.itemCode);
+  if (filters.erpStatus) params.set("erpStatus", filters.erpStatus);
+
+  return params;
+}
+
 export default function CustomerBids() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isInitialMount = useRef(true);
+
   const [bids, setBids] = useState<CustomerBidDto[]>([]);
   const [pagination, setPagination] = useState<PaginationDto | null>(null);
   const [dateRange, setDateRange] = useState<DateRangeDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter state
-  const [filters, setFilters] = useState<CustomerBidFilters>({
-    page: 1,
-    limit: DEFAULT_LIMIT,
-    schoolYear: "next",
-  });
+  // Filter state - initialized from URL params
+  const [filters, setFilters] = useState<CustomerBidFilters>(() =>
+    parseFiltersFromURL(searchParams)
+  );
 
-  // Local filter inputs (before applying)
-  const [siteCodeInput, setSiteCodeInput] = useState("");
-  const [customerBillToInput, setCustomerBillToInput] = useState("");
-  const [customerNameInput, setCustomerNameInput] = useState("");
-  const [salesRepInput, setSalesRepInput] = useState("");
-  const [itemCodeInput, setItemCodeInput] = useState("");
-  const [erpStatusInput, setErpStatusInput] = useState("");
+  // Local filter inputs (before applying) - initialized from URL params
+  const [siteCodeInput, setSiteCodeInput] = useState(
+    () => searchParams.get("siteCode") || ""
+  );
+  const [customerBillToInput, setCustomerBillToInput] = useState(
+    () => searchParams.get("customerBillTo") || ""
+  );
+  const [customerNameInput, setCustomerNameInput] = useState(
+    () => searchParams.get("customerName") || ""
+  );
+  const [salesRepInput, setSalesRepInput] = useState(
+    () => searchParams.get("salesRep") || ""
+  );
+  const [itemCodeInput, setItemCodeInput] = useState(
+    () => searchParams.get("itemCode") || ""
+  );
+  const [erpStatusInput, setErpStatusInput] = useState(
+    () => searchParams.get("erpStatus") || ""
+  );
 
   // Column visibility state
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    sourceDb: false,
+    customerBillTo: false,
+    contactName: false,
+    contactEmail: false,
+    contactPhone: false,
+  });
   const [tableInstance, setTableInstance] =
     useState<Table<CustomerBidDto> | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -121,6 +185,44 @@ export default function CustomerBids() {
   useEffect(() => {
     void fetchData(filters);
   }, [filters, fetchData]);
+
+  // Sync filters to URL (skip on initial mount to avoid double navigation)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const newParams = filtersToURLParams(filters);
+    setSearchParams(newParams, { replace: true });
+  }, [filters, setSearchParams]);
+
+  // Sync URL changes back to filters (for browser back/forward)
+  useEffect(() => {
+    const urlFilters = parseFiltersFromURL(searchParams);
+    const currentFiltersStr = JSON.stringify({
+      ...filters,
+      // Normalize undefined to match URL parsing
+      siteCode: filters.siteCode || undefined,
+      customerBillTo: filters.customerBillTo || undefined,
+      customerName: filters.customerName || undefined,
+      salesRep: filters.salesRep || undefined,
+      itemCode: filters.itemCode || undefined,
+      erpStatus: filters.erpStatus || undefined,
+    });
+    const urlFiltersStr = JSON.stringify(urlFilters);
+
+    if (urlFiltersStr !== currentFiltersStr) {
+      setFilters(urlFilters);
+      // Sync local inputs
+      setSiteCodeInput(urlFilters.siteCode || "");
+      setCustomerBillToInput(urlFilters.customerBillTo || "");
+      setCustomerNameInput(urlFilters.customerName || "");
+      setSalesRepInput(urlFilters.salesRep || "");
+      setItemCodeInput(urlFilters.itemCode || "");
+      setErpStatusInput(urlFilters.erpStatus || "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // Intentionally not including filters to avoid loop
 
   const handleSearch = () => {
     const newFilters: CustomerBidFilters = {
@@ -206,9 +308,23 @@ export default function CustomerBids() {
               ? {
                   ...b,
                   confirmed: updated.confirmed,
+                  yearAround: updated.yearAround,
                   augustDemand: updated.augustDemand,
                   septemberDemand: updated.septemberDemand,
                   octoberDemand: updated.octoberDemand,
+                  // Menu months
+                  menuJan: updated.menuJan,
+                  menuFeb: updated.menuFeb,
+                  menuMar: updated.menuMar,
+                  menuApr: updated.menuApr,
+                  menuMay: updated.menuMay,
+                  menuJun: updated.menuJun,
+                  menuJul: updated.menuJul,
+                  menuAug: updated.menuAug,
+                  menuSep: updated.menuSep,
+                  menuOct: updated.menuOct,
+                  menuNov: updated.menuNov,
+                  menuDec: updated.menuDec,
                 }
               : b
           )

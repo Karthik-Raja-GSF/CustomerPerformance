@@ -36,6 +36,8 @@ export interface CustomerBidDto {
   bidEndDate: string | null;
   itemCode: string;
   itemDescription: string | null;
+  /** Brand name from Item.description_2 */
+  brandName: string | null;
   erpStatus: string | null;
   bidQuantity: number | null;
 
@@ -56,12 +58,28 @@ export interface CustomerBidDto {
   // User-editable fields
   /** User confirmation flag */
   confirmed: boolean;
+  /** Year-around item flag */
+  yearAround: boolean;
   /** User's August demand forecast */
   augustDemand: number | null;
   /** User's September demand forecast */
   septemberDemand: number | null;
   /** User's October demand forecast */
   octoberDemand: number | null;
+
+  // Menu months - which months the item is on the menu (when not year-around)
+  menuJan: boolean | null;
+  menuFeb: boolean | null;
+  menuMar: boolean | null;
+  menuApr: boolean | null;
+  menuMay: boolean | null;
+  menuJun: boolean | null;
+  menuJul: boolean | null;
+  menuAug: boolean | null;
+  menuSep: boolean | null;
+  menuOct: boolean | null;
+  menuNov: boolean | null;
+  menuDec: boolean | null;
 }
 
 /**
@@ -124,9 +142,23 @@ export interface CustomerBidKeyDto {
  */
 export interface UpdateCustomerBidDto {
   confirmed?: boolean;
+  yearAround?: boolean;
   augustDemand?: number | null;
   septemberDemand?: number | null;
   octoberDemand?: number | null;
+  // Menu months
+  menuJan?: boolean | null;
+  menuFeb?: boolean | null;
+  menuMar?: boolean | null;
+  menuApr?: boolean | null;
+  menuMay?: boolean | null;
+  menuJun?: boolean | null;
+  menuJul?: boolean | null;
+  menuAug?: boolean | null;
+  menuSep?: boolean | null;
+  menuOct?: boolean | null;
+  menuNov?: boolean | null;
+  menuDec?: boolean | null;
 }
 
 /**

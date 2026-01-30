@@ -1057,6 +1057,7 @@ model CustomerBidData {
   schoolYear     String @map("school_year") // "2025-2026"
 
   // Pre-calculated fields (populated by sync job)
+  bidQty         Decimal? @map("bid_qty")
   lastYearBidQty Decimal? @map("last_year_bid_qty")
   lastYearActual Decimal? @map("last_year_actual")
   lyAugust       Decimal? @map("ly_august")
@@ -1066,9 +1067,24 @@ model CustomerBidData {
 
   // User-editable fields
   confirmed       Boolean  @default(false)
+  yearAround      Boolean  @default(false) @map("year_around")
   augustDemand    Decimal? @map("august_demand")
   septemberDemand Decimal? @map("september_demand")
   octoberDemand   Decimal? @map("october_demand")
+
+  // Menu months - which months the item is on the menu (when not year-around)
+  menuJan         Boolean? @default(false) @map("jan")
+  menuFeb         Boolean? @default(false) @map("feb")
+  menuMar         Boolean? @default(false) @map("mar")
+  menuApr         Boolean? @default(false) @map("apr")
+  menuMay         Boolean? @default(false) @map("may")
+  menuJun         Boolean? @default(false) @map("jun")
+  menuJul         Boolean? @default(false) @map("jul")
+  menuAug         Boolean? @default(false) @map("aug")
+  menuSep         Boolean? @default(false) @map("sep")
+  menuOct         Boolean? @default(false) @map("oct")
+  menuNov         Boolean? @default(false) @map("nov")
+  menuDec         Boolean? @default(false) @map("dec")
 
   // Audit fields
   confirmedBy String?   @map("confirmed_by")

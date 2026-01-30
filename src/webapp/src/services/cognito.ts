@@ -233,7 +233,81 @@ export function signIn(
 }
 
 /**
+ * Refresh tokens for federated users via Cognito OAuth endpoint
+ * Used when getCurrentUser() returns null (federated/OAuth users)
+ */
+async function refreshWithOAuthEndpoint(
+  refreshToken: string
+): Promise<CognitoAuthResult> {
+  const { domain, clientId } = cognitoConfig;
+
+  if (!domain) {
+    throw new CognitoAuthError(
+      "Cognito domain not configured",
+      "ConfigurationError"
+    );
+  }
+
+  const response = await fetch(`https://${domain}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new CognitoAuthError(
+      `Token refresh failed: ${errorText}`,
+      "TokenRefreshFailed"
+    );
+  }
+
+  const tokens = (await response.json()) as CognitoTokenResponse;
+  const idTokenPayload = parseJwtPayload(tokens.id_token);
+
+  // Store the new refresh token if provided
+  if (tokens.refresh_token) {
+    localStorage.setItem("refresh_token", tokens.refresh_token);
+  }
+
+  const email =
+    (idTokenPayload.email as string) ||
+    (idTokenPayload["custom:email"] as string) ||
+    "";
+  const fallbackName = extractNameFromEmail(email);
+
+  const user: CognitoUserInfo = {
+    userId: idTokenPayload.sub as string,
+    email,
+    firstName:
+      (idTokenPayload.given_name as string) ||
+      (idTokenPayload["custom:firstName"] as string) ||
+      fallbackName.firstName,
+    lastName:
+      (idTokenPayload.family_name as string) ||
+      (idTokenPayload["custom:lastName"] as string) ||
+      fallbackName.lastName,
+  };
+
+  return {
+    idToken: tokens.id_token,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token || refreshToken,
+    expiresIn: tokens.expires_in,
+    user,
+  };
+}
+
+/**
  * Refresh the current session
+ * For native Cognito users: Uses SDK refresh
+ * For federated users: Uses OAuth token endpoint with stored refresh token
  */
 export function refreshSession(): Promise<CognitoAuthResult> {
   return new Promise((resolve, reject) => {
@@ -241,7 +315,16 @@ export function refreshSession(): Promise<CognitoAuthResult> {
       const pool = getUserPool();
       const cognitoUser = pool.getCurrentUser();
 
+      // For federated users, getCurrentUser() returns null
+      // Try OAuth refresh if we have a stored refresh token
       if (!cognitoUser) {
+        const storedRefreshToken = localStorage.getItem("refresh_token");
+        if (storedRefreshToken) {
+          refreshWithOAuthEndpoint(storedRefreshToken)
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
         reject(new CognitoAuthError("No session found", "NoCurrentUser"));
         return;
       }

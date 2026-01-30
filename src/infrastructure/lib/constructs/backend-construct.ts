@@ -116,18 +116,32 @@ export class BackendConstruct extends Construct {
       family: taskFamily,
     });
 
-    // Grant Bedrock permissions
+    // Grant Bedrock permissions (including cross-region inference profile access)
     taskDefinition.taskRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream",
+          "bedrock:GetInferenceProfile",
+          "bedrock:ListInferenceProfiles",
         ],
         resources: [
           "arn:aws:bedrock:*::foundation-model/*",
           "arn:aws:bedrock:*:*:inference-profile/*",
         ],
+      })
+    );
+
+    // Grant AWS Marketplace permissions for Bedrock model access
+    taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe",
+        ],
+        resources: ["*"],
       })
     );
 

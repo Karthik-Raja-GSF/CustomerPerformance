@@ -57,9 +57,23 @@ const pathParamsSchema = z.object({
  */
 const updateBidSchema = z.object({
   confirmed: z.boolean().optional(),
+  yearAround: z.boolean().optional(),
   augustDemand: z.number().nullable().optional(),
   septemberDemand: z.number().nullable().optional(),
   octoberDemand: z.number().nullable().optional(),
+  // Menu months
+  menuJan: z.boolean().nullable().optional(),
+  menuFeb: z.boolean().nullable().optional(),
+  menuMar: z.boolean().nullable().optional(),
+  menuApr: z.boolean().nullable().optional(),
+  menuMay: z.boolean().nullable().optional(),
+  menuJun: z.boolean().nullable().optional(),
+  menuJul: z.boolean().nullable().optional(),
+  menuAug: z.boolean().nullable().optional(),
+  menuSep: z.boolean().nullable().optional(),
+  menuOct: z.boolean().nullable().optional(),
+  menuNov: z.boolean().nullable().optional(),
+  menuDec: z.boolean().nullable().optional(),
 });
 
 /**
@@ -75,9 +89,23 @@ const bulkUpdateSchema = z.object({
         itemNo: z.string().min(1),
         schoolYear: z.string().regex(/^\d{4}-\d{4}$/),
         confirmed: z.boolean().optional(),
+        yearAround: z.boolean().optional(),
         augustDemand: z.number().nullable().optional(),
         septemberDemand: z.number().nullable().optional(),
         octoberDemand: z.number().nullable().optional(),
+        // Menu months
+        menuJan: z.boolean().nullable().optional(),
+        menuFeb: z.boolean().nullable().optional(),
+        menuMar: z.boolean().nullable().optional(),
+        menuApr: z.boolean().nullable().optional(),
+        menuMay: z.boolean().nullable().optional(),
+        menuJun: z.boolean().nullable().optional(),
+        menuJul: z.boolean().nullable().optional(),
+        menuAug: z.boolean().nullable().optional(),
+        menuSep: z.boolean().nullable().optional(),
+        menuOct: z.boolean().nullable().optional(),
+        menuNov: z.boolean().nullable().optional(),
+        menuDec: z.boolean().nullable().optional(),
       })
     )
     .min(1)

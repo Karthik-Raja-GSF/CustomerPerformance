@@ -35,6 +35,7 @@ interface BaseBidRow {
   salesRep: string | null;
   itemNo: string;
   itemDescription: string | null;
+  brandName: string | null;
   bidQty: Prisma.Decimal | null;
   bidStart: Date;
   bidEnd: Date | null;
@@ -47,9 +48,23 @@ interface BaseBidRow {
   lyOctober: Prisma.Decimal | null;
   isLost: boolean | null;
   confirmed: boolean | null;
+  yearAround: boolean | null;
   augustDemand: Prisma.Decimal | null;
   septemberDemand: Prisma.Decimal | null;
   octoberDemand: Prisma.Decimal | null;
+  // Menu months
+  menuJan: boolean | null;
+  menuFeb: boolean | null;
+  menuMar: boolean | null;
+  menuApr: boolean | null;
+  menuMay: boolean | null;
+  menuJun: boolean | null;
+  menuJul: boolean | null;
+  menuAug: boolean | null;
+  menuSep: boolean | null;
+  menuOct: boolean | null;
+  menuNov: boolean | null;
+  menuDec: boolean | null;
 }
 
 /**
@@ -149,11 +164,10 @@ export class CustomerBidService implements ICustomerBidService {
       // Execute the new simplified query with materialized CTE
       const baseQuery = Prisma.sql`
         WITH filtered_sales AS MATERIALIZED (
-            SELECT
+            SELECT DISTINCT
                 item_no_,
                 source_db,
                 sales_code,
-                customer_bid_qty_,
                 starting_date,
                 ending_date
             FROM dw2_nav.sales_price
@@ -171,7 +185,8 @@ export class CustomerBidService implements ICustomerBidService {
             c.salesperson_code AS "salesRep",
             sp.item_no_ AS "itemNo",
             i.description AS "itemDescription",
-            SUM(sp.customer_bid_qty_) AS "bidQty",
+            i.description_2 AS "brandName",
+            cbd.bid_qty AS "bidQty",
             MIN(sp.starting_date) AS "bidStart",
             MAX(sp.ending_date) AS "bidEnd",
             sku_latest.status AS "erpStatus",
@@ -184,9 +199,23 @@ export class CustomerBidService implements ICustomerBidService {
             COALESCE(cbd.is_lost, false) AS "isLost",
             -- User-editable fields
             COALESCE(cbd.confirmed, false) AS "confirmed",
+            COALESCE(cbd.year_around, false) AS "yearAround",
             cbd.august_demand AS "augustDemand",
             cbd.september_demand AS "septemberDemand",
-            cbd.october_demand AS "octoberDemand"
+            cbd.october_demand AS "octoberDemand",
+            -- Menu months
+            cbd.jan AS "menuJan",
+            cbd.feb AS "menuFeb",
+            cbd.mar AS "menuMar",
+            cbd.apr AS "menuApr",
+            cbd.may AS "menuMay",
+            cbd.jun AS "menuJun",
+            cbd.jul AS "menuJul",
+            cbd.aug AS "menuAug",
+            cbd.sep AS "menuSep",
+            cbd.oct AS "menuOct",
+            cbd.nov AS "menuNov",
+            cbd.dec AS "menuDec"
         FROM filtered_sales sp
         INNER JOIN dw2_nav.customer c
             ON sp.sales_code = c.no_
@@ -216,6 +245,7 @@ export class CustomerBidService implements ICustomerBidService {
             c.location_code,
             sp.item_no_,
             i.description,
+            i.description_2,
             c.no_,
             c."name",
             c.contact,
@@ -223,6 +253,7 @@ export class CustomerBidService implements ICustomerBidService {
             c.phone_no_,
             c.salesperson_code,
             sku_latest.status,
+            cbd.bid_qty,
             cbd.last_year_bid_qty,
             cbd.last_year_actual,
             cbd.ly_august,
@@ -230,9 +261,22 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_october,
             cbd.is_lost,
             cbd.confirmed,
+            cbd.year_around,
             cbd.august_demand,
             cbd.september_demand,
-            cbd.october_demand
+            cbd.october_demand,
+            cbd.jan,
+            cbd.feb,
+            cbd.mar,
+            cbd.apr,
+            cbd.may,
+            cbd.jun,
+            cbd.jul,
+            cbd.aug,
+            cbd.sep,
+            cbd.oct,
+            cbd.nov,
+            cbd.dec
         ORDER BY c.location_code, sp.item_no_, c.no_
         LIMIT ${limit + 1} OFFSET ${offset}
       `;
@@ -257,6 +301,7 @@ export class CustomerBidService implements ICustomerBidService {
         bidEndDate: row.bidEnd?.toISOString() ?? null,
         itemCode: row.itemNo,
         itemDescription: row.itemDescription,
+        brandName: row.brandName,
         erpStatus: row.erpStatus,
         bidQuantity: row.bidQty ? Number(row.bidQty) : null,
         // Pre-calculated fields (from sync)
@@ -268,11 +313,25 @@ export class CustomerBidService implements ICustomerBidService {
         isLost: row.isLost ?? false,
         // User-editable fields
         confirmed: row.confirmed ?? false,
+        yearAround: row.yearAround ?? false,
         augustDemand: row.augustDemand ? Number(row.augustDemand) : null,
         septemberDemand: row.septemberDemand
           ? Number(row.septemberDemand)
           : null,
         octoberDemand: row.octoberDemand ? Number(row.octoberDemand) : null,
+        // Menu months
+        menuJan: row.menuJan,
+        menuFeb: row.menuFeb,
+        menuMar: row.menuMar,
+        menuApr: row.menuApr,
+        menuMay: row.menuMay,
+        menuJun: row.menuJun,
+        menuJul: row.menuJul,
+        menuAug: row.menuAug,
+        menuSep: row.menuSep,
+        menuOct: row.menuOct,
+        menuNov: row.menuNov,
+        menuDec: row.menuDec,
       }));
 
       logger.info(
@@ -394,19 +453,47 @@ export class CustomerBidService implements ICustomerBidService {
           itemNo: key.itemNo,
           schoolYear: key.schoolYear,
           confirmed: data.confirmed ?? false,
+          yearAround: data.yearAround ?? false,
           augustDemand: data.augustDemand,
           septemberDemand: data.septemberDemand,
           octoberDemand: data.octoberDemand,
           confirmedBy: data.confirmed ? userId : null,
           confirmedAt: data.confirmed ? new Date() : null,
+          // Menu months
+          menuJan: data.menuJan,
+          menuFeb: data.menuFeb,
+          menuMar: data.menuMar,
+          menuApr: data.menuApr,
+          menuMay: data.menuMay,
+          menuJun: data.menuJun,
+          menuJul: data.menuJul,
+          menuAug: data.menuAug,
+          menuSep: data.menuSep,
+          menuOct: data.menuOct,
+          menuNov: data.menuNov,
+          menuDec: data.menuDec,
         },
         update: {
           confirmed: data.confirmed,
+          yearAround: data.yearAround,
           augustDemand: data.augustDemand,
           septemberDemand: data.septemberDemand,
           octoberDemand: data.octoberDemand,
           confirmedBy: data.confirmed ? userId : undefined,
           confirmedAt: data.confirmed ? new Date() : undefined,
+          // Menu months
+          menuJan: data.menuJan,
+          menuFeb: data.menuFeb,
+          menuMar: data.menuMar,
+          menuApr: data.menuApr,
+          menuMay: data.menuMay,
+          menuJun: data.menuJun,
+          menuJul: data.menuJul,
+          menuAug: data.menuAug,
+          menuSep: data.menuSep,
+          menuOct: data.menuOct,
+          menuNov: data.menuNov,
+          menuDec: data.menuDec,
         },
       });
 
@@ -429,6 +516,7 @@ export class CustomerBidService implements ICustomerBidService {
         bidEndDate: null,
         itemCode: record.itemNo,
         itemDescription: null,
+        brandName: null,
         erpStatus: null,
         bidQuantity: null,
         lastYearBidQty: record.lastYearBidQty
@@ -442,6 +530,7 @@ export class CustomerBidService implements ICustomerBidService {
         lyOctober: record.lyOctober ? Number(record.lyOctober) : null,
         isLost: record.isLost,
         confirmed: record.confirmed,
+        yearAround: record.yearAround,
         augustDemand: record.augustDemand ? Number(record.augustDemand) : null,
         septemberDemand: record.septemberDemand
           ? Number(record.septemberDemand)
@@ -449,6 +538,19 @@ export class CustomerBidService implements ICustomerBidService {
         octoberDemand: record.octoberDemand
           ? Number(record.octoberDemand)
           : null,
+        // Menu months
+        menuJan: record.menuJan,
+        menuFeb: record.menuFeb,
+        menuMar: record.menuMar,
+        menuApr: record.menuApr,
+        menuMay: record.menuMay,
+        menuJun: record.menuJun,
+        menuJul: record.menuJul,
+        menuAug: record.menuAug,
+        menuSep: record.menuSep,
+        menuOct: record.menuOct,
+        menuNov: record.menuNov,
+        menuDec: record.menuDec,
       };
     } catch (error) {
       logger.error(
@@ -491,9 +593,22 @@ export class CustomerBidService implements ICustomerBidService {
           },
           {
             confirmed: record.confirmed,
+            yearAround: record.yearAround,
             augustDemand: record.augustDemand,
             septemberDemand: record.septemberDemand,
             octoberDemand: record.octoberDemand,
+            menuJan: record.menuJan,
+            menuFeb: record.menuFeb,
+            menuMar: record.menuMar,
+            menuApr: record.menuApr,
+            menuMay: record.menuMay,
+            menuJun: record.menuJun,
+            menuJul: record.menuJul,
+            menuAug: record.menuAug,
+            menuSep: record.menuSep,
+            menuOct: record.menuOct,
+            menuNov: record.menuNov,
+            menuDec: record.menuDec,
           },
           userId
         );
@@ -589,26 +704,29 @@ export class CustomerBidService implements ICustomerBidService {
         "Calculated sync date ranges"
       );
 
-      // Query current year bids to sync
+      // Query current year bids to sync (with bid qty)
       const currentYearBids = await this.prisma.$queryRaw<
         Array<{
           source_db: string;
           site_code: string;
           customer_bill_to: string;
           item_no: string;
+          bid_qty: Prisma.Decimal;
         }>
       >(Prisma.sql`
-        SELECT DISTINCT
+        SELECT
             sp.source_db,
             c.location_code AS site_code,
             sp.sales_code AS customer_bill_to,
-            sp.item_no_  AS item_no
+            sp.item_no_ AS item_no,
+            SUM(sp.customer_bid_qty_) AS bid_qty
         FROM dw2_nav.sales_price sp
         INNER JOIN dw2_nav.customer c
             ON sp.sales_code = c.no_
             AND sp.source_db = c.source_db
         WHERE sp.starting_date >= ${startDateStr}::date
           AND sp.ending_date <= ${endDateStr}::date
+        GROUP BY sp.source_db, c.location_code, sp.sales_code, sp.item_no_
       `);
 
       logger.debug(
@@ -757,6 +875,7 @@ export class CustomerBidService implements ICustomerBidService {
                 customerBillTo: bid.customer_bill_to,
                 itemNo: bid.item_no,
                 schoolYear: schoolYearString,
+                bidQty: bid.bid_qty,
                 lastYearBidQty,
                 isLost,
                 lastYearActual: salesData?.totalQty ?? null,
@@ -766,6 +885,7 @@ export class CustomerBidService implements ICustomerBidService {
                 syncedAt: new Date(),
               },
               update: {
+                bidQty: bid.bid_qty,
                 lastYearBidQty,
                 isLost,
                 lastYearActual: salesData?.totalQty ?? null,

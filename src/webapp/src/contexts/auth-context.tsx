@@ -37,6 +37,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 // Token storage keys
 const TOKEN_KEY = "access_token";
 const ID_TOKEN_KEY = "id_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 const REFRESH_THRESHOLD = 5 * 60 * 1000; // Refresh 5 minutes before expiry
 
 interface AuthProviderProps {
@@ -81,6 +82,9 @@ export function AuthProvider({
   const storeTokens = useCallback((authResponse: AuthResponse) => {
     localStorage.setItem(TOKEN_KEY, authResponse.accessToken);
     localStorage.setItem(ID_TOKEN_KEY, authResponse.idToken);
+    if (authResponse.refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, authResponse.refreshToken);
+    }
   }, []);
 
   /**
@@ -89,6 +93,7 @@ export function AuthProvider({
   const clearTokens = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ID_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }, []);
 
   /**

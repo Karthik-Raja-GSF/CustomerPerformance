@@ -10,6 +10,7 @@ import type {
 } from "@/types/customer-bids";
 import { EditableNumberCell } from "@/components/editable-cells/EditableNumberCell";
 import { EditableCheckboxCell } from "@/components/editable-cells/EditableCheckboxCell";
+import { EditableMonthsCell } from "@/components/editable-cells/EditableMonthsCell";
 
 interface SortableHeaderProps<TData, TValue> {
   column: Column<TData, TValue>;
@@ -171,6 +172,20 @@ export function createColumns(
       cell: ({ row }) => row.getValue<string>("itemCode"),
     },
     {
+      accessorKey: "brandName",
+      header: () => (
+        <span className="text-muted-foreground font-medium">Brand Name</span>
+      ),
+      cell: ({ row }) => {
+        const brand = row.getValue<string | null>("brandName");
+        return (
+          <div className="max-w-[150px] truncate" title={brand ?? undefined}>
+            {brand ?? "-"}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "itemDescription",
       header: () => (
         <span className="text-muted-foreground font-medium">
@@ -233,6 +248,31 @@ export function createColumns(
         </div>
       ),
     },
+    // Conversion Rate: (LY Actual / LY Bid Qty) * 100
+    {
+      id: "conversionRate",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          Conv Rate
+        </div>
+      ),
+      cell: ({ row }) => {
+        const lyActual = row.original.lastYearActual;
+        const lyBidQty = row.original.lastYearBidQty;
+
+        // Can't calculate if bid qty is 0, null, or if actual is null
+        if (!lyBidQty || lyBidQty === 0 || lyActual === null) {
+          return <div className="text-right text-muted-foreground">-</div>;
+        }
+
+        const rate = (lyActual / lyBidQty) * 100;
+        return (
+          <div className="text-right font-medium tabular-nums">
+            {rate.toFixed(1)}%
+          </div>
+        );
+      },
+    },
     {
       accessorKey: "lyAugust",
       header: () => (
@@ -274,6 +314,57 @@ export function createColumns(
     },
     // User-editable columns
     {
+      accessorKey: "yearAround",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          Year Around
+        </div>
+      ),
+      cell: ({ row }) => (
+        <EditableCheckboxCell
+          value={row.original.yearAround}
+          onSave={async (value) => {
+            if (value) {
+              // When setting yearAround, also confirm and copy LY values
+              await onCellUpdate(row.original, {
+                yearAround: value,
+                confirmed: true,
+                augustDemand: row.original.lyAugust ?? 0,
+                septemberDemand: row.original.lySeptember ?? 0,
+                octoberDemand: row.original.lyOctober ?? 0,
+              });
+            } else {
+              // When unchecking yearAround, also unconfirm and clear demand values
+              await onCellUpdate(row.original, {
+                yearAround: value,
+                confirmed: false,
+                augustDemand: null,
+                septemberDemand: null,
+                octoberDemand: null,
+              });
+            }
+          }}
+        />
+      ),
+    },
+    {
+      id: "menuMonths",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          Menu Months
+        </div>
+      ),
+      cell: ({ row }) => (
+        <EditableMonthsCell
+          data={row.original}
+          yearAround={row.original.yearAround}
+          onSave={async (updates) => {
+            await onCellUpdate(row.original, updates);
+          }}
+        />
+      ),
+    },
+    {
       accessorKey: "confirmed",
       header: () => (
         <div className="text-center text-muted-foreground font-medium">
@@ -293,7 +384,13 @@ export function createColumns(
                 octoberDemand: row.original.lyOctober ?? 0,
               });
             } else {
-              await onCellUpdate(row.original, { confirmed: value });
+              // When unconfirming, clear demand values
+              await onCellUpdate(row.original, {
+                confirmed: value,
+                augustDemand: null,
+                septemberDemand: null,
+                octoberDemand: null,
+              });
             }
           }}
         />
