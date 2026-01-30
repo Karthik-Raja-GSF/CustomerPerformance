@@ -29,6 +29,7 @@ interface BaseBidRow {
   siteCode: string | null;
   customerName: string | null;
   customerBillTo: string | null;
+  coOpCode: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -179,6 +180,7 @@ export class CustomerBidService implements ICustomerBidService {
             c.location_code AS "siteCode",
             c."name" AS "customerName",
             c.no_ AS "customerBillTo",
+            c.co_op_code AS "coOpCode",
             c.contact AS "contactName",
             c.e_mail AS "contactEmail",
             c.phone_no_ AS "contactPhone",
@@ -247,6 +249,7 @@ export class CustomerBidService implements ICustomerBidService {
             i.description,
             i.description_2,
             c.no_,
+            c.co_op_code,
             c."name",
             c.contact,
             c.e_mail,
@@ -293,6 +296,7 @@ export class CustomerBidService implements ICustomerBidService {
         siteCode: row.siteCode,
         customerName: row.customerName,
         customerBillTo: row.customerBillTo,
+        coOpCode: row.coOpCode,
         contactName: row.contactName,
         contactEmail: row.contactEmail,
         contactPhone: row.contactPhone,
@@ -508,6 +512,7 @@ export class CustomerBidService implements ICustomerBidService {
         siteCode: record.siteCode,
         customerName: null,
         customerBillTo: record.customerBillTo,
+        coOpCode: null,
         contactName: null,
         contactEmail: null,
         contactPhone: null,

@@ -259,6 +259,8 @@ model Customer {
   commodityRegion           String?  @map("commodity_region")
 
   @@id([sourceDb, no])
+  // Note: Raw SQL index includes covering columns (location_code, name, contact, e_mail, phone_no_, salesperson_code)
+  @@index([no, sourceDb], map: "idx_customer_no_source")
   @@map("customer")
   @@schema("dw2_nav")
 }

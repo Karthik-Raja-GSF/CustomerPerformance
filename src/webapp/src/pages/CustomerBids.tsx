@@ -155,6 +155,7 @@ export default function CustomerBids() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     sourceDb: false,
     customerBillTo: false,
+    coOpCode: false,
     contactName: false,
     contactEmail: false,
     contactPhone: false,

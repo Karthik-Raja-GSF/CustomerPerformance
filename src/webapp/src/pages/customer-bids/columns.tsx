@@ -100,6 +100,13 @@ export function createColumns(
       cell: ({ row }) => row.getValue<string | null>("customerBillTo") ?? "-",
     },
     {
+      accessorKey: "coOpCode",
+      header: () => (
+        <span className="text-muted-foreground font-medium">Co-op Code</span>
+      ),
+      cell: ({ row }) => row.getValue<string | null>("coOpCode") ?? "-",
+    },
+    {
       accessorKey: "contactName",
       header: () => (
         <span className="text-muted-foreground font-medium">Contact Name</span>

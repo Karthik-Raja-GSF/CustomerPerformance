@@ -26,6 +26,8 @@ export interface CustomerBidDto {
   siteCode: string | null;
   customerName: string | null;
   customerBillTo: string | null;
+  /** Customer co-op code */
+  coOpCode: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
