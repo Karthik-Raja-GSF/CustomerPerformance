@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronDown, Filter, RefreshCw } from "lucide-react";
+import { ChevronDown, Download, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Input } from "@/shadcn/components/input";
 import { Label } from "@/shadcn/components/label";
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shadcn/components/dropdown-menu";
 import {
@@ -38,6 +39,11 @@ import {
   type VisibilityState,
 } from "@/pages/customer-bids/data-table";
 import { createColumns } from "@/pages/customer-bids/columns";
+import {
+  exportToCSV,
+  exportToSIQCSV,
+  customerBidExportColumns,
+} from "@/utils/export-csv";
 import type { Table } from "@tanstack/react-table";
 
 /**
@@ -562,6 +568,39 @@ export default function CustomerBids() {
                   {column.id.replace(/([A-Z])/g, " $1").trim()}
                 </DropdownMenuCheckboxItem>
               ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Export dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bids.length === 0 || isLoading}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => {
+                exportToCSV(bids, customerBidExportColumns, "customer-bids");
+                toast.success("CSV exported successfully");
+              }}
+            >
+              Export CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                exportToSIQCSV(bids, "customer-bids-siq");
+                toast.success("SIQ CSV exported successfully");
+              }}
+            >
+              Export SIQ
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 

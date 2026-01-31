@@ -1066,6 +1066,9 @@ model CustomerBidData {
   lySeptember    Decimal? @map("ly_september")
   lyOctober      Decimal? @map("ly_october")
   isLost         Boolean  @default(false) @map("is_lost")
+  bidStart       DateTime? @map("bid_start")
+  bidEnd         DateTime? @map("bid_end")
+  erpStatus      String?   @map("erp_status")
 
   // User-editable fields
   confirmed       Boolean  @default(false)

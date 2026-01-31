@@ -189,9 +189,9 @@ export class CustomerBidService implements ICustomerBidService {
             i.description AS "itemDescription",
             i.description_2 AS "brandName",
             cbd.bid_qty AS "bidQty",
-            MIN(sp.starting_date) AS "bidStart",
-            MAX(sp.ending_date) AS "bidEnd",
-            sku_latest.status AS "erpStatus",
+            cbd.bid_start AS "bidStart",
+            cbd.bid_end AS "bidEnd",
+            cbd.erp_status AS "erpStatus",
             -- From customer_bid_data table (pre-calculated by sync)
             cbd.last_year_bid_qty AS "lastYearBidQty",
             cbd.last_year_actual AS "lastYearActual",
@@ -225,16 +225,6 @@ export class CustomerBidService implements ICustomerBidService {
         INNER JOIN dw2_nav.item i
             ON sp.item_no_ = i.no_
             AND sp.source_db = i.source_db
-        INNER JOIN (
-            SELECT DISTINCT ON (item_no_, source_db)
-                item_no_,
-                source_db,
-                status
-            FROM dw2_nav.stockkeeping_unit
-            ORDER BY item_no_, source_db, last_date_modified DESC
-        ) sku_latest
-            ON sp.item_no_ = sku_latest.item_no_
-            AND sp.source_db = sku_latest.source_db
         LEFT JOIN ait.customer_bid_data cbd
             ON sp.source_db = cbd.source_db
             AND c.location_code = cbd.site_code
@@ -255,8 +245,10 @@ export class CustomerBidService implements ICustomerBidService {
             c.e_mail,
             c.phone_no_,
             c.salesperson_code,
-            sku_latest.status,
             cbd.bid_qty,
+            cbd.bid_start,
+            cbd.bid_end,
+            cbd.erp_status,
             cbd.last_year_bid_qty,
             cbd.last_year_actual,
             cbd.ly_august,
@@ -301,7 +293,7 @@ export class CustomerBidService implements ICustomerBidService {
         contactEmail: row.contactEmail,
         contactPhone: row.contactPhone,
         salesRep: row.salesRep,
-        bidStartDate: row.bidStart.toISOString(),
+        bidStartDate: row.bidStart?.toISOString() ?? "",
         bidEndDate: row.bidEnd?.toISOString() ?? null,
         itemCode: row.itemNo,
         itemDescription: row.itemDescription,
@@ -709,7 +701,7 @@ export class CustomerBidService implements ICustomerBidService {
         "Calculated sync date ranges"
       );
 
-      // Query current year bids to sync (with bid qty)
+      // Query current year bids to sync (with bid qty, dates)
       const currentYearBids = await this.prisma.$queryRaw<
         Array<{
           source_db: string;
@@ -717,6 +709,8 @@ export class CustomerBidService implements ICustomerBidService {
           customer_bill_to: string;
           item_no: string;
           bid_qty: Prisma.Decimal;
+          bid_start: Date;
+          bid_end: Date;
         }>
       >(Prisma.sql`
         SELECT
@@ -724,7 +718,9 @@ export class CustomerBidService implements ICustomerBidService {
             c.location_code AS site_code,
             sp.sales_code AS customer_bill_to,
             sp.item_no_ AS item_no,
-            SUM(sp.customer_bid_qty_) AS bid_qty
+            SUM(sp.customer_bid_qty_) AS bid_qty,
+            MIN(sp.starting_date) AS bid_start,
+            MAX(sp.ending_date) AS bid_end
         FROM dw2_nav.sales_price sp
         INNER JOIN dw2_nav.customer c
             ON sp.sales_code = c.no_
@@ -839,6 +835,37 @@ export class CustomerBidService implements ICustomerBidService {
         });
       }
 
+      // Query ERP status for all items (latest by last_date_modified)
+      const erpStatusMap = new Map<string, string>();
+      const erpStatuses = await this.prisma.$queryRaw<
+        Array<{
+          source_db: string;
+          item_no: string;
+          status: string;
+        }>
+      >(Prisma.sql`
+        SELECT DISTINCT ON (item_no_, source_db)
+            source_db,
+            item_no_ AS item_no,
+            status
+        FROM dw2_nav.stockkeeping_unit
+        ORDER BY item_no_, source_db, last_date_modified DESC
+      `);
+
+      for (const row of erpStatuses) {
+        const key = `${row.source_db}|${row.item_no}`;
+        erpStatusMap.set(key, row.status);
+      }
+
+      logger.debug(
+        {
+          event: "customer-bid.sync.erp-status-found",
+          syncId,
+          count: erpStatuses.length,
+        },
+        "Found ERP status data"
+      );
+
       // Create set of current year keys for isLost calculation
       const currentYearKeys = new Set(
         currentYearBids.map(
@@ -848,60 +875,99 @@ export class CustomerBidService implements ICustomerBidService {
       );
 
       let recordsInserted = 0;
-      const recordsUpdated = 0;
+      let recordsUpdated = 0;
 
-      // Upsert records in batches
+      // Upsert records in batches using raw SQL to track inserts vs updates
       const batchSize = 100;
+      const now = new Date();
+
       for (let i = 0; i < currentYearBids.length; i += batchSize) {
         const batch = currentYearBids.slice(i, i + batchSize);
 
-        await this.prisma.$transaction(
-          batch.map((bid) => {
-            const key = `${bid.source_db}|${bid.site_code}|${bid.customer_bill_to}|${bid.item_no}`;
-            const lastYearBidQty = lastYearBidsMap.get(key) ?? null;
-            const salesData = lastYearSalesMap.get(key);
-            const wasInLastYear = lastYearBidsMap.has(key);
-            const isInCurrentYear = currentYearKeys.has(key);
-            const isLost = wasInLastYear && !isInCurrentYear;
+        // Build batch data with all computed values
+        const batchData = batch.map((bid) => {
+          const key = `${bid.source_db}|${bid.site_code}|${bid.customer_bill_to}|${bid.item_no}`;
+          const erpKey = `${bid.source_db}|${bid.item_no}`;
+          const lastYearBidQty = lastYearBidsMap.get(key) ?? null;
+          const salesData = lastYearSalesMap.get(key);
+          const erpStatus = erpStatusMap.get(erpKey) ?? null;
+          const wasInLastYear = lastYearBidsMap.has(key);
+          const isInCurrentYear = currentYearKeys.has(key);
+          const isLost = wasInLastYear && !isInCurrentYear;
 
-            return this.prisma.customerBidData.upsert({
-              where: {
-                sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-                  sourceDb: bid.source_db,
-                  siteCode: bid.site_code,
-                  customerBillTo: bid.customer_bill_to,
-                  itemNo: bid.item_no,
-                  schoolYear: schoolYearString,
-                },
-              },
-              create: {
-                sourceDb: bid.source_db,
-                siteCode: bid.site_code,
-                customerBillTo: bid.customer_bill_to,
-                itemNo: bid.item_no,
-                schoolYear: schoolYearString,
-                bidQty: bid.bid_qty,
-                lastYearBidQty,
-                isLost,
-                lastYearActual: salesData?.totalQty ?? null,
-                lyAugust: salesData?.augQty ?? null,
-                lySeptember: salesData?.sepQty ?? null,
-                lyOctober: salesData?.octQty ?? null,
-                syncedAt: new Date(),
-              },
-              update: {
-                bidQty: bid.bid_qty,
-                lastYearBidQty,
-                isLost,
-                lastYearActual: salesData?.totalQty ?? null,
-                lyAugust: salesData?.augQty ?? null,
-                lySeptember: salesData?.sepQty ?? null,
-                lyOctober: salesData?.octQty ?? null,
-                syncedAt: new Date(),
-              },
-            });
-          })
+          return {
+            sourceDb: bid.source_db,
+            siteCode: bid.site_code,
+            customerBillTo: bid.customer_bill_to,
+            itemNo: bid.item_no,
+            schoolYear: schoolYearString,
+            bidQty: bid.bid_qty,
+            bidStart: bid.bid_start,
+            bidEnd: bid.bid_end,
+            erpStatus,
+            lastYearBidQty,
+            isLost,
+            lastYearActual: salesData?.totalQty ?? null,
+            lyAugust: salesData?.augQty ?? null,
+            lySeptember: salesData?.sepQty ?? null,
+            lyOctober: salesData?.octQty ?? null,
+          };
+        });
+
+        // Use raw SQL with ON CONFLICT to track inserts vs updates via xmax
+        const results = await this.prisma.$queryRaw<Array<{ xmax: string }>>(
+          Prisma.sql`
+            INSERT INTO ait.customer_bid_data (
+              source_db, site_code, customer_bill_to, item_no, school_year,
+              bid_qty, bid_start, bid_end, erp_status,
+              last_year_bid_qty, is_lost, last_year_actual,
+              ly_august, ly_september, ly_october, synced_at, updated_at
+            )
+            SELECT * FROM UNNEST(
+              ${batchData.map((d) => d.sourceDb)}::text[],
+              ${batchData.map((d) => d.siteCode)}::text[],
+              ${batchData.map((d) => d.customerBillTo)}::text[],
+              ${batchData.map((d) => d.itemNo)}::text[],
+              ${batchData.map((d) => d.schoolYear)}::text[],
+              ${batchData.map((d) => (d.bidQty ? Number(d.bidQty) : null))}::decimal[],
+              ${batchData.map((d) => d.bidStart)}::timestamp[],
+              ${batchData.map((d) => d.bidEnd)}::timestamp[],
+              ${batchData.map((d) => d.erpStatus)}::text[],
+              ${batchData.map((d) => (d.lastYearBidQty ? Number(d.lastYearBidQty) : null))}::decimal[],
+              ${batchData.map((d) => d.isLost)}::boolean[],
+              ${batchData.map((d) => (d.lastYearActual ? Number(d.lastYearActual) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyAugust ? Number(d.lyAugust) : null))}::decimal[],
+              ${batchData.map((d) => (d.lySeptember ? Number(d.lySeptember) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyOctober ? Number(d.lyOctober) : null))}::decimal[],
+              ${batchData.map(() => now)}::timestamp[],
+              ${batchData.map(() => now)}::timestamp[]
+            )
+            ON CONFLICT (source_db, site_code, customer_bill_to, item_no, school_year)
+            DO UPDATE SET
+              bid_qty = EXCLUDED.bid_qty,
+              bid_start = EXCLUDED.bid_start,
+              bid_end = EXCLUDED.bid_end,
+              erp_status = EXCLUDED.erp_status,
+              last_year_bid_qty = EXCLUDED.last_year_bid_qty,
+              is_lost = EXCLUDED.is_lost,
+              last_year_actual = EXCLUDED.last_year_actual,
+              ly_august = EXCLUDED.ly_august,
+              ly_september = EXCLUDED.ly_september,
+              ly_october = EXCLUDED.ly_october,
+              synced_at = EXCLUDED.synced_at,
+              updated_at = EXCLUDED.updated_at
+            RETURNING xmax::text
+          `
         );
+
+        // Count inserts vs updates: xmax = 0 means INSERT, xmax > 0 means UPDATE
+        for (const row of results) {
+          if (row.xmax === "0") {
+            recordsInserted++;
+          } else {
+            recordsUpdated++;
+          }
+        }
       }
 
       // Process LOST bids: bids that existed last year but NOT in current year
@@ -921,52 +987,80 @@ export class CustomerBidService implements ICustomerBidService {
 
       for (let i = 0; i < lostBids.length; i += batchSize) {
         const batch = lostBids.slice(i, i + batchSize);
+        const syncedAt = new Date();
 
-        await this.prisma.$transaction(
-          batch.map((bid) => {
-            const key = `${bid.source_db}|${bid.site_code}|${bid.customer_bill_to}|${bid.item_no}`;
-            const salesData = lastYearSalesMap.get(key);
+        // Build batch data with computed values
+        const batchData = batch.map((bid) => {
+          const key = `${bid.source_db}|${bid.site_code}|${bid.customer_bill_to}|${bid.item_no}`;
+          const erpKey = `${bid.source_db}|${bid.item_no}`;
+          const salesData = lastYearSalesMap.get(key);
+          const erpStatus = erpStatusMap.get(erpKey) ?? null;
 
-            return this.prisma.customerBidData.upsert({
-              where: {
-                sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-                  sourceDb: bid.source_db,
-                  siteCode: bid.site_code,
-                  customerBillTo: bid.customer_bill_to,
-                  itemNo: bid.item_no,
-                  schoolYear: schoolYearString,
-                },
-              },
-              create: {
-                sourceDb: bid.source_db,
-                siteCode: bid.site_code,
-                customerBillTo: bid.customer_bill_to,
-                itemNo: bid.item_no,
-                schoolYear: schoolYearString,
-                lastYearBidQty: bid.bid_qty,
-                isLost: true,
-                lastYearActual: salesData?.totalQty ?? null,
-                lyAugust: salesData?.augQty ?? null,
-                lySeptember: salesData?.sepQty ?? null,
-                lyOctober: salesData?.octQty ?? null,
-                syncedAt: new Date(),
-              },
-              update: {
-                lastYearBidQty: bid.bid_qty,
-                isLost: true,
-                lastYearActual: salesData?.totalQty ?? null,
-                lyAugust: salesData?.augQty ?? null,
-                lySeptember: salesData?.sepQty ?? null,
-                lyOctober: salesData?.octQty ?? null,
-                syncedAt: new Date(),
-              },
-            });
-          })
+          return {
+            sourceDb: bid.source_db,
+            siteCode: bid.site_code,
+            customerBillTo: bid.customer_bill_to,
+            itemNo: bid.item_no,
+            schoolYear: schoolYearString,
+            erpStatus,
+            lastYearBidQty: bid.bid_qty,
+            isLost: true,
+            lastYearActual: salesData?.totalQty ?? null,
+            lyAugust: salesData?.augQty ?? null,
+            lySeptember: salesData?.sepQty ?? null,
+            lyOctober: salesData?.octQty ?? null,
+            syncedAt,
+          };
+        });
+
+        // Use raw SQL with UNNEST to batch insert and get xmax for insert/update tracking
+        const results = await this.prisma.$queryRaw<Array<{ xmax: string }>>(
+          Prisma.sql`
+            INSERT INTO ait.customer_bid_data (
+              source_db, site_code, customer_bill_to, item_no, school_year,
+              erp_status, last_year_bid_qty, is_lost,
+              last_year_actual, ly_august, ly_september, ly_october, synced_at, updated_at
+            )
+            SELECT * FROM UNNEST(
+              ${batchData.map((d) => d.sourceDb)}::text[],
+              ${batchData.map((d) => d.siteCode)}::text[],
+              ${batchData.map((d) => d.customerBillTo)}::text[],
+              ${batchData.map((d) => d.itemNo)}::text[],
+              ${batchData.map((d) => d.schoolYear)}::text[],
+              ${batchData.map((d) => d.erpStatus)}::text[],
+              ${batchData.map((d) => (d.lastYearBidQty ? Number(d.lastYearBidQty) : null))}::decimal[],
+              ${batchData.map((d) => d.isLost)}::boolean[],
+              ${batchData.map((d) => (d.lastYearActual ? Number(d.lastYearActual) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyAugust ? Number(d.lyAugust) : null))}::decimal[],
+              ${batchData.map((d) => (d.lySeptember ? Number(d.lySeptember) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyOctober ? Number(d.lyOctober) : null))}::decimal[],
+              ${batchData.map(() => syncedAt)}::timestamp[],
+              ${batchData.map(() => syncedAt)}::timestamp[]
+            )
+            ON CONFLICT (source_db, site_code, customer_bill_to, item_no, school_year)
+            DO UPDATE SET
+              erp_status = EXCLUDED.erp_status,
+              last_year_bid_qty = EXCLUDED.last_year_bid_qty,
+              is_lost = EXCLUDED.is_lost,
+              last_year_actual = EXCLUDED.last_year_actual,
+              ly_august = EXCLUDED.ly_august,
+              ly_september = EXCLUDED.ly_september,
+              ly_october = EXCLUDED.ly_october,
+              synced_at = EXCLUDED.synced_at,
+              updated_at = EXCLUDED.updated_at
+            RETURNING xmax::text
+          `
         );
-      }
 
-      // Count inserted vs updated (approximate)
-      recordsInserted = currentYearBids.length + lostBids.length;
+        // Count inserts vs updates: xmax = 0 means INSERT, xmax > 0 means UPDATE
+        for (const row of results) {
+          if (row.xmax === "0") {
+            recordsInserted++;
+          } else {
+            recordsUpdated++;
+          }
+        }
+      }
 
       const durationMs = Date.now() - startTime;
 
