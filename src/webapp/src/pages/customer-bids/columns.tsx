@@ -407,7 +407,7 @@ export function createColumns(
       accessorKey: "augustDemand",
       header: () => (
         <div className="text-right text-muted-foreground font-medium">
-          Aug Demand
+          Aug Estimate
         </div>
       ),
       cell: ({ row }) => (
@@ -423,7 +423,7 @@ export function createColumns(
       accessorKey: "septemberDemand",
       header: () => (
         <div className="text-right text-muted-foreground font-medium">
-          Sep Demand
+          Sep Estimate
         </div>
       ),
       cell: ({ row }) => (
@@ -439,7 +439,7 @@ export function createColumns(
       accessorKey: "octoberDemand",
       header: () => (
         <div className="text-right text-muted-foreground font-medium">
-          Oct Demand
+          Oct Estimate
         </div>
       ),
       cell: ({ row }) => (

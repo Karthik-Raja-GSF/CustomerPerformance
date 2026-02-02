@@ -153,9 +153,9 @@ export const customerBidExportColumns: ExportColumn[] = [
   // User-editable fields (always included)
   { key: "confirmed", header: "Confirmed" },
   { key: "yearAround", header: "Year Around" },
-  { key: "augustDemand", header: "Aug Demand" },
-  { key: "septemberDemand", header: "Sep Demand" },
-  { key: "octoberDemand", header: "Oct Demand" },
+  { key: "augustDemand", header: "Aug Estimate" },
+  { key: "septemberDemand", header: "Sep Estimate" },
+  { key: "octoberDemand", header: "Oct Estimate" },
   // Menu months
   { key: "menuJan", header: "Menu Jan" },
   { key: "menuFeb", header: "Menu Feb" },

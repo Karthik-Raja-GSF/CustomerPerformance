@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Settings2, GraduationCap } from "lucide-react";
+import { Settings2, GraduationCap, TrendingUp } from "lucide-react";
 import { StarqIcon } from "@/components/icons/starq-icon";
 
 import { Branding } from "@/navigation/branding";
@@ -25,6 +25,17 @@ const data = {
       title: "Back to School",
       url: "/back-to-school",
       icon: GraduationCap,
+    },
+    {
+      title: "Demand Planning",
+      url: "/demand-planning/monthly-forecast",
+      icon: TrendingUp,
+      items: [
+        {
+          title: "Monthly Forecast",
+          url: "/demand-planning/monthly-forecast",
+        },
+      ],
     },
     {
       title: "Settings",

@@ -6,6 +6,7 @@ import Prompts from "@/pages/settings/Prompts";
 import StockiqSync from "@/pages/StockiqSync";
 import CustomerBidsSync from "@/pages/CustomerBidsSync";
 import CustomerBids from "@/pages/CustomerBids";
+import MonthlyForecast from "@/pages/MonthlyForecast";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import ForceChangePassword from "@/pages/ForceChangePassword";
@@ -16,6 +17,7 @@ export const routes = [
   { path: "/stockiq-sync", title: "StockIQ Sync" },
   { path: "/customer-bids-sync", title: "Customer Bids Sync" },
   { path: "/back-to-school", title: "Back to School" },
+  { path: "/demand-planning/monthly-forecast", title: "Monthly Forecast" },
   { path: "/settings", title: "Settings - Prompts" },
 ];
 
@@ -37,6 +39,10 @@ function App() {
           <Route path="/stockiq-sync" element={<StockiqSync />} />
           <Route path="/customer-bids-sync" element={<CustomerBidsSync />} />
           <Route path="/back-to-school" element={<CustomerBids />} />
+          <Route
+            path="/demand-planning/monthly-forecast"
+            element={<MonthlyForecast />}
+          />
           <Route path="/settings" element={<Settings />}>
             <Route index element={<Prompts />} />
           </Route>
