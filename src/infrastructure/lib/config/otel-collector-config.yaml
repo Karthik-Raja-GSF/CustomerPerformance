@@ -122,11 +122,12 @@ exporters:
     auth:
       authenticator: sigv4auth/logs
 
-  # Debug exporter for troubleshooting (standard OTEL Contrib naming)
-  debug:
-    verbosity: detailed
-    sampling_initial: 10
-    sampling_thereafter: 100
+  # Debug exporter removed for cost optimization - was generating excessive logs
+  # To re-enable for troubleshooting, uncomment:
+  # debug:
+  #   verbosity: detailed
+  #   sampling_initial: 10
+  #   sampling_thereafter: 100
 
 service:
   extensions:
@@ -169,4 +170,4 @@ service:
 
   telemetry:
     logs:
-      level: warn
+      level: error # Reduced from warn for cost optimization

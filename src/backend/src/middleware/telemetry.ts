@@ -68,14 +68,16 @@ export function telemetryMiddleware(
     "http.user_agent": req.headers["user-agent"] || "unknown",
   });
 
-  // Log incoming request
-  logger.info({
-    event: "request.start",
-    requestId,
-    method: req.method,
-    path: req.path,
-    userAgent: req.headers["user-agent"],
-  });
+  // Log incoming request (only in development to reduce log volume)
+  if (process.env.NODE_ENV === "development") {
+    logger.info({
+      event: "request.start",
+      requestId,
+      method: req.method,
+      path: req.path,
+      userAgent: req.headers["user-agent"],
+    });
+  }
 
   // Record metrics and log on response finish
   res.on("finish", () => {
@@ -83,20 +85,16 @@ export function telemetryMiddleware(
     const statusCode = res.statusCode;
     const isError = statusCode >= 400;
 
-    // Record request duration
+    // Record request duration (removed route/status_code to reduce metric cardinality)
     const httpRequestDuration = getHttpRequestDuration();
     httpRequestDuration.record(duration, {
       method: req.method,
-      route: req.route?.path || req.path,
-      status_code: String(statusCode),
     });
 
-    // Record request count
+    // Record request count (removed route/status_code to reduce metric cardinality)
     const httpRequestsTotal = getHttpRequestsTotal();
     httpRequestsTotal.add(1, {
       method: req.method,
-      route: req.route?.path || req.path,
-      status_code: String(statusCode),
     });
 
     // Record error count
@@ -104,24 +102,28 @@ export function telemetryMiddleware(
       const httpErrorsTotal = getHttpErrorsTotal();
       httpErrorsTotal.add(1, {
         method: req.method,
-        route: req.route?.path || req.path,
-        status_code: String(statusCode),
+        error_type: statusCode >= 500 ? "server_error" : "client_error",
       });
     }
 
     // Decrement active connections
     activeConnections.add(-1);
 
-    // Log response
-    const logMethod = isError ? "error" : "info";
-    logger[logMethod]({
-      event: "request.complete",
-      requestId,
-      method: req.method,
-      path: req.path,
-      statusCode,
-      duration,
-    });
+    // Log response (only errors in production to reduce log volume)
+    const shouldLogCompletion =
+      process.env.NODE_ENV === "development" || isError;
+
+    if (shouldLogCompletion) {
+      const logMethod = isError ? "error" : "info";
+      logger[logMethod]({
+        event: "request.complete",
+        requestId,
+        method: req.method,
+        path: req.path,
+        statusCode,
+        duration,
+      });
+    }
   });
 
   // Handle connection close before response

@@ -145,9 +145,31 @@ export class BackendConstruct extends Construct {
       })
     );
 
-    // CloudWatch Log Group
+    // CloudWatch Log Group for ECS container logs
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       logGroupName,
+      retention:
+        naming.env === "prd"
+          ? logs.RetentionDays.ONE_MONTH
+          : logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Pre-create OTEL metrics log group with retention
+    // This log group is used by awsemf exporter in otel-collector-config.yaml
+    const otelMetricsLogGroup = new logs.LogGroup(this, "OtelMetricsLogGroup", {
+      logGroupName: `/ait/${naming.env}/backend/metrics`,
+      retention:
+        naming.env === "prd"
+          ? logs.RetentionDays.ONE_MONTH
+          : logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Pre-create OTEL logs log group with retention
+    // This log group is used by otlphttp/cloudwatch-logs exporter
+    const otelLogsLogGroup = new logs.LogGroup(this, "OtelLogsLogGroup", {
+      logGroupName: `/ait/${naming.env}/backend/otel-logs`,
       retention:
         naming.env === "prd"
           ? logs.RetentionDays.ONE_MONTH
@@ -219,6 +241,8 @@ export class BackendConstruct extends Construct {
         AWS_REGION: cdk.Aws.REGION,
         ENVIRONMENT: naming.env,
         OTEL_SERVICE_NAME: otelServiceName,
+        // Reduce OTEL collector internal logging for cost optimization
+        OTEL_LOG_LEVEL: "warn",
       },
       secrets: {
         // Load config from SSM - passed directly to collector via --config=env:
@@ -565,6 +589,16 @@ export class BackendConstruct extends Construct {
     addStandardTags(serviceSecurityGroup, naming.env, ecsSgName);
     addStandardTags(targetGroup, naming.env, tgName);
     addStandardTags(logGroup, naming.env, logGroupName);
+    addStandardTags(
+      otelMetricsLogGroup,
+      naming.env,
+      `/ait/${naming.env}/backend/metrics`
+    );
+    addStandardTags(
+      otelLogsLogGroup,
+      naming.env,
+      `/ait/${naming.env}/backend/otel-logs`
+    );
     // Only tag certificate if it was created (not imported)
     if (!certificateArn) {
       addStandardTags(
