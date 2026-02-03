@@ -9,6 +9,7 @@ import type {
   CustomerBidDto,
   CustomerBidKey,
   CustomerBidFilters,
+  CustomerBidFilterOptions,
   CustomerBidListResponse,
   UpdateCustomerBidDto,
 } from "@/types/customer-bids";
@@ -37,6 +38,7 @@ export async function getCustomerBids(
   if (filters?.salesRep) params.set("salesRep", filters.salesRep);
   if (filters?.itemCode) params.set("itemCode", filters.itemCode);
   if (filters?.erpStatus) params.set("erpStatus", filters.erpStatus);
+  if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
 
   const queryString = params.toString();
   const url = `/customer-bids${queryString ? `?${queryString}` : ""}`;
@@ -78,6 +80,16 @@ export async function updateCustomerBid(
  * @param schoolYear - The school year string (e.g., "2026-2027")
  * @returns CustomerBidKey for API calls
  */
+/**
+ * Fetch distinct filter option values for autocomplete suggestions
+ */
+export async function getCustomerBidFilterOptions(): Promise<CustomerBidFilterOptions> {
+  const response = await apiClient.get<ApiResponse<CustomerBidFilterOptions>>(
+    "/customer-bids/filter-options"
+  );
+  return response.data;
+}
+
 export function buildBidKey(
   bid: CustomerBidDto,
   schoolYear: string

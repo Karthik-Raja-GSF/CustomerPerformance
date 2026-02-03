@@ -6,6 +6,7 @@ import {
   BulkUpdateCustomerBidDto,
   BulkUpdateResultDto,
   CustomerBidDto,
+  CustomerBidFilterOptionsDto,
   SyncResultDto,
   SyncLogDto,
   SchoolYear,
@@ -83,4 +84,11 @@ export interface ICustomerBidService {
    * @returns Promise resolving to array of sync log entries
    */
   getSyncHistory(limit?: number): Promise<SyncLogDto[]>;
+
+  /**
+   * Get distinct filter option values for autocomplete suggestions
+   *
+   * @returns Promise resolving to distinct values for each filterable field
+   */
+  getFilterOptions(): Promise<CustomerBidFilterOptionsDto>;
 }

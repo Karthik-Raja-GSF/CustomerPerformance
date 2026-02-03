@@ -35,6 +35,7 @@ const querySchema = z.object({
     .enum(["true", "false"])
     .transform((v) => v === "true")
     .optional(),
+  coOpCode: z.string().optional(),
   sourceDb: z.string().optional(),
   schoolYear: z.enum(["current", "previous", "next"]).default("next"),
 });
@@ -215,6 +216,31 @@ router.get(
       res.json({
         status: "success",
         ...result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * GET /customer-bids/filter-options
+ * Get distinct filter option values for autocomplete suggestions
+ */
+router.get(
+  "/filter-options",
+  authenticate,
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.getFilterOptions();
+
+      res.json({
+        status: "success",
+        data: result,
       });
     } catch (error) {
       handleCustomerBidError(error, res, next);

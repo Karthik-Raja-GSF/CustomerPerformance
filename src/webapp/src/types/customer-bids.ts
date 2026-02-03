@@ -141,8 +141,19 @@ export interface CustomerBidFilters {
   salesRep?: string;
   itemCode?: string;
   erpStatus?: string;
+  coOpCode?: string;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
+}
+
+/**
+ * Distinct filter option values for autocomplete suggestions
+ */
+export interface CustomerBidFilterOptions {
+  siteCodes: string[];
+  salesReps: string[];
+  erpStatuses: string[];
+  coOpCodes: string[];
 }
 
 /**

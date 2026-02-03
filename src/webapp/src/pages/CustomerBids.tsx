@@ -5,6 +5,7 @@ import { ChevronDown, Download, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Input } from "@/shadcn/components/input";
 import { Label } from "@/shadcn/components/label";
+import { FilterCombobox } from "@/components/filter-combobox";
 import { Badge } from "@/shadcn/components/badge";
 import {
   DropdownMenu,
@@ -23,12 +24,14 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/shadcn/components/tabs";
 import {
   getCustomerBids,
+  getCustomerBidFilterOptions,
   updateCustomerBid,
   buildBidKey,
 } from "@/apis/customer-bids";
 import type {
   CustomerBidDto,
   CustomerBidFilters,
+  CustomerBidFilterOptions,
   PaginationDto,
   SchoolYear,
   DateRangeDto,
@@ -96,6 +99,7 @@ function parseFiltersFromURL(
     salesRep: searchParams.get("salesRep") || undefined,
     itemCode: searchParams.get("itemCode") || undefined,
     erpStatus: searchParams.get("erpStatus") || undefined,
+    coOpCode: searchParams.get("coOpCode") || undefined,
   };
 }
 
@@ -118,6 +122,7 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.salesRep) params.set("salesRep", filters.salesRep);
   if (filters.itemCode) params.set("itemCode", filters.itemCode);
   if (filters.erpStatus) params.set("erpStatus", filters.erpStatus);
+  if (filters.coOpCode) params.set("coOpCode", filters.coOpCode);
 
   return params;
 }
@@ -156,6 +161,13 @@ export default function CustomerBids() {
   const [erpStatusInput, setErpStatusInput] = useState(
     () => searchParams.get("erpStatus") || ""
   );
+  const [coOpCodeInput, setCoOpCodeInput] = useState(
+    () => searchParams.get("coOpCode") || ""
+  );
+
+  // Filter options for datalist autocomplete
+  const [filterOptions, setFilterOptions] =
+    useState<CustomerBidFilterOptions | null>(null);
 
   // Column visibility state
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
@@ -193,6 +205,20 @@ export default function CustomerBids() {
     void fetchData(filters);
   }, [filters, fetchData]);
 
+  // Fetch filter options when filter sheet is opened
+  useEffect(() => {
+    if (!filterSheetOpen) return;
+    const fetchFilterOptions = async () => {
+      try {
+        const options = await getCustomerBidFilterOptions();
+        setFilterOptions(options);
+      } catch {
+        // Filter options are a nice-to-have; silently degrade
+      }
+    };
+    void fetchFilterOptions();
+  }, [filterSheetOpen]);
+
   // Sync filters to URL (skip on initial mount to avoid double navigation)
   useEffect(() => {
     if (isInitialMount.current) {
@@ -215,6 +241,7 @@ export default function CustomerBids() {
       salesRep: filters.salesRep || undefined,
       itemCode: filters.itemCode || undefined,
       erpStatus: filters.erpStatus || undefined,
+      coOpCode: filters.coOpCode || undefined,
     });
     const urlFiltersStr = JSON.stringify(urlFilters);
 
@@ -227,6 +254,7 @@ export default function CustomerBids() {
       setSalesRepInput(urlFilters.salesRep || "");
       setItemCodeInput(urlFilters.itemCode || "");
       setErpStatusInput(urlFilters.erpStatus || "");
+      setCoOpCodeInput(urlFilters.coOpCode || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Intentionally not including filters to avoid loop
@@ -242,6 +270,7 @@ export default function CustomerBids() {
       salesRep: salesRepInput || undefined,
       itemCode: itemCodeInput || undefined,
       erpStatus: erpStatusInput || undefined,
+      coOpCode: coOpCodeInput || undefined,
     };
     setFilters(newFilters);
     setFilterSheetOpen(false);
@@ -254,6 +283,7 @@ export default function CustomerBids() {
     setSalesRepInput("");
     setItemCodeInput("");
     setErpStatusInput("");
+    setCoOpCodeInput("");
     setFilters((prev) => ({
       page: 1,
       limit: prev.limit,
@@ -275,7 +305,8 @@ export default function CustomerBids() {
       customerNameInput ||
       salesRepInput ||
       itemCodeInput ||
-      erpStatusInput
+      erpStatusInput ||
+      coOpCodeInput
   );
 
   const activeFilterCount = [
@@ -285,6 +316,7 @@ export default function CustomerBids() {
     salesRepInput,
     itemCodeInput,
     erpStatusInput,
+    coOpCodeInput,
   ].filter(Boolean).length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -421,19 +453,27 @@ export default function CustomerBids() {
             </SheetHeader>
             <div className="space-y-6">
               <div className="space-y-3">
-                <Label
-                  htmlFor="siteCode"
-                  className="text-sm font-medium text-foreground"
-                >
+                <Label className="text-sm font-medium text-foreground">
                   Site Code
                 </Label>
-                <Input
-                  id="siteCode"
-                  placeholder="e.g. ATL, DFW, CHI"
+                <FilterCombobox
+                  options={filterOptions?.siteCodes ?? []}
                   value={siteCodeInput}
-                  onChange={(e) => setSiteCodeInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-11"
+                  onValueChange={setSiteCodeInput}
+                  placeholder="e.g. ATL, DFW, CHI"
+                  label="Site Code"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-foreground">
+                  Co-Op Code
+                </Label>
+                <FilterCombobox
+                  options={filterOptions?.coOpCodes ?? []}
+                  value={coOpCodeInput}
+                  onValueChange={setCoOpCodeInput}
+                  placeholder="e.g. COOP001"
+                  label="Co-Op Code"
                 />
               </div>
               <div className="space-y-3">
@@ -469,19 +509,15 @@ export default function CustomerBids() {
                 />
               </div>
               <div className="space-y-3">
-                <Label
-                  htmlFor="salesRep"
-                  className="text-sm font-medium text-foreground"
-                >
+                <Label className="text-sm font-medium text-foreground">
                   Sales Representative
                 </Label>
-                <Input
-                  id="salesRep"
-                  placeholder="e.g. John Smith"
+                <FilterCombobox
+                  options={filterOptions?.salesReps ?? []}
                   value={salesRepInput}
-                  onChange={(e) => setSalesRepInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-11"
+                  onValueChange={setSalesRepInput}
+                  placeholder="e.g. JSMITH"
+                  label="Sales Representative"
                 />
               </div>
               <div className="space-y-3">
@@ -501,19 +537,15 @@ export default function CustomerBids() {
                 />
               </div>
               <div className="space-y-3">
-                <Label
-                  htmlFor="erpStatus"
-                  className="text-sm font-medium text-foreground"
-                >
+                <Label className="text-sm font-medium text-foreground">
                   ERP Status
                 </Label>
-                <Input
-                  id="erpStatus"
-                  placeholder="e.g. Active, Blocked"
+                <FilterCombobox
+                  options={filterOptions?.erpStatuses ?? []}
                   value={erpStatusInput}
-                  onChange={(e) => setErpStatusInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-11"
+                  onValueChange={setErpStatusInput}
+                  placeholder="e.g. Active, Blocked"
+                  label="ERP Status"
                 />
               </div>
             </div>

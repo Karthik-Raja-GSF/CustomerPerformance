@@ -117,11 +117,22 @@ export interface CustomerBidQueryDto {
   salesRep?: string;
   itemCode?: string;
   erpStatus?: string;
+  coOpCode?: string;
   sourceDb?: string;
   isLost?: boolean;
   confirmed?: boolean;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
+}
+
+/**
+ * Distinct filter option values for autocomplete suggestions
+ */
+export interface CustomerBidFilterOptionsDto {
+  siteCodes: string[];
+  salesReps: string[];
+  erpStatuses: string[];
+  coOpCodes: string[];
 }
 
 // ============================================

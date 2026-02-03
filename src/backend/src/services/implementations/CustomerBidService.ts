@@ -9,6 +9,7 @@ import {
   UpdateCustomerBidDto,
   BulkUpdateCustomerBidDto,
   BulkUpdateResultDto,
+  CustomerBidFilterOptionsDto,
   SyncResultDto,
   SyncLogDto,
   SchoolYear,
@@ -152,6 +153,10 @@ export class CustomerBidService implements ICustomerBidService {
 
       if (query.sourceDb) {
         whereConditions.push(Prisma.sql`sp.source_db = ${query.sourceDb}`);
+      }
+
+      if (query.coOpCode) {
+        whereConditions.push(Prisma.sql`c.co_op_code = ${query.coOpCode}`);
       }
 
       const additionalWhere =
@@ -1146,6 +1151,51 @@ export class CustomerBidService implements ICustomerBidService {
     });
 
     return logs.map((log) => this.toSyncLogDto(log));
+  }
+
+  /**
+   * Get distinct filter option values for autocomplete suggestions.
+   * Queries all distinct values globally (not scoped by school year).
+   */
+  async getFilterOptions(): Promise<CustomerBidFilterOptionsDto> {
+    try {
+      const rows = await this.prisma.$queryRaw<
+        { field: string; value: string }[]
+      >(Prisma.sql`
+        SELECT 'siteCode' AS "field", location_code AS "value"
+        FROM (SELECT DISTINCT location_code FROM dw2_nav.customer WHERE location_code IS NOT NULL AND location_code != '' ORDER BY 1) t
+        UNION ALL
+        SELECT 'salesRep', salesperson_code
+        FROM (SELECT DISTINCT salesperson_code FROM dw2_nav.customer WHERE salesperson_code IS NOT NULL AND salesperson_code != '' ORDER BY 1) t
+        UNION ALL
+        SELECT 'erpStatus', erp_status
+        FROM (SELECT DISTINCT erp_status FROM ait.customer_bid_data WHERE erp_status IS NOT NULL AND erp_status != '' ORDER BY 1) t
+        UNION ALL
+        SELECT 'coOpCode', co_op_code
+        FROM (SELECT DISTINCT co_op_code FROM dw2_nav.customer WHERE co_op_code IS NOT NULL AND co_op_code != '' ORDER BY 1) t
+      `);
+
+      const grouped: Record<string, string[]> = {};
+      for (const row of rows) {
+        (grouped[row.field] ??= []).push(row.value);
+      }
+
+      return {
+        siteCodes: grouped["siteCode"] ?? [],
+        salesReps: grouped["salesRep"] ?? [],
+        erpStatuses: grouped["erpStatus"] ?? [],
+        coOpCodes: grouped["coOpCode"] ?? [],
+      };
+    } catch (error) {
+      logger.error(
+        { event: "customer-bid.filter-options.error", error },
+        "Failed to fetch filter options"
+      );
+      throw new CustomerBidDatabaseError(
+        "Failed to fetch filter options from database",
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 
   /**
