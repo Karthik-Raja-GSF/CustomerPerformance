@@ -1071,11 +1071,21 @@ model CustomerBidData {
   erpStatus      String?   @map("erp_status")
 
   // User-editable fields
-  confirmed       Boolean  @default(false)
   yearAround      Boolean  @default(false) @map("year_around")
-  augustDemand    Decimal? @map("august_demand")
-  septemberDemand Decimal? @map("september_demand")
-  octoberDemand   Decimal? @map("october_demand")
+
+  // Monthly estimates - nullable decimal for each month
+  estimateJan Decimal? @map("estimate_jan")
+  estimateFeb Decimal? @map("estimate_feb")
+  estimateMar Decimal? @map("estimate_mar")
+  estimateApr Decimal? @map("estimate_apr")
+  estimateMay Decimal? @map("estimate_may")
+  estimateJun Decimal? @map("estimate_jun")
+  estimateJul Decimal? @map("estimate_jul")
+  estimateAug Decimal? @map("estimate_aug")
+  estimateSep Decimal? @map("estimate_sep")
+  estimateOct Decimal? @map("estimate_oct")
+  estimateNov Decimal? @map("estimate_nov")
+  estimateDec Decimal? @map("estimate_dec")
 
   // Menu months - which months the item is on the menu (when not year-around)
   menuJan         Boolean? @default(false) @map("jan")
@@ -1091,7 +1101,7 @@ model CustomerBidData {
   menuNov         Boolean? @default(false) @map("nov")
   menuDec         Boolean? @default(false) @map("dec")
 
-  // Audit fields
+  // Confirmation fields (confirmed_at IS NOT NULL = confirmed)
   confirmedBy String?   @map("confirmed_by")
   confirmedAt DateTime? @map("confirmed_at")
   syncedAt    DateTime? @map("synced_at")
@@ -1100,7 +1110,7 @@ model CustomerBidData {
 
   @@id([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
   @@index([schoolYear])
-  @@index([confirmed])
+  @@index([confirmedAt])
   @@index([isLost])
   @@map("customer_bid_data")
   @@schema("ait")

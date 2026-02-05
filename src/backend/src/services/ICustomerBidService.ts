@@ -37,26 +37,40 @@ export interface ICustomerBidService {
    *
    * @param key - Composite key identifying the record
    * @param data - User-editable fields to update
-   * @param userId - ID of user making the update (for audit)
    * @returns Promise resolving to updated customer bid DTO
    */
   updateBid(
     key: CustomerBidKeyDto,
-    data: UpdateCustomerBidDto,
-    userId: string
+    data: UpdateCustomerBidDto
   ): Promise<CustomerBidDto>;
 
   /**
    * Bulk update user-editable fields on multiple customer bid records
    *
    * @param data - Bulk update payload with records to update
-   * @param userId - ID of user making the update (for audit)
    * @returns Promise resolving to bulk update result
    */
-  bulkUpdateBids(
-    data: BulkUpdateCustomerBidDto,
-    userId: string
-  ): Promise<BulkUpdateResultDto>;
+  bulkUpdateBids(data: BulkUpdateCustomerBidDto): Promise<BulkUpdateResultDto>;
+
+  /**
+   * Confirm a customer bid record
+   *
+   * @param key - Composite key identifying the record
+   * @param userEmail - Email of user confirming (from JWT)
+   * @returns Promise resolving to updated customer bid DTO
+   */
+  confirmBid(
+    key: CustomerBidKeyDto,
+    userEmail: string
+  ): Promise<CustomerBidDto>;
+
+  /**
+   * Unconfirm a customer bid record
+   *
+   * @param key - Composite key identifying the record
+   * @returns Promise resolving to updated customer bid DTO
+   */
+  unconfirmBid(key: CustomerBidKeyDto): Promise<CustomerBidDto>;
 
   /**
    * Trigger a sync operation to populate/refresh calculated fields

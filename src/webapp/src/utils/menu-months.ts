@@ -21,6 +21,35 @@ export const MENU_MONTHS = [
 export type MonthKey = (typeof MENU_MONTHS)[number]["key"];
 
 /**
+ * Estimate months mapping - links menu month keys to estimate field keys
+ */
+export const ESTIMATE_MONTHS = [
+  { menuKey: "menuJan", estimateKey: "estimateJan", label: "Jan" },
+  { menuKey: "menuFeb", estimateKey: "estimateFeb", label: "Feb" },
+  { menuKey: "menuMar", estimateKey: "estimateMar", label: "Mar" },
+  { menuKey: "menuApr", estimateKey: "estimateApr", label: "Apr" },
+  { menuKey: "menuMay", estimateKey: "estimateMay", label: "May" },
+  { menuKey: "menuJun", estimateKey: "estimateJun", label: "Jun" },
+  { menuKey: "menuJul", estimateKey: "estimateJul", label: "Jul" },
+  { menuKey: "menuAug", estimateKey: "estimateAug", label: "Aug" },
+  { menuKey: "menuSep", estimateKey: "estimateSep", label: "Sep" },
+  { menuKey: "menuOct", estimateKey: "estimateOct", label: "Oct" },
+  { menuKey: "menuNov", estimateKey: "estimateNov", label: "Nov" },
+  { menuKey: "menuDec", estimateKey: "estimateDec", label: "Dec" },
+] as const;
+
+export type EstimateKey = (typeof ESTIMATE_MONTHS)[number]["estimateKey"];
+
+/**
+ * Default months to show for Year Around items: Aug, Oct, Dec
+ */
+export const YEAR_AROUND_ESTIMATE_MONTHS = [
+  "menuAug",
+  "menuSep",
+  "menuOct",
+] as const;
+
+/**
  * Extract month values from a data object containing month boolean fields
  */
 export function getMonthValues(

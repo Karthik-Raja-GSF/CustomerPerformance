@@ -39,6 +39,8 @@ export async function getCustomerBids(
   if (filters?.itemCode) params.set("itemCode", filters.itemCode);
   if (filters?.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
+  if (filters?.confirmed !== undefined)
+    params.set("confirmed", filters.confirmed.toString());
 
   const queryString = params.toString();
   const url = `/customer-bids${queryString ? `?${queryString}` : ""}`;
@@ -53,22 +55,47 @@ export async function getCustomerBids(
 }
 
 /**
+ * Build the REST path for a customer bid record
+ */
+function buildBidPath(key: CustomerBidKey): string {
+  const { sourceDb, siteCode, customerBillTo, itemNo, schoolYear } = key;
+  return `/customer-bids/${encodeURIComponent(sourceDb)}/${encodeURIComponent(siteCode)}/${encodeURIComponent(customerBillTo)}/${encodeURIComponent(itemNo)}/${encodeURIComponent(schoolYear)}`;
+}
+
+/**
  * Update a customer bid record's user-editable fields
- *
- * @param key - Composite key identifying the record
- * @param updates - Fields to update (confirmed, augustDemand, septemberDemand, octoberDemand)
- * @returns Updated CustomerBidDto
  */
 export async function updateCustomerBid(
   key: CustomerBidKey,
   updates: UpdateCustomerBidDto
 ): Promise<CustomerBidDto> {
-  const { sourceDb, siteCode, customerBillTo, itemNo, schoolYear } = key;
-  const path = `/customer-bids/${encodeURIComponent(sourceDb)}/${encodeURIComponent(siteCode)}/${encodeURIComponent(customerBillTo)}/${encodeURIComponent(itemNo)}/${encodeURIComponent(schoolYear)}`;
-
   const response = await apiClient.patch<ApiResponse<CustomerBidDto>>(
-    path,
+    buildBidPath(key),
     updates
+  );
+  return response.data;
+}
+
+/**
+ * Confirm a customer bid record (sets confirmed_at and confirmed_by)
+ */
+export async function confirmCustomerBid(
+  key: CustomerBidKey
+): Promise<CustomerBidDto> {
+  const response = await apiClient.post<ApiResponse<CustomerBidDto>>(
+    `${buildBidPath(key)}/confirm`
+  );
+  return response.data;
+}
+
+/**
+ * Unconfirm a customer bid record (clears confirmed_at and confirmed_by)
+ */
+export async function unconfirmCustomerBid(
+  key: CustomerBidKey
+): Promise<CustomerBidDto> {
+  const response = await apiClient.post<ApiResponse<CustomerBidDto>>(
+    `${buildBidPath(key)}/unconfirm`
   );
   return response.data;
 }

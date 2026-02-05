@@ -1,9 +1,31 @@
-import type React from "react";
+import { useState, type ReactNode } from "react";
 import { type Column, type ColumnDef } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  CircleCheck,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Badge } from "@/shadcn/components/badge";
 import { cn } from "@/shadcn/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/shadcn/components/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/shadcn/components/tooltip";
 import type {
   CustomerBidDto,
   UpdateCustomerBidDto,
@@ -11,6 +33,33 @@ import type {
 import { EditableNumberCell } from "@/components/editable-cells/EditableNumberCell";
 import { EditableCheckboxCell } from "@/components/editable-cells/EditableCheckboxCell";
 import { EditableMonthsCell } from "@/components/editable-cells/EditableMonthsCell";
+import {
+  ESTIMATE_MONTHS,
+  YEAR_AROUND_ESTIMATE_MONTHS,
+} from "@/utils/menu-months";
+
+/** Conversion rate color thresholds (%). Green if within range, red otherwise. */
+const CONVERSION_RATE_THRESHOLDS = { min: 70, max: 100 } as const;
+
+/**
+ * Get visible estimate months based on yearAround and menuMonths selection
+ * - If yearAround=true: show Aug, Sep, Oct
+ * - If yearAround=false: show months selected in menuMonths
+ */
+function getVisibleEstimateMonths(
+  data: CustomerBidDto
+): (typeof ESTIMATE_MONTHS)[number][] {
+  if (data.yearAround) {
+    // Year Around = true: show Aug, Sep, Oct
+    return ESTIMATE_MONTHS.filter((m) =>
+      YEAR_AROUND_ESTIMATE_MONTHS.includes(
+        m.menuKey as (typeof YEAR_AROUND_ESTIMATE_MONTHS)[number]
+      )
+    );
+  }
+  // Year Around = false: show selected menu months
+  return ESTIMATE_MONTHS.filter((m) => data[m.menuKey] === true);
+}
 
 interface SortableHeaderProps<TData, TValue> {
   column: Column<TData, TValue>;
@@ -52,6 +101,132 @@ function formatNumber(value: number | null | undefined): React.ReactNode {
   return value.toLocaleString();
 }
 
+function ConfirmCell({
+  bid,
+  onConfirm,
+  onUnconfirm,
+  canUnconfirm = true,
+}: {
+  bid: CustomerBidDto;
+  onConfirm: (bid: CustomerBidDto) => Promise<void>;
+  onUnconfirm: (bid: CustomerBidDto) => Promise<void>;
+  canUnconfirm?: boolean;
+}): ReactNode {
+  const [isLoading, setIsLoading] = useState(false);
+  const isConfirmed = !!bid.confirmedAt;
+
+  const handleAction = async (action: () => Promise<void>) => {
+    setIsLoading(true);
+    try {
+      await action();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isConfirmed && canUnconfirm) {
+    return (
+      <AlertDialog>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-green-600 cursor-pointer hover:opacity-80"
+              >
+                <CircleCheck className="h-4 w-4" />
+                <span className="text-xs truncate max-w-[100px]">
+                  {bid.confirmedBy}
+                </span>
+              </button>
+            </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Confirmed by {bid.confirmedBy}</p>
+            <p className="text-muted-foreground">
+              {bid.confirmedAt
+                ? new Date(bid.confirmedAt).toLocaleString()
+                : ""}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unconfirm this bid?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the confirmation from this bid record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleAction(() => onUnconfirm(bid))}
+            >
+              Unconfirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  if (isConfirmed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1.5 text-green-600">
+            <CircleCheck className="h-4 w-4" />
+            <span className="text-xs truncate max-w-[100px]">
+              {bid.confirmedBy}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Confirmed by {bid.confirmedBy}</p>
+          <p className="text-muted-foreground">
+            {bid.confirmedAt ? new Date(bid.confirmedAt).toLocaleString() : ""}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          Confirm
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm this bid?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will mark the bid as confirmed with your email and the current
+            timestamp.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => void handleAction(() => onConfirm(bid))}
+          >
+            Confirm
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export type OnCellUpdateFn = (
   bid: CustomerBidDto,
   updates: UpdateCustomerBidDto
@@ -59,12 +234,15 @@ export type OnCellUpdateFn = (
 
 export interface ColumnsConfig {
   onCellUpdate: OnCellUpdateFn;
+  onConfirm: (bid: CustomerBidDto) => Promise<void>;
+  onUnconfirm: (bid: CustomerBidDto) => Promise<void>;
+  canUnconfirm?: boolean;
 }
 
 export function createColumns(
   config: ColumnsConfig
 ): ColumnDef<CustomerBidDto>[] {
-  const { onCellUpdate } = config;
+  const { onCellUpdate, onConfirm, onUnconfirm, canUnconfirm = true } = config;
 
   return [
     // Source DB - hidden by default
@@ -273,8 +451,16 @@ export function createColumns(
         }
 
         const rate = (lyActual / lyBidQty) * 100;
+        const isHealthy =
+          rate >= CONVERSION_RATE_THRESHOLDS.min &&
+          rate <= CONVERSION_RATE_THRESHOLDS.max;
         return (
-          <div className="text-right font-medium tabular-nums">
+          <div
+            className={cn(
+              "text-right font-medium tabular-nums",
+              isHealthy ? "text-green-600" : "text-red-600"
+            )}
+          >
             {rate.toFixed(1)}%
           </div>
         );
@@ -332,23 +518,15 @@ export function createColumns(
           value={row.original.yearAround}
           onSave={async (value) => {
             if (value) {
-              // When setting yearAround, also confirm and copy LY values
+              // Year Around checked: populate Aug, Sep, Oct with last year's values
               await onCellUpdate(row.original, {
-                yearAround: value,
-                confirmed: true,
-                augustDemand: row.original.lyAugust ?? 0,
-                septemberDemand: row.original.lySeptember ?? 0,
-                octoberDemand: row.original.lyOctober ?? 0,
+                yearAround: true,
+                estimateAug: row.original.lyAugust,
+                estimateSep: row.original.lySeptember,
+                estimateOct: row.original.lyOctober,
               });
             } else {
-              // When unchecking yearAround, also unconfirm and clear demand values
-              await onCellUpdate(row.original, {
-                yearAround: value,
-                confirmed: false,
-                augustDemand: null,
-                septemberDemand: null,
-                octoberDemand: null,
-              });
+              await onCellUpdate(row.original, { yearAround: false });
             }
           }}
         />
@@ -371,83 +549,61 @@ export function createColumns(
         />
       ),
     },
+    // Dynamic Estimates column - shows based on yearAround and menuMonths
     {
-      accessorKey: "confirmed",
+      id: "estimates",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          Estimates
+        </div>
+      ),
+      cell: ({ row }) => {
+        const visibleMonths = getVisibleEstimateMonths(row.original);
+
+        if (visibleMonths.length === 0) {
+          return <div className="text-center text-muted-foreground">-</div>;
+        }
+
+        return (
+          <div className="flex gap-2 justify-center">
+            {visibleMonths.map((month) => {
+              const estimateKey = month.estimateKey;
+              return (
+                <div
+                  key={month.menuKey}
+                  className="flex flex-col items-center min-w-[60px]"
+                >
+                  <span className="text-xs text-muted-foreground mb-1">
+                    {month.label}
+                  </span>
+                  <EditableNumberCell
+                    value={row.original[estimateKey]}
+                    onSave={async (value) => {
+                      await onCellUpdate(row.original, {
+                        [estimateKey]: value,
+                      });
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        );
+      },
+    },
+    {
+      id: "confirmed",
       header: () => (
         <div className="text-center text-muted-foreground font-medium">
           Confirmed
         </div>
       ),
       cell: ({ row }) => (
-        <EditableCheckboxCell
-          value={row.original.confirmed}
-          onSave={async (value) => {
-            if (value) {
-              // When confirming, copy LY values to demand fields
-              await onCellUpdate(row.original, {
-                confirmed: value,
-                augustDemand: row.original.lyAugust ?? 0,
-                septemberDemand: row.original.lySeptember ?? 0,
-                octoberDemand: row.original.lyOctober ?? 0,
-              });
-            } else {
-              // When unconfirming, clear demand values
-              await onCellUpdate(row.original, {
-                confirmed: value,
-                augustDemand: null,
-                septemberDemand: null,
-                octoberDemand: null,
-              });
-            }
-          }}
-        />
-      ),
-    },
-    {
-      accessorKey: "augustDemand",
-      header: () => (
-        <div className="text-right text-muted-foreground font-medium">
-          Aug Estimate
-        </div>
-      ),
-      cell: ({ row }) => (
-        <EditableNumberCell
-          value={row.original.augustDemand}
-          onSave={async (value) => {
-            await onCellUpdate(row.original, { augustDemand: value });
-          }}
-        />
-      ),
-    },
-    {
-      accessorKey: "septemberDemand",
-      header: () => (
-        <div className="text-right text-muted-foreground font-medium">
-          Sep Estimate
-        </div>
-      ),
-      cell: ({ row }) => (
-        <EditableNumberCell
-          value={row.original.septemberDemand}
-          onSave={async (value) => {
-            await onCellUpdate(row.original, { septemberDemand: value });
-          }}
-        />
-      ),
-    },
-    {
-      accessorKey: "octoberDemand",
-      header: () => (
-        <div className="text-right text-muted-foreground font-medium">
-          Oct Estimate
-        </div>
-      ),
-      cell: ({ row }) => (
-        <EditableNumberCell
-          value={row.original.octoberDemand}
-          onSave={async (value) => {
-            await onCellUpdate(row.original, { octoberDemand: value });
-          }}
+        <ConfirmCell
+          bid={row.original}
+          onConfirm={onConfirm}
+          onUnconfirm={onUnconfirm}
+          canUnconfirm={canUnconfirm}
         />
       ),
     },
@@ -458,5 +614,11 @@ export function createColumns(
 export const columns: ColumnDef<CustomerBidDto>[] = createColumns({
   onCellUpdate: async () => {
     console.warn("Cell update not configured");
+  },
+  onConfirm: async () => {
+    console.warn("Confirm not configured");
+  },
+  onUnconfirm: async () => {
+    console.warn("Unconfirm not configured");
   },
 });

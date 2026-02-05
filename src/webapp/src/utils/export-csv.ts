@@ -58,17 +58,35 @@ export function exportToCSV<T extends object>(
 }
 
 /**
+ * Monthly estimate configuration for SIQ export
+ */
+const SIQ_ESTIMATE_MONTHS = [
+  { key: "estimateJan" as const, month: 1, label: "01" },
+  { key: "estimateFeb" as const, month: 2, label: "02" },
+  { key: "estimateMar" as const, month: 3, label: "03" },
+  { key: "estimateApr" as const, month: 4, label: "04" },
+  { key: "estimateMay" as const, month: 5, label: "05" },
+  { key: "estimateJun" as const, month: 6, label: "06" },
+  { key: "estimateJul" as const, month: 7, label: "07" },
+  { key: "estimateAug" as const, month: 8, label: "08" },
+  { key: "estimateSep" as const, month: 9, label: "09" },
+  { key: "estimateOct" as const, month: 10, label: "10" },
+  { key: "estimateNov" as const, month: 11, label: "11" },
+  { key: "estimateDec" as const, month: 12, label: "12" },
+];
+
+/**
  * Export customer bids to SIQ CSV format
  *
- * Transforms each bid record into up to 3 rows (one per demand month).
- * Only includes rows where the demand quantity is greater than 0.
+ * Transforms each bid record into up to 12 rows (one per estimate month).
+ * Only includes rows where the estimate quantity is greater than 0.
  *
  * SIQ Format:
  * - Item Code: itemCode
  * - Site Code: siteCode
  * - Customer Ship To Code: customerBillTo
- * - Demand Date: MM/DD/YYYY (1st of Aug/Sep/Oct next year)
- * - Quantity: augustDemand/septemberDemand/octoberDemand
+ * - Demand Date: MM/01/YYYY (1st of each month)
+ * - Quantity: estimate value
  * - Note: customerName
  */
 export function exportToSIQCSV(data: CustomerBidDto[], filename: string): void {
@@ -83,31 +101,16 @@ export function exportToSIQCSV(data: CustomerBidDto[], filename: string): void {
       Note: row.customerName || "",
     };
 
-    // August demand
-    if (row.augustDemand != null && row.augustDemand > 0) {
-      siqRows.push({
-        ...baseRow,
-        "Demand Date": `08/01/${nextYear}`,
-        Quantity: row.augustDemand,
-      });
-    }
-
-    // September demand
-    if (row.septemberDemand != null && row.septemberDemand > 0) {
-      siqRows.push({
-        ...baseRow,
-        "Demand Date": `09/01/${nextYear}`,
-        Quantity: row.septemberDemand,
-      });
-    }
-
-    // October demand
-    if (row.octoberDemand != null && row.octoberDemand > 0) {
-      siqRows.push({
-        ...baseRow,
-        "Demand Date": `10/01/${nextYear}`,
-        Quantity: row.octoberDemand,
-      });
+    // Iterate through all 12 estimate months
+    for (const monthConfig of SIQ_ESTIMATE_MONTHS) {
+      const estimateValue = row[monthConfig.key];
+      if (estimateValue != null && estimateValue > 0) {
+        siqRows.push({
+          ...baseRow,
+          "Demand Date": `${monthConfig.label}/01/${nextYear}`,
+          Quantity: estimateValue,
+        });
+      }
     }
   }
 
@@ -151,11 +154,22 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "lySeptember", header: "LY September" },
   { key: "lyOctober", header: "LY October" },
   // User-editable fields (always included)
-  { key: "confirmed", header: "Confirmed" },
+  { key: "confirmedAt", header: "Confirmed At" },
+  { key: "confirmedBy", header: "Confirmed By" },
   { key: "yearAround", header: "Year Around" },
-  { key: "augustDemand", header: "Aug Estimate" },
-  { key: "septemberDemand", header: "Sep Estimate" },
-  { key: "octoberDemand", header: "Oct Estimate" },
+  // Monthly estimates
+  { key: "estimateJan", header: "Jan Estimate" },
+  { key: "estimateFeb", header: "Feb Estimate" },
+  { key: "estimateMar", header: "Mar Estimate" },
+  { key: "estimateApr", header: "Apr Estimate" },
+  { key: "estimateMay", header: "May Estimate" },
+  { key: "estimateJun", header: "Jun Estimate" },
+  { key: "estimateJul", header: "Jul Estimate" },
+  { key: "estimateAug", header: "Aug Estimate" },
+  { key: "estimateSep", header: "Sep Estimate" },
+  { key: "estimateOct", header: "Oct Estimate" },
+  { key: "estimateNov", header: "Nov Estimate" },
+  { key: "estimateDec", header: "Dec Estimate" },
   // Menu months
   { key: "menuJan", header: "Menu Jan" },
   { key: "menuFeb", header: "Menu Feb" },

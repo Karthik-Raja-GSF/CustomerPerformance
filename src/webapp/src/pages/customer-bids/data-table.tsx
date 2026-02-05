@@ -13,8 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
+  FileSearch,
   RefreshCw,
-  SearchX,
 } from "lucide-react";
 
 import { Button } from "@/shadcn/components/button";
@@ -213,24 +213,22 @@ export function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-48 text-center"
+                  className="h-64 text-center"
                 >
-                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                    <SearchX className="h-10 w-10" />
-                    <div className="space-y-1">
-                      <p className="font-medium">No results found</p>
-                      <p className="text-sm">
+                  <div className="flex flex-col items-center gap-4 py-8">
+                    <div className="rounded-full bg-muted p-4">
+                      <FileSearch className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-2 text-center">
+                      <p className="text-lg font-medium">No results found</p>
+                      <p className="text-sm text-muted-foreground max-w-sm">
                         {hasFilters
                           ? "Try adjusting your filters to find what you're looking for."
                           : "No data available at this time."}
                       </p>
                     </div>
                     {hasFilters && onClearFilters && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onClearFilters}
-                      >
+                      <Button variant="outline" onClick={onClearFilters}>
                         Clear filters
                       </Button>
                     )}

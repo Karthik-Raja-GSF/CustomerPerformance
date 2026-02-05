@@ -6,40 +6,18 @@ import {
   TokenExpiredError,
   InvalidTokenError,
 } from "@/utils/errors/auth-errors";
-import { config } from "@/config/index";
 
 /**
  * Authentication Middleware
  *
  * Extracts and verifies JWT token from Authorization header.
  * Attaches decoded user payload to request object.
- *
- * In development mode with SKIP_AUTH=true, authentication is bypassed.
  */
 export async function authenticate(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  // Development bypass - skip auth when SKIP_AUTH env var is set
-  if (config.nodeEnv === "development" && process.env.SKIP_AUTH === "true") {
-    req.user = {
-      userId: "dev-user",
-      email: "dev@example.com",
-      firstName: "Dev",
-      lastName: "User",
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      isFederated: false,
-      federatedProvider: undefined,
-      federatedProviderType: undefined,
-      idpEmail: undefined,
-      cognitoUsername: undefined,
-    };
-    next();
-    return;
-  }
-
   try {
     const authHeader = req.headers.authorization;
 

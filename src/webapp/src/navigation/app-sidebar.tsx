@@ -35,6 +35,10 @@ const data = {
           title: "Monthly Forecast",
           url: "/demand-planning/monthly-forecast",
         },
+        {
+          title: "Confirmed Bid Items",
+          url: "/demand-planning/confirmed-bid-items",
+        },
       ],
     },
     {

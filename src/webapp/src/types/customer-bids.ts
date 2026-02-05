@@ -57,17 +57,29 @@ export interface CustomerBidDto {
   /** True if item was in previous year but NOT in current year */
   isLost: boolean;
 
+  // Confirmation fields
+  /** ISO8601 UTC timestamp when confirmed, or null if unconfirmed */
+  confirmedAt: string | null;
+  /** Email of user who confirmed, or null if unconfirmed */
+  confirmedBy: string | null;
+
   // User-editable fields
-  /** User confirmation flag */
-  confirmed: boolean;
   /** Year-around item flag */
   yearAround: boolean;
-  /** User's August demand forecast */
-  augustDemand: number | null;
-  /** User's September demand forecast */
-  septemberDemand: number | null;
-  /** User's October demand forecast */
-  octoberDemand: number | null;
+
+  // Monthly estimates (nullable decimal)
+  estimateJan: number | null;
+  estimateFeb: number | null;
+  estimateMar: number | null;
+  estimateApr: number | null;
+  estimateMay: number | null;
+  estimateJun: number | null;
+  estimateJul: number | null;
+  estimateAug: number | null;
+  estimateSep: number | null;
+  estimateOct: number | null;
+  estimateNov: number | null;
+  estimateDec: number | null;
 
   // Menu months - which months the item is on the menu (when not year-around)
   menuJan: boolean | null;
@@ -88,11 +100,20 @@ export interface CustomerBidDto {
  * Update payload for customer bid user-editable fields
  */
 export interface UpdateCustomerBidDto {
-  confirmed?: boolean;
   yearAround?: boolean;
-  augustDemand?: number | null;
-  septemberDemand?: number | null;
-  octoberDemand?: number | null;
+  // Monthly estimates
+  estimateJan?: number | null;
+  estimateFeb?: number | null;
+  estimateMar?: number | null;
+  estimateApr?: number | null;
+  estimateMay?: number | null;
+  estimateJun?: number | null;
+  estimateJul?: number | null;
+  estimateAug?: number | null;
+  estimateSep?: number | null;
+  estimateOct?: number | null;
+  estimateNov?: number | null;
+  estimateDec?: number | null;
   // Menu months
   menuJan?: boolean | null;
   menuFeb?: boolean | null;
@@ -144,6 +165,8 @@ export interface CustomerBidFilters {
   coOpCode?: string;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
+  /** Filter by confirmation status - defaults to false (show unconfirmed) */
+  confirmed?: boolean;
 }
 
 /**

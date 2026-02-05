@@ -49,11 +49,22 @@ interface BaseBidRow {
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
   isLost: boolean | null;
-  confirmed: boolean | null;
+  confirmedAt: Date | null;
+  confirmedBy: string | null;
   yearAround: boolean | null;
-  augustDemand: Prisma.Decimal | null;
-  septemberDemand: Prisma.Decimal | null;
-  octoberDemand: Prisma.Decimal | null;
+  // Monthly estimates
+  estimateJan: Prisma.Decimal | null;
+  estimateFeb: Prisma.Decimal | null;
+  estimateMar: Prisma.Decimal | null;
+  estimateApr: Prisma.Decimal | null;
+  estimateMay: Prisma.Decimal | null;
+  estimateJun: Prisma.Decimal | null;
+  estimateJul: Prisma.Decimal | null;
+  estimateAug: Prisma.Decimal | null;
+  estimateSep: Prisma.Decimal | null;
+  estimateOct: Prisma.Decimal | null;
+  estimateNov: Prisma.Decimal | null;
+  estimateDec: Prisma.Decimal | null;
   // Menu months
   menuJan: boolean | null;
   menuFeb: boolean | null;
@@ -159,6 +170,16 @@ export class CustomerBidService implements ICustomerBidService {
         whereConditions.push(Prisma.sql`c.co_op_code = ${query.coOpCode}`);
       }
 
+      if (query.confirmed !== undefined) {
+        if (query.confirmed) {
+          // Show only confirmed items (confirmed_at is NOT NULL)
+          whereConditions.push(Prisma.sql`cbd.confirmed_at IS NOT NULL`);
+        } else {
+          // Show only unconfirmed items (confirmed_at IS NULL)
+          whereConditions.push(Prisma.sql`cbd.confirmed_at IS NULL`);
+        }
+      }
+
       const additionalWhere =
         whereConditions.length > 0
           ? Prisma.sql`AND ${Prisma.join(whereConditions, " AND ")}`
@@ -205,11 +226,22 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_october AS "lyOctober",
             COALESCE(cbd.is_lost, false) AS "isLost",
             -- User-editable fields
-            COALESCE(cbd.confirmed, false) AS "confirmed",
+            cbd.confirmed_at AS "confirmedAt",
+            cbd.confirmed_by AS "confirmedBy",
             COALESCE(cbd.year_around, false) AS "yearAround",
-            cbd.august_demand AS "augustDemand",
-            cbd.september_demand AS "septemberDemand",
-            cbd.october_demand AS "octoberDemand",
+            -- Monthly estimates
+            cbd.estimate_jan AS "estimateJan",
+            cbd.estimate_feb AS "estimateFeb",
+            cbd.estimate_mar AS "estimateMar",
+            cbd.estimate_apr AS "estimateApr",
+            cbd.estimate_may AS "estimateMay",
+            cbd.estimate_jun AS "estimateJun",
+            cbd.estimate_jul AS "estimateJul",
+            cbd.estimate_aug AS "estimateAug",
+            cbd.estimate_sep AS "estimateSep",
+            cbd.estimate_oct AS "estimateOct",
+            cbd.estimate_nov AS "estimateNov",
+            cbd.estimate_dec AS "estimateDec",
             -- Menu months
             cbd.jan AS "menuJan",
             cbd.feb AS "menuFeb",
@@ -260,11 +292,21 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_september,
             cbd.ly_october,
             cbd.is_lost,
-            cbd.confirmed,
+            cbd.confirmed_at,
+            cbd.confirmed_by,
             cbd.year_around,
-            cbd.august_demand,
-            cbd.september_demand,
-            cbd.october_demand,
+            cbd.estimate_jan,
+            cbd.estimate_feb,
+            cbd.estimate_mar,
+            cbd.estimate_apr,
+            cbd.estimate_may,
+            cbd.estimate_jun,
+            cbd.estimate_jul,
+            cbd.estimate_aug,
+            cbd.estimate_sep,
+            cbd.estimate_oct,
+            cbd.estimate_nov,
+            cbd.estimate_dec,
             cbd.jan,
             cbd.feb,
             cbd.mar,
@@ -312,14 +354,24 @@ export class CustomerBidService implements ICustomerBidService {
         lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
         lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
         isLost: row.isLost ?? false,
+        // Confirmation fields
+        confirmedAt: row.confirmedAt?.toISOString() ?? null,
+        confirmedBy: row.confirmedBy ?? null,
         // User-editable fields
-        confirmed: row.confirmed ?? false,
         yearAround: row.yearAround ?? false,
-        augustDemand: row.augustDemand ? Number(row.augustDemand) : null,
-        septemberDemand: row.septemberDemand
-          ? Number(row.septemberDemand)
-          : null,
-        octoberDemand: row.octoberDemand ? Number(row.octoberDemand) : null,
+        // Monthly estimates
+        estimateJan: row.estimateJan ? Number(row.estimateJan) : null,
+        estimateFeb: row.estimateFeb ? Number(row.estimateFeb) : null,
+        estimateMar: row.estimateMar ? Number(row.estimateMar) : null,
+        estimateApr: row.estimateApr ? Number(row.estimateApr) : null,
+        estimateMay: row.estimateMay ? Number(row.estimateMay) : null,
+        estimateJun: row.estimateJun ? Number(row.estimateJun) : null,
+        estimateJul: row.estimateJul ? Number(row.estimateJul) : null,
+        estimateAug: row.estimateAug ? Number(row.estimateAug) : null,
+        estimateSep: row.estimateSep ? Number(row.estimateSep) : null,
+        estimateOct: row.estimateOct ? Number(row.estimateOct) : null,
+        estimateNov: row.estimateNov ? Number(row.estimateNov) : null,
+        estimateDec: row.estimateDec ? Number(row.estimateDec) : null,
         // Menu months
         menuJan: row.menuJan,
         menuFeb: row.menuFeb,
@@ -427,11 +479,10 @@ export class CustomerBidService implements ICustomerBidService {
    */
   async updateBid(
     key: CustomerBidKeyDto,
-    data: UpdateCustomerBidDto,
-    userId: string
+    data: UpdateCustomerBidDto
   ): Promise<CustomerBidDto> {
     logger.debug(
-      { event: "customer-bid.update", key, data, userId },
+      { event: "customer-bid.update", key, data },
       "Updating customer bid"
     );
 
@@ -453,13 +504,20 @@ export class CustomerBidService implements ICustomerBidService {
           customerBillTo: key.customerBillTo,
           itemNo: key.itemNo,
           schoolYear: key.schoolYear,
-          confirmed: data.confirmed ?? false,
           yearAround: data.yearAround ?? false,
-          augustDemand: data.augustDemand,
-          septemberDemand: data.septemberDemand,
-          octoberDemand: data.octoberDemand,
-          confirmedBy: data.confirmed ? userId : null,
-          confirmedAt: data.confirmed ? new Date() : null,
+          // Monthly estimates
+          estimateJan: data.estimateJan,
+          estimateFeb: data.estimateFeb,
+          estimateMar: data.estimateMar,
+          estimateApr: data.estimateApr,
+          estimateMay: data.estimateMay,
+          estimateJun: data.estimateJun,
+          estimateJul: data.estimateJul,
+          estimateAug: data.estimateAug,
+          estimateSep: data.estimateSep,
+          estimateOct: data.estimateOct,
+          estimateNov: data.estimateNov,
+          estimateDec: data.estimateDec,
           // Menu months
           menuJan: data.menuJan,
           menuFeb: data.menuFeb,
@@ -475,13 +533,20 @@ export class CustomerBidService implements ICustomerBidService {
           menuDec: data.menuDec,
         },
         update: {
-          confirmed: data.confirmed,
           yearAround: data.yearAround,
-          augustDemand: data.augustDemand,
-          septemberDemand: data.septemberDemand,
-          octoberDemand: data.octoberDemand,
-          confirmedBy: data.confirmed ? userId : undefined,
-          confirmedAt: data.confirmed ? new Date() : undefined,
+          // Monthly estimates
+          estimateJan: data.estimateJan,
+          estimateFeb: data.estimateFeb,
+          estimateMar: data.estimateMar,
+          estimateApr: data.estimateApr,
+          estimateMay: data.estimateMay,
+          estimateJun: data.estimateJun,
+          estimateJul: data.estimateJul,
+          estimateAug: data.estimateAug,
+          estimateSep: data.estimateSep,
+          estimateOct: data.estimateOct,
+          estimateNov: data.estimateNov,
+          estimateDec: data.estimateDec,
           // Menu months
           menuJan: data.menuJan,
           menuFeb: data.menuFeb,
@@ -503,57 +568,7 @@ export class CustomerBidService implements ICustomerBidService {
         "Customer bid updated successfully"
       );
 
-      // Return a minimal DTO (full data requires querying with JOINs)
-      return {
-        sourceDb: record.sourceDb,
-        siteCode: record.siteCode,
-        customerName: null,
-        customerBillTo: record.customerBillTo,
-        coOpCode: null,
-        contactName: null,
-        contactEmail: null,
-        contactPhone: null,
-        salesRep: null,
-        bidStartDate: "",
-        bidEndDate: null,
-        itemCode: record.itemNo,
-        itemDescription: null,
-        brandName: null,
-        erpStatus: null,
-        bidQuantity: null,
-        lastYearBidQty: record.lastYearBidQty
-          ? Number(record.lastYearBidQty)
-          : null,
-        lastYearActual: record.lastYearActual
-          ? Number(record.lastYearActual)
-          : null,
-        lyAugust: record.lyAugust ? Number(record.lyAugust) : null,
-        lySeptember: record.lySeptember ? Number(record.lySeptember) : null,
-        lyOctober: record.lyOctober ? Number(record.lyOctober) : null,
-        isLost: record.isLost,
-        confirmed: record.confirmed,
-        yearAround: record.yearAround,
-        augustDemand: record.augustDemand ? Number(record.augustDemand) : null,
-        septemberDemand: record.septemberDemand
-          ? Number(record.septemberDemand)
-          : null,
-        octoberDemand: record.octoberDemand
-          ? Number(record.octoberDemand)
-          : null,
-        // Menu months
-        menuJan: record.menuJan,
-        menuFeb: record.menuFeb,
-        menuMar: record.menuMar,
-        menuApr: record.menuApr,
-        menuMay: record.menuMay,
-        menuJun: record.menuJun,
-        menuJul: record.menuJul,
-        menuAug: record.menuAug,
-        menuSep: record.menuSep,
-        menuOct: record.menuOct,
-        menuNov: record.menuNov,
-        menuDec: record.menuDec,
-      };
+      return this.recordToDto(record);
     } catch (error) {
       logger.error(
         { event: "customer-bid.update.error", key, error },
@@ -571,8 +586,7 @@ export class CustomerBidService implements ICustomerBidService {
    * Bulk update user-editable fields on multiple customer bid records
    */
   async bulkUpdateBids(
-    data: BulkUpdateCustomerBidDto,
-    userId: string
+    data: BulkUpdateCustomerBidDto
   ): Promise<BulkUpdateResultDto> {
     logger.debug(
       { event: "customer-bid.bulk-update", recordCount: data.records.length },
@@ -594,11 +608,21 @@ export class CustomerBidService implements ICustomerBidService {
             schoolYear: record.schoolYear,
           },
           {
-            confirmed: record.confirmed,
             yearAround: record.yearAround,
-            augustDemand: record.augustDemand,
-            septemberDemand: record.septemberDemand,
-            octoberDemand: record.octoberDemand,
+            // Monthly estimates
+            estimateJan: record.estimateJan,
+            estimateFeb: record.estimateFeb,
+            estimateMar: record.estimateMar,
+            estimateApr: record.estimateApr,
+            estimateMay: record.estimateMay,
+            estimateJun: record.estimateJun,
+            estimateJul: record.estimateJul,
+            estimateAug: record.estimateAug,
+            estimateSep: record.estimateSep,
+            estimateOct: record.estimateOct,
+            estimateNov: record.estimateNov,
+            estimateDec: record.estimateDec,
+            // Menu months
             menuJan: record.menuJan,
             menuFeb: record.menuFeb,
             menuMar: record.menuMar,
@@ -611,8 +635,7 @@ export class CustomerBidService implements ICustomerBidService {
             menuOct: record.menuOct,
             menuNov: record.menuNov,
             menuDec: record.menuDec,
-          },
-          userId
+          }
         );
         updated++;
       } catch (error) {
@@ -635,6 +658,202 @@ export class CustomerBidService implements ICustomerBidService {
       failed,
       errors: errors.length > 0 ? errors : undefined,
     };
+  }
+
+  /**
+   * Map a CustomerBidData Prisma record to a minimal CustomerBidDto
+   */
+  private recordToDto(record: {
+    sourceDb: string;
+    siteCode: string;
+    customerBillTo: string;
+    itemNo: string;
+    lastYearBidQty: Prisma.Decimal | null;
+    lastYearActual: Prisma.Decimal | null;
+    lyAugust: Prisma.Decimal | null;
+    lySeptember: Prisma.Decimal | null;
+    lyOctober: Prisma.Decimal | null;
+    isLost: boolean;
+    confirmedAt: Date | null;
+    confirmedBy: string | null;
+    yearAround: boolean;
+    estimateJan: Prisma.Decimal | null;
+    estimateFeb: Prisma.Decimal | null;
+    estimateMar: Prisma.Decimal | null;
+    estimateApr: Prisma.Decimal | null;
+    estimateMay: Prisma.Decimal | null;
+    estimateJun: Prisma.Decimal | null;
+    estimateJul: Prisma.Decimal | null;
+    estimateAug: Prisma.Decimal | null;
+    estimateSep: Prisma.Decimal | null;
+    estimateOct: Prisma.Decimal | null;
+    estimateNov: Prisma.Decimal | null;
+    estimateDec: Prisma.Decimal | null;
+    menuJan: boolean | null;
+    menuFeb: boolean | null;
+    menuMar: boolean | null;
+    menuApr: boolean | null;
+    menuMay: boolean | null;
+    menuJun: boolean | null;
+    menuJul: boolean | null;
+    menuAug: boolean | null;
+    menuSep: boolean | null;
+    menuOct: boolean | null;
+    menuNov: boolean | null;
+    menuDec: boolean | null;
+  }): CustomerBidDto {
+    return {
+      sourceDb: record.sourceDb,
+      siteCode: record.siteCode,
+      customerName: null,
+      customerBillTo: record.customerBillTo,
+      coOpCode: null,
+      contactName: null,
+      contactEmail: null,
+      contactPhone: null,
+      salesRep: null,
+      bidStartDate: "",
+      bidEndDate: null,
+      itemCode: record.itemNo,
+      itemDescription: null,
+      brandName: null,
+      erpStatus: null,
+      bidQuantity: null,
+      lastYearBidQty: record.lastYearBidQty
+        ? Number(record.lastYearBidQty)
+        : null,
+      lastYearActual: record.lastYearActual
+        ? Number(record.lastYearActual)
+        : null,
+      lyAugust: record.lyAugust ? Number(record.lyAugust) : null,
+      lySeptember: record.lySeptember ? Number(record.lySeptember) : null,
+      lyOctober: record.lyOctober ? Number(record.lyOctober) : null,
+      isLost: record.isLost,
+      confirmedAt: record.confirmedAt?.toISOString() ?? null,
+      confirmedBy: record.confirmedBy ?? null,
+      yearAround: record.yearAround,
+      // Monthly estimates
+      estimateJan: record.estimateJan ? Number(record.estimateJan) : null,
+      estimateFeb: record.estimateFeb ? Number(record.estimateFeb) : null,
+      estimateMar: record.estimateMar ? Number(record.estimateMar) : null,
+      estimateApr: record.estimateApr ? Number(record.estimateApr) : null,
+      estimateMay: record.estimateMay ? Number(record.estimateMay) : null,
+      estimateJun: record.estimateJun ? Number(record.estimateJun) : null,
+      estimateJul: record.estimateJul ? Number(record.estimateJul) : null,
+      estimateAug: record.estimateAug ? Number(record.estimateAug) : null,
+      estimateSep: record.estimateSep ? Number(record.estimateSep) : null,
+      estimateOct: record.estimateOct ? Number(record.estimateOct) : null,
+      estimateNov: record.estimateNov ? Number(record.estimateNov) : null,
+      estimateDec: record.estimateDec ? Number(record.estimateDec) : null,
+      menuJan: record.menuJan,
+      menuFeb: record.menuFeb,
+      menuMar: record.menuMar,
+      menuApr: record.menuApr,
+      menuMay: record.menuMay,
+      menuJun: record.menuJun,
+      menuJul: record.menuJul,
+      menuAug: record.menuAug,
+      menuSep: record.menuSep,
+      menuOct: record.menuOct,
+      menuNov: record.menuNov,
+      menuDec: record.menuDec,
+    };
+  }
+
+  async confirmBid(
+    key: CustomerBidKeyDto,
+    userEmail: string
+  ): Promise<CustomerBidDto> {
+    logger.debug(
+      { event: "customer-bid.confirm", key, userEmail },
+      "Confirming customer bid"
+    );
+
+    try {
+      const record = await this.prisma.customerBidData.upsert({
+        where: {
+          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
+            sourceDb: key.sourceDb,
+            siteCode: key.siteCode,
+            customerBillTo: key.customerBillTo,
+            itemNo: key.itemNo,
+            schoolYear: key.schoolYear,
+          },
+        },
+        create: {
+          sourceDb: key.sourceDb,
+          siteCode: key.siteCode,
+          customerBillTo: key.customerBillTo,
+          itemNo: key.itemNo,
+          schoolYear: key.schoolYear,
+          confirmedBy: userEmail,
+          confirmedAt: new Date(),
+        },
+        update: {
+          confirmedBy: userEmail,
+          confirmedAt: new Date(),
+        },
+      });
+
+      logger.info(
+        { event: "customer-bid.confirm.success", key },
+        "Customer bid confirmed"
+      );
+
+      return this.recordToDto(record);
+    } catch (error) {
+      logger.error(
+        { event: "customer-bid.confirm.error", key, error },
+        "Failed to confirm customer bid"
+      );
+
+      throw new CustomerBidDatabaseError(
+        "Failed to confirm customer bid",
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  async unconfirmBid(key: CustomerBidKeyDto): Promise<CustomerBidDto> {
+    logger.debug(
+      { event: "customer-bid.unconfirm", key },
+      "Unconfirming customer bid"
+    );
+
+    try {
+      const record = await this.prisma.customerBidData.update({
+        where: {
+          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
+            sourceDb: key.sourceDb,
+            siteCode: key.siteCode,
+            customerBillTo: key.customerBillTo,
+            itemNo: key.itemNo,
+            schoolYear: key.schoolYear,
+          },
+        },
+        data: {
+          confirmedBy: null,
+          confirmedAt: null,
+        },
+      });
+
+      logger.info(
+        { event: "customer-bid.unconfirm.success", key },
+        "Customer bid unconfirmed"
+      );
+
+      return this.recordToDto(record);
+    } catch (error) {
+      logger.error(
+        { event: "customer-bid.unconfirm.error", key, error },
+        "Failed to unconfirm customer bid"
+      );
+
+      throw new CustomerBidDatabaseError(
+        "Failed to unconfirm customer bid",
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 
   /**

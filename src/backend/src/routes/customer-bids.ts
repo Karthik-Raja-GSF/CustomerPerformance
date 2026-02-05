@@ -57,11 +57,20 @@ const pathParamsSchema = z.object({
  * Update DTO schema for PATCH requests
  */
 const updateBidSchema = z.object({
-  confirmed: z.boolean().optional(),
   yearAround: z.boolean().optional(),
-  augustDemand: z.number().nullable().optional(),
-  septemberDemand: z.number().nullable().optional(),
-  octoberDemand: z.number().nullable().optional(),
+  // Monthly estimates
+  estimateJan: z.number().nullable().optional(),
+  estimateFeb: z.number().nullable().optional(),
+  estimateMar: z.number().nullable().optional(),
+  estimateApr: z.number().nullable().optional(),
+  estimateMay: z.number().nullable().optional(),
+  estimateJun: z.number().nullable().optional(),
+  estimateJul: z.number().nullable().optional(),
+  estimateAug: z.number().nullable().optional(),
+  estimateSep: z.number().nullable().optional(),
+  estimateOct: z.number().nullable().optional(),
+  estimateNov: z.number().nullable().optional(),
+  estimateDec: z.number().nullable().optional(),
   // Menu months
   menuJan: z.boolean().nullable().optional(),
   menuFeb: z.boolean().nullable().optional(),
@@ -89,11 +98,20 @@ const bulkUpdateSchema = z.object({
         customerBillTo: z.string().min(1),
         itemNo: z.string().min(1),
         schoolYear: z.string().regex(/^\d{4}-\d{4}$/),
-        confirmed: z.boolean().optional(),
         yearAround: z.boolean().optional(),
-        augustDemand: z.number().nullable().optional(),
-        septemberDemand: z.number().nullable().optional(),
-        octoberDemand: z.number().nullable().optional(),
+        // Monthly estimates
+        estimateJan: z.number().nullable().optional(),
+        estimateFeb: z.number().nullable().optional(),
+        estimateMar: z.number().nullable().optional(),
+        estimateApr: z.number().nullable().optional(),
+        estimateMay: z.number().nullable().optional(),
+        estimateJun: z.number().nullable().optional(),
+        estimateJul: z.number().nullable().optional(),
+        estimateAug: z.number().nullable().optional(),
+        estimateSep: z.number().nullable().optional(),
+        estimateOct: z.number().nullable().optional(),
+        estimateNov: z.number().nullable().optional(),
+        estimateDec: z.number().nullable().optional(),
         // Menu months
         menuJan: z.boolean().nullable().optional(),
         menuFeb: z.boolean().nullable().optional(),
@@ -260,7 +278,6 @@ router.get(
  * - schoolYear: School year in format YYYY-YYYY (e.g., "2025-2026")
  *
  * Request Body:
- * - confirmed?: boolean - User confirmation flag
  * - augustDemand?: number | null - August demand forecast
  * - septemberDemand?: number | null - September demand forecast
  * - octoberDemand?: number | null - October demand forecast
@@ -290,12 +307,9 @@ router.patch(
         CUSTOMER_BID_SERVICE_TOKEN
       );
 
-      const userId = req.user?.userId || "unknown";
-
       const result = await customerBidService.updateBid(
         pathParsed.data,
-        bodyParsed.data,
-        userId
+        bodyParsed.data
       );
 
       res.json({
@@ -315,7 +329,7 @@ router.patch(
  * Request Body:
  * - records: Array of objects containing:
  *   - sourceDb, siteCode, customerBillTo, itemNo, schoolYear (required)
- *   - confirmed, augustDemand, septemberDemand, octoberDemand (optional)
+ *   - augustDemand, septemberDemand, octoberDemand (optional)
  *
  * Response:
  * - updated: Number of successfully updated records
@@ -339,16 +353,85 @@ router.post(
         CUSTOMER_BID_SERVICE_TOKEN
       );
 
-      const userId = req.user?.userId || "unknown";
-
-      const result = await customerBidService.bulkUpdateBids(
-        parsed.data,
-        userId
-      );
+      const result = await customerBidService.bulkUpdateBids(parsed.data);
 
       res.json({
         status: "success",
         ...result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * POST /customer-bids/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/confirm
+ * Confirm a customer bid record
+ *
+ * Sets confirmed_at to current UTC timestamp and confirmed_by to the
+ * authenticated user's email. Creates the record if it doesn't exist.
+ */
+router.post(
+  "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/confirm",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pathParsed = pathParamsSchema.safeParse(req.params);
+      if (!pathParsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid path parameters: ${pathParsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const userEmail = req.user?.email || "unknown";
+
+      const result = await customerBidService.confirmBid(
+        pathParsed.data,
+        userEmail
+      );
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * POST /customer-bids/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/unconfirm
+ * Unconfirm a customer bid record
+ *
+ * Clears confirmed_at and confirmed_by fields (sets to null).
+ */
+router.post(
+  "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/unconfirm",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pathParsed = pathParamsSchema.safeParse(req.params);
+      if (!pathParsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid path parameters: ${pathParsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.unconfirmBid(pathParsed.data);
+
+      res.json({
+        status: "success",
+        data: result,
       });
     } catch (error) {
       handleCustomerBidError(error, res, next);

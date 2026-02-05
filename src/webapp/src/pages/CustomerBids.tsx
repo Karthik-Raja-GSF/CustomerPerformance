@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shadcn/components/dropdown-menu";
 import {
@@ -22,10 +21,13 @@ import {
   SheetTrigger,
 } from "@/shadcn/components/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/shadcn/components/tabs";
+import { Switch } from "@/shadcn/components/switch";
 import {
   getCustomerBids,
   getCustomerBidFilterOptions,
   updateCustomerBid,
+  confirmCustomerBid,
+  unconfirmCustomerBid,
   buildBidKey,
 } from "@/apis/customer-bids";
 import type {
@@ -85,8 +87,18 @@ const DEFAULT_LIMIT = 50;
  * Parse URL search params to CustomerBidFilters
  */
 function parseFiltersFromURL(
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
+  defaultConfirmed = false
 ): CustomerBidFilters {
+  // Parse confirmed param: "true" -> true, "false" -> false, missing -> use default
+  const confirmedParam = searchParams.get("confirmed");
+  const confirmed =
+    confirmedParam === "true"
+      ? true
+      : confirmedParam === "false"
+        ? false
+        : undefined;
+
   return {
     page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
     limit: searchParams.get("limit")
@@ -100,6 +112,7 @@ function parseFiltersFromURL(
     itemCode: searchParams.get("itemCode") || undefined,
     erpStatus: searchParams.get("erpStatus") || undefined,
     coOpCode: searchParams.get("coOpCode") || undefined,
+    confirmed: confirmed ?? defaultConfirmed,
   };
 }
 
@@ -123,11 +136,35 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.itemCode) params.set("itemCode", filters.itemCode);
   if (filters.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters.coOpCode) params.set("coOpCode", filters.coOpCode);
+  // Always include confirmed in URL (false is default, true means showing confirmed only)
+  if (filters.confirmed !== undefined) {
+    params.set("confirmed", filters.confirmed.toString());
+  }
 
   return params;
 }
 
-export default function CustomerBids() {
+interface CustomerBidsProps {
+  pageTitle?: string;
+  pageDescription?: string;
+  defaultConfirmed?: boolean;
+  defaultColumnVisibility?: VisibilityState;
+  canUnconfirm?: boolean;
+  showSIQExport?: boolean;
+  showCSVExport?: boolean;
+  showConfirmedFilter?: boolean;
+}
+
+export default function CustomerBids({
+  pageTitle = "Back to School",
+  pageDescription = "View and filter customer bid data",
+  defaultConfirmed = false,
+  defaultColumnVisibility,
+  canUnconfirm = true,
+  showSIQExport = false,
+  showCSVExport = true,
+  showConfirmedFilter = true,
+}: CustomerBidsProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const isInitialMount = useRef(true);
 
@@ -139,7 +176,7 @@ export default function CustomerBids() {
 
   // Filter state - initialized from URL params
   const [filters, setFilters] = useState<CustomerBidFilters>(() =>
-    parseFiltersFromURL(searchParams)
+    parseFiltersFromURL(searchParams, defaultConfirmed)
   );
 
   // Local filter inputs (before applying) - initialized from URL params
@@ -164,6 +201,14 @@ export default function CustomerBids() {
   const [coOpCodeInput, setCoOpCodeInput] = useState(
     () => searchParams.get("coOpCode") || ""
   );
+  const [confirmedFilter, setConfirmedFilter] = useState<boolean>(() => {
+    const param = searchParams.get("confirmed");
+    return param === "true"
+      ? true
+      : param === "false"
+        ? false
+        : defaultConfirmed;
+  });
 
   // Filter options for datalist autocomplete
   const [filterOptions, setFilterOptions] =
@@ -177,6 +222,7 @@ export default function CustomerBids() {
     contactName: false,
     contactEmail: false,
     contactPhone: false,
+    ...defaultColumnVisibility,
   });
   const [tableInstance, setTableInstance] =
     useState<Table<CustomerBidDto> | null>(null);
@@ -231,7 +277,7 @@ export default function CustomerBids() {
 
   // Sync URL changes back to filters (for browser back/forward)
   useEffect(() => {
-    const urlFilters = parseFiltersFromURL(searchParams);
+    const urlFilters = parseFiltersFromURL(searchParams, defaultConfirmed);
     const currentFiltersStr = JSON.stringify({
       ...filters,
       // Normalize undefined to match URL parsing
@@ -271,6 +317,7 @@ export default function CustomerBids() {
       itemCode: itemCodeInput || undefined,
       erpStatus: erpStatusInput || undefined,
       coOpCode: coOpCodeInput || undefined,
+      confirmed: confirmedFilter,
     };
     setFilters(newFilters);
     setFilterSheetOpen(false);
@@ -284,10 +331,12 @@ export default function CustomerBids() {
     setItemCodeInput("");
     setErpStatusInput("");
     setCoOpCodeInput("");
+    setConfirmedFilter(defaultConfirmed);
     setFilters((prev) => ({
       page: 1,
       limit: prev.limit,
       schoolYear: prev.schoolYear,
+      confirmed: defaultConfirmed,
     }));
   };
 
@@ -306,7 +355,8 @@ export default function CustomerBids() {
       salesRepInput ||
       itemCodeInput ||
       erpStatusInput ||
-      coOpCodeInput
+      coOpCodeInput ||
+      (showConfirmedFilter && confirmedFilter)
   );
 
   const activeFilterCount = [
@@ -317,6 +367,7 @@ export default function CustomerBids() {
     itemCodeInput,
     erpStatusInput,
     coOpCodeInput,
+    showConfirmedFilter && confirmedFilter,
   ].filter(Boolean).length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -346,11 +397,22 @@ export default function CustomerBids() {
             b.itemCode === bid.itemCode
               ? {
                   ...b,
-                  confirmed: updated.confirmed,
+                  confirmedAt: updated.confirmedAt,
+                  confirmedBy: updated.confirmedBy,
                   yearAround: updated.yearAround,
-                  augustDemand: updated.augustDemand,
-                  septemberDemand: updated.septemberDemand,
-                  octoberDemand: updated.octoberDemand,
+                  // Monthly estimates
+                  estimateJan: updated.estimateJan,
+                  estimateFeb: updated.estimateFeb,
+                  estimateMar: updated.estimateMar,
+                  estimateApr: updated.estimateApr,
+                  estimateMay: updated.estimateMay,
+                  estimateJun: updated.estimateJun,
+                  estimateJul: updated.estimateJul,
+                  estimateAug: updated.estimateAug,
+                  estimateSep: updated.estimateSep,
+                  estimateOct: updated.estimateOct,
+                  estimateNov: updated.estimateNov,
+                  estimateDec: updated.estimateDec,
                   // Menu months
                   menuJan: updated.menuJan,
                   menuFeb: updated.menuFeb,
@@ -379,21 +441,93 @@ export default function CustomerBids() {
     [filters.schoolYear]
   );
 
+  const handleConfirm = useCallback(
+    async (bid: CustomerBidDto) => {
+      const schoolYearString = getSchoolYearString(
+        filters.schoolYear || "next"
+      );
+      const key = buildBidKey(bid, schoolYearString);
+
+      try {
+        const updated = await confirmCustomerBid(key);
+        setBids((prev) =>
+          prev.map((b) =>
+            b.sourceDb === bid.sourceDb &&
+            b.siteCode === bid.siteCode &&
+            b.customerBillTo === bid.customerBillTo &&
+            b.itemCode === bid.itemCode
+              ? {
+                  ...b,
+                  confirmedAt: updated.confirmedAt,
+                  confirmedBy: updated.confirmedBy,
+                }
+              : b
+          )
+        );
+        toast.success("Bid confirmed");
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to confirm";
+        toast.error(message);
+        throw err;
+      }
+    },
+    [filters.schoolYear]
+  );
+
+  const handleUnconfirm = useCallback(
+    async (bid: CustomerBidDto) => {
+      const schoolYearString = getSchoolYearString(
+        filters.schoolYear || "next"
+      );
+      const key = buildBidKey(bid, schoolYearString);
+
+      try {
+        const updated = await unconfirmCustomerBid(key);
+        setBids((prev) =>
+          prev.map((b) =>
+            b.sourceDb === bid.sourceDb &&
+            b.siteCode === bid.siteCode &&
+            b.customerBillTo === bid.customerBillTo &&
+            b.itemCode === bid.itemCode
+              ? {
+                  ...b,
+                  confirmedAt: updated.confirmedAt,
+                  confirmedBy: updated.confirmedBy,
+                }
+              : b
+          )
+        );
+        toast.success("Confirmation removed");
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to unconfirm";
+        toast.error(message);
+        throw err;
+      }
+    },
+    [filters.schoolYear]
+  );
+
   // Create columns with the cell update handler
   const tableColumns = useMemo(
-    () => createColumns({ onCellUpdate: handleCellUpdate }),
-    [handleCellUpdate]
+    () =>
+      createColumns({
+        onCellUpdate: handleCellUpdate,
+        onConfirm: handleConfirm,
+        onUnconfirm: handleUnconfirm,
+        canUnconfirm,
+      }),
+    [handleCellUpdate, handleConfirm, handleUnconfirm, canUnconfirm]
   );
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="shrink-0 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Back to School
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
         <p className="text-muted-foreground">
-          View and filter customer bid data
+          {pageDescription}
           {dateRange && (
             <span className="ml-2">
               ({dateRange.startDate} to {dateRange.endDate})
@@ -451,7 +585,7 @@ export default function CustomerBids() {
                 Narrow down results by applying filters below
               </p>
             </SheetHeader>
-            <div className="space-y-6">
+            <div className="space-y-6 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-3">
                 <Label className="text-sm font-medium text-foreground">
                   Site Code
@@ -548,8 +682,23 @@ export default function CustomerBids() {
                   label="ERP Status"
                 />
               </div>
+              {showConfirmedFilter && (
+                <div className="flex items-center justify-between py-2">
+                  <Label
+                    htmlFor="confirmed-filter"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Show Confirmed Only
+                  </Label>
+                  <Switch
+                    id="confirmed-filter"
+                    checked={confirmedFilter}
+                    onCheckedChange={setConfirmedFilter}
+                  />
+                </div>
+              )}
             </div>
-            <div className="flex gap-3 pt-8">
+            <div className="flex gap-3 pt-8 pb-8">
               <Button
                 type="button"
                 variant="outline"
@@ -603,38 +752,35 @@ export default function CustomerBids() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Export dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={bids.length === 0 || isLoading}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => {
-                exportToCSV(bids, customerBidExportColumns, "customer-bids");
-                toast.success("CSV exported successfully");
-              }}
-            >
-              Export CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                exportToSIQCSV(bids, "customer-bids-siq");
-                toast.success("SIQ CSV exported successfully");
-              }}
-            >
-              Export SIQ
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Export buttons */}
+        {showCSVExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={bids.length === 0 || isLoading}
+            onClick={() => {
+              exportToCSV(bids, customerBidExportColumns, "customer-bids");
+              toast.success("CSV exported successfully");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        )}
+        {showSIQExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={bids.length === 0 || isLoading}
+            onClick={() => {
+              exportToSIQCSV(bids, "customer-bids-siq");
+              toast.success("SIQ CSV exported successfully");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export SIQ
+          </Button>
+        )}
 
         {/* Refresh button */}
         <Button

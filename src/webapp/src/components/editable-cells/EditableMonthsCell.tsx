@@ -93,11 +93,28 @@ export function EditableMonthsCell({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Build update object with all month values
-      const updates: UpdateCustomerBidDto = {};
-      for (const month of MENU_MONTHS) {
-        updates[month.key] = localMonths[month.key];
+      // Check if all 12 months are selected
+      const allMonthsSelected = MENU_MONTHS.every(
+        (month) => localMonths[month.key] === true
+      );
+
+      let updates: UpdateCustomerBidDto;
+
+      if (allMonthsSelected) {
+        // All months selected = Year Around
+        // Set yearAround to true and clear all menu months
+        updates = { yearAround: true };
+        for (const month of MENU_MONTHS) {
+          updates[month.key] = false;
+        }
+      } else {
+        // Normal save: just the month values
+        updates = {};
+        for (const month of MENU_MONTHS) {
+          updates[month.key] = localMonths[month.key];
+        }
       }
+
       await onSave(updates);
       setIsOpen(false);
     } catch {
