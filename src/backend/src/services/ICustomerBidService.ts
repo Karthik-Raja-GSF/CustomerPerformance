@@ -41,7 +41,8 @@ export interface ICustomerBidService {
    */
   updateBid(
     key: CustomerBidKeyDto,
-    data: UpdateCustomerBidDto
+    data: UpdateCustomerBidDto,
+    userEmail: string
   ): Promise<CustomerBidDto>;
 
   /**
@@ -50,7 +51,10 @@ export interface ICustomerBidService {
    * @param data - Bulk update payload with records to update
    * @returns Promise resolving to bulk update result
    */
-  bulkUpdateBids(data: BulkUpdateCustomerBidDto): Promise<BulkUpdateResultDto>;
+  bulkUpdateBids(
+    data: BulkUpdateCustomerBidDto,
+    userEmail: string
+  ): Promise<BulkUpdateResultDto>;
 
   /**
    * Confirm a customer bid record

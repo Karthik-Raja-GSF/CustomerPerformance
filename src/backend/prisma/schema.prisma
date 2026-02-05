@@ -1101,6 +1101,10 @@ model CustomerBidData {
   menuNov         Boolean? @default(false) @map("nov")
   menuDec         Boolean? @default(false) @map("dec")
 
+  // Last updated tracking
+  lastUpdatedAt DateTime? @map("last_updated_at")
+  lastUpdatedBy String?   @map("last_updated_by")
+
   // Confirmation fields (confirmed_at IS NOT NULL = confirmed)
   confirmedBy String?   @map("confirmed_by")
   confirmedAt DateTime? @map("confirmed_at")

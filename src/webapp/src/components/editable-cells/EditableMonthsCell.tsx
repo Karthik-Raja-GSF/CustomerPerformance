@@ -20,6 +20,8 @@ interface EditableMonthsCellProps {
   data: Partial<Record<MonthKey, boolean | null>>;
   /** Whether this is a year-around item (disables editing) */
   yearAround: boolean;
+  /** Whether editing is disabled (e.g., confirmed bids) */
+  disabled?: boolean;
   /** Callback when months are saved */
   onSave: (updates: UpdateCustomerBidDto) => Promise<void>;
 }
@@ -27,6 +29,7 @@ interface EditableMonthsCellProps {
 export function EditableMonthsCell({
   data,
   yearAround,
+  disabled = false,
   onSave,
 }: EditableMonthsCellProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -134,6 +137,15 @@ export function EditableMonthsCell({
   }
 
   const displayText = formatMonthsDisplay(data);
+
+  if (disabled) {
+    return (
+      <div className="flex items-center h-8 px-2 text-sm text-muted-foreground">
+        <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
+        {displayText}
+      </div>
+    );
+  }
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>

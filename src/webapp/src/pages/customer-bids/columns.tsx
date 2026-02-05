@@ -1,12 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { type Column, type ColumnDef } from "@tanstack/react-table";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  CircleCheck,
-  Loader2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Badge } from "@/shadcn/components/badge";
 import { cn } from "@/shadcn/lib/utils";
@@ -115,6 +109,30 @@ function ConfirmCell({
   const [isLoading, setIsLoading] = useState(false);
   const isConfirmed = !!bid.confirmedAt;
 
+  const canConfirm = useMemo(() => {
+    const months = [
+      { estimate: "estimateJan", menu: "menuJan" },
+      { estimate: "estimateFeb", menu: "menuFeb" },
+      { estimate: "estimateMar", menu: "menuMar" },
+      { estimate: "estimateApr", menu: "menuApr" },
+      { estimate: "estimateMay", menu: "menuMay" },
+      { estimate: "estimateJun", menu: "menuJun" },
+      { estimate: "estimateJul", menu: "menuJul" },
+      { estimate: "estimateAug", menu: "menuAug" },
+      { estimate: "estimateSep", menu: "menuSep" },
+      { estimate: "estimateOct", menu: "menuOct" },
+      { estimate: "estimateNov", menu: "menuNov" },
+      { estimate: "estimateDec", menu: "menuDec" },
+    ] as const;
+
+    return months.some((m) => {
+      const est = bid[m.estimate];
+      const hasEstimate = est != null && est > 0;
+      const hasMenu = bid.yearAround || bid[m.menu] === true;
+      return hasEstimate && hasMenu;
+    });
+  }, [bid]);
+
   const handleAction = async (action: () => Promise<void>) => {
     setIsLoading(true);
     try {
@@ -135,29 +153,19 @@ function ConfirmCell({
   if (isConfirmed && canUnconfirm) {
     return (
       <AlertDialog>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <AlertDialogTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-green-600 cursor-pointer hover:opacity-80"
-              >
-                <CircleCheck className="h-4 w-4" />
-                <span className="text-xs truncate max-w-[100px]">
-                  {bid.confirmedBy}
-                </span>
-              </button>
-            </AlertDialogTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Confirmed by {bid.confirmedBy}</p>
-            <p className="text-muted-foreground">
+        <AlertDialogTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-col items-center text-xs cursor-pointer hover:opacity-80"
+          >
+            <span className="truncate max-w-[120px]">{bid.confirmedBy}</span>
+            <span className="text-muted-foreground">
               {bid.confirmedAt
                 ? new Date(bid.confirmedAt).toLocaleString()
                 : ""}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+            </span>
+          </button>
+        </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unconfirm this bid?</AlertDialogTitle>
@@ -180,20 +188,27 @@ function ConfirmCell({
 
   if (isConfirmed) {
     return (
+      <div className="flex flex-col items-center text-xs">
+        <span className="truncate max-w-[120px]">{bid.confirmedBy}</span>
+        <span className="text-muted-foreground">
+          {bid.confirmedAt ? new Date(bid.confirmedAt).toLocaleString() : ""}
+        </span>
+      </div>
+    );
+  }
+
+  if (!canConfirm) {
+    return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-1.5 text-green-600">
-            <CircleCheck className="h-4 w-4" />
-            <span className="text-xs truncate max-w-[100px]">
-              {bid.confirmedBy}
-            </span>
-          </div>
+          <span tabIndex={0}>
+            <Button variant="outline" size="sm" disabled>
+              Confirm
+            </Button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Confirmed by {bid.confirmedBy}</p>
-          <p className="text-muted-foreground">
-            {bid.confirmedAt ? new Date(bid.confirmedAt).toLocaleString() : ""}
-          </p>
+          <p>Add at least one estimate with a menu month to confirm</p>
         </TooltipContent>
       </Tooltip>
     );
@@ -320,17 +335,23 @@ export function createColumns(
       ),
       cell: ({ row }) => row.getValue<string | null>("salesRep") ?? "-",
     },
-    // isLost - Badge display (WON/LOST)
+    // isLost - Badge display (RENEWED/NEW)
     {
       accessorKey: "isLost",
       header: () => (
-        <span className="text-muted-foreground font-medium">Won/Lost</span>
+        <span className="text-muted-foreground font-medium">Renewed/New</span>
       ),
       cell: ({ row }) => {
         const isLost = row.getValue<boolean>("isLost");
         return (
-          <Badge variant={isLost ? "destructive" : "default"}>
-            {isLost ? "LOST" : "WON"}
+          <Badge
+            className={
+              isLost
+                ? "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
+                : "border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
+            }
+          >
+            {isLost ? "NEW" : "RENEWED"}
           </Badge>
         );
       },
@@ -513,24 +534,28 @@ export function createColumns(
           Year Around
         </div>
       ),
-      cell: ({ row }) => (
-        <EditableCheckboxCell
-          value={row.original.yearAround}
-          onSave={async (value) => {
-            if (value) {
-              // Year Around checked: populate Aug, Sep, Oct with last year's values
-              await onCellUpdate(row.original, {
-                yearAround: true,
-                estimateAug: row.original.lyAugust,
-                estimateSep: row.original.lySeptember,
-                estimateOct: row.original.lyOctober,
-              });
-            } else {
-              await onCellUpdate(row.original, { yearAround: false });
-            }
-          }}
-        />
-      ),
+      cell: ({ row }) => {
+        const isConfirmed = !!row.original.confirmedAt;
+        return (
+          <EditableCheckboxCell
+            value={row.original.yearAround}
+            disabled={isConfirmed}
+            onSave={async (value) => {
+              if (value) {
+                // Year Around checked: populate Aug, Sep, Oct with last year's values
+                await onCellUpdate(row.original, {
+                  yearAround: true,
+                  estimateAug: row.original.lyAugust,
+                  estimateSep: row.original.lySeptember,
+                  estimateOct: row.original.lyOctober,
+                });
+              } else {
+                await onCellUpdate(row.original, { yearAround: false });
+              }
+            }}
+          />
+        );
+      },
     },
     {
       id: "menuMonths",
@@ -539,15 +564,19 @@ export function createColumns(
           Menu Months
         </div>
       ),
-      cell: ({ row }) => (
-        <EditableMonthsCell
-          data={row.original}
-          yearAround={row.original.yearAround}
-          onSave={async (updates) => {
-            await onCellUpdate(row.original, updates);
-          }}
-        />
-      ),
+      cell: ({ row }) => {
+        const isConfirmed = !!row.original.confirmedAt;
+        return (
+          <EditableMonthsCell
+            data={row.original}
+            yearAround={row.original.yearAround}
+            disabled={isConfirmed}
+            onSave={async (updates) => {
+              await onCellUpdate(row.original, updates);
+            }}
+          />
+        );
+      },
     },
     // Dynamic Estimates column - shows based on yearAround and menuMonths
     {
@@ -606,6 +635,33 @@ export function createColumns(
           canUnconfirm={canUnconfirm}
         />
       ),
+    },
+    {
+      id: "lastUpdated",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          Last Updated
+        </div>
+      ),
+      cell: ({ row }) => {
+        const { lastUpdatedBy, lastUpdatedAt } = row.original;
+        if (!lastUpdatedBy && !lastUpdatedAt) {
+          return <div className="text-center text-muted-foreground">-</div>;
+        }
+        return (
+          <div className="flex flex-col items-center text-xs">
+            <span
+              className="truncate max-w-[120px]"
+              title={lastUpdatedBy ?? undefined}
+            >
+              {lastUpdatedBy ?? "-"}
+            </span>
+            <span className="text-muted-foreground">
+              {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString() : "-"}
+            </span>
+          </div>
+        );
+      },
     },
   ];
 }

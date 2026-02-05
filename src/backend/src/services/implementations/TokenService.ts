@@ -64,7 +64,10 @@ export class TokenService implements ITokenService {
   ): TokenPayload {
     // Standard claims
     const userId = cognitoPayload.sub as string;
-    const email = cognitoPayload.email as string;
+    const email =
+      (cognitoPayload.email as string) ||
+      (cognitoPayload["custom:email"] as string) ||
+      "";
     const firstName = (cognitoPayload.given_name as string) || "";
     const lastName = (cognitoPayload.family_name as string) || "";
     const iat = cognitoPayload.iat as number;

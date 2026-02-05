@@ -16,6 +16,7 @@ import {
 } from "@/contracts/dtos/customer-bid.dto";
 import {
   CustomerBidDatabaseError,
+  CustomerBidQueryError,
   CustomerBidSyncInProgressError,
 } from "@/utils/errors/customer-bid-errors";
 import { createChildLogger } from "@/telemetry/logger";
@@ -49,6 +50,8 @@ interface BaseBidRow {
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
   isLost: boolean | null;
+  lastUpdatedAt: Date | null;
+  lastUpdatedBy: string | null;
   confirmedAt: Date | null;
   confirmedBy: string | null;
   yearAround: boolean | null;
@@ -170,6 +173,12 @@ export class CustomerBidService implements ICustomerBidService {
         whereConditions.push(Prisma.sql`c.co_op_code = ${query.coOpCode}`);
       }
 
+      if (query.isLost !== undefined) {
+        whereConditions.push(
+          Prisma.sql`COALESCE(cbd.is_lost, false) = ${query.isLost}`
+        );
+      }
+
       if (query.confirmed !== undefined) {
         if (query.confirmed) {
           // Show only confirmed items (confirmed_at is NOT NULL)
@@ -225,6 +234,9 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_september AS "lySeptember",
             cbd.ly_october AS "lyOctober",
             COALESCE(cbd.is_lost, false) AS "isLost",
+            -- Last updated tracking
+            cbd.last_updated_at AS "lastUpdatedAt",
+            cbd.last_updated_by AS "lastUpdatedBy",
             -- User-editable fields
             cbd.confirmed_at AS "confirmedAt",
             cbd.confirmed_by AS "confirmedBy",
@@ -292,6 +304,8 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_september,
             cbd.ly_october,
             cbd.is_lost,
+            cbd.last_updated_at,
+            cbd.last_updated_by,
             cbd.confirmed_at,
             cbd.confirmed_by,
             cbd.year_around,
@@ -354,6 +368,9 @@ export class CustomerBidService implements ICustomerBidService {
         lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
         lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
         isLost: row.isLost ?? false,
+        // Last updated tracking
+        lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
+        lastUpdatedBy: row.lastUpdatedBy ?? null,
         // Confirmation fields
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
         confirmedBy: row.confirmedBy ?? null,
@@ -479,7 +496,8 @@ export class CustomerBidService implements ICustomerBidService {
    */
   async updateBid(
     key: CustomerBidKeyDto,
-    data: UpdateCustomerBidDto
+    data: UpdateCustomerBidDto,
+    userEmail: string
   ): Promise<CustomerBidDto> {
     logger.debug(
       { event: "customer-bid.update", key, data },
@@ -487,17 +505,86 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
+      const compositeKey = {
+        sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
+          sourceDb: key.sourceDb,
+          siteCode: key.siteCode,
+          customerBillTo: key.customerBillTo,
+          itemNo: key.itemNo,
+          schoolYear: key.schoolYear,
+        },
+      };
+
+      // Check if bid is confirmed — enforce restrictions
+      const existing = await this.prisma.customerBidData.findUnique({
+        where: compositeKey,
+      });
+
+      if (existing?.confirmedAt) {
+        // Reject yearAround changes on confirmed bids
+        if (data.yearAround !== undefined) {
+          throw new CustomerBidQueryError(
+            "Cannot update Year Around on a confirmed bid"
+          );
+        }
+
+        // Reject menu month changes on confirmed bids
+        const menuFields = [
+          "menuJan",
+          "menuFeb",
+          "menuMar",
+          "menuApr",
+          "menuMay",
+          "menuJun",
+          "menuJul",
+          "menuAug",
+          "menuSep",
+          "menuOct",
+          "menuNov",
+          "menuDec",
+        ] as const;
+        for (const field of menuFields) {
+          if (data[field] !== undefined) {
+            throw new CustomerBidQueryError(
+              "Cannot update menu months on a confirmed bid"
+            );
+          }
+        }
+
+        // For estimates: only allow updates for months where menu is selected (or yearAround)
+        const estimateToMenu = [
+          { est: "estimateJan", menu: existing.menuJan },
+          { est: "estimateFeb", menu: existing.menuFeb },
+          { est: "estimateMar", menu: existing.menuMar },
+          { est: "estimateApr", menu: existing.menuApr },
+          { est: "estimateMay", menu: existing.menuMay },
+          { est: "estimateJun", menu: existing.menuJun },
+          { est: "estimateJul", menu: existing.menuJul },
+          { est: "estimateAug", menu: existing.menuAug },
+          { est: "estimateSep", menu: existing.menuSep },
+          { est: "estimateOct", menu: existing.menuOct },
+          { est: "estimateNov", menu: existing.menuNov },
+          { est: "estimateDec", menu: existing.menuDec },
+        ] as const;
+        const isYearAround = existing.yearAround ?? false;
+
+        for (const { est, menu } of estimateToMenu) {
+          if (data[est] !== undefined) {
+            const hasMenu = isYearAround || menu === true;
+            if (!hasMenu) {
+              throw new CustomerBidQueryError(
+                `Cannot update ${est} — menu month is not selected`
+              );
+            }
+          }
+        }
+      }
+
+      const now = new Date();
+
       // Upsert the record - create if not exists, update if exists
       const record = await this.prisma.customerBidData.upsert({
-        where: {
-          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-            sourceDb: key.sourceDb,
-            siteCode: key.siteCode,
-            customerBillTo: key.customerBillTo,
-            itemNo: key.itemNo,
-            schoolYear: key.schoolYear,
-          },
-        },
+        where: compositeKey,
         create: {
           sourceDb: key.sourceDb,
           siteCode: key.siteCode,
@@ -505,6 +592,8 @@ export class CustomerBidService implements ICustomerBidService {
           itemNo: key.itemNo,
           schoolYear: key.schoolYear,
           yearAround: data.yearAround ?? false,
+          lastUpdatedAt: now,
+          lastUpdatedBy: userEmail,
           // Monthly estimates
           estimateJan: data.estimateJan,
           estimateFeb: data.estimateFeb,
@@ -534,6 +623,8 @@ export class CustomerBidService implements ICustomerBidService {
         },
         update: {
           yearAround: data.yearAround,
+          lastUpdatedAt: now,
+          lastUpdatedBy: userEmail,
           // Monthly estimates
           estimateJan: data.estimateJan,
           estimateFeb: data.estimateFeb,
@@ -570,6 +661,10 @@ export class CustomerBidService implements ICustomerBidService {
 
       return this.recordToDto(record);
     } catch (error) {
+      if (error instanceof CustomerBidQueryError) {
+        throw error;
+      }
+
       logger.error(
         { event: "customer-bid.update.error", key, error },
         "Failed to update customer bid"
@@ -586,7 +681,8 @@ export class CustomerBidService implements ICustomerBidService {
    * Bulk update user-editable fields on multiple customer bid records
    */
   async bulkUpdateBids(
-    data: BulkUpdateCustomerBidDto
+    data: BulkUpdateCustomerBidDto,
+    userEmail: string
   ): Promise<BulkUpdateResultDto> {
     logger.debug(
       { event: "customer-bid.bulk-update", recordCount: data.records.length },
@@ -635,7 +731,8 @@ export class CustomerBidService implements ICustomerBidService {
             menuOct: record.menuOct,
             menuNov: record.menuNov,
             menuDec: record.menuDec,
-          }
+          },
+          userEmail
         );
         updated++;
       } catch (error) {
@@ -674,6 +771,8 @@ export class CustomerBidService implements ICustomerBidService {
     lySeptember: Prisma.Decimal | null;
     lyOctober: Prisma.Decimal | null;
     isLost: boolean;
+    lastUpdatedAt: Date | null;
+    lastUpdatedBy: string | null;
     confirmedAt: Date | null;
     confirmedBy: string | null;
     yearAround: boolean;
@@ -729,6 +828,8 @@ export class CustomerBidService implements ICustomerBidService {
       lySeptember: record.lySeptember ? Number(record.lySeptember) : null,
       lyOctober: record.lyOctober ? Number(record.lyOctober) : null,
       isLost: record.isLost,
+      lastUpdatedAt: record.lastUpdatedAt?.toISOString() ?? null,
+      lastUpdatedBy: record.lastUpdatedBy ?? null,
       confirmedAt: record.confirmedAt?.toISOString() ?? null,
       confirmedBy: record.confirmedBy ?? null,
       yearAround: record.yearAround,
@@ -770,7 +871,8 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
-      const record = await this.prisma.customerBidData.upsert({
+      // Validate: at least 1 month must have both an estimate and a menu month
+      const existing = await this.prisma.customerBidData.findUnique({
         where: {
           sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
             sourceDb: key.sourceDb,
@@ -780,16 +882,52 @@ export class CustomerBidService implements ICustomerBidService {
             schoolYear: key.schoolYear,
           },
         },
-        create: {
-          sourceDb: key.sourceDb,
-          siteCode: key.siteCode,
-          customerBillTo: key.customerBillTo,
-          itemNo: key.itemNo,
-          schoolYear: key.schoolYear,
-          confirmedBy: userEmail,
-          confirmedAt: new Date(),
+      });
+
+      if (!existing) {
+        throw new CustomerBidQueryError(
+          "Cannot confirm: no estimate or menu month data exists for this bid"
+        );
+      }
+
+      const months = [
+        { est: existing.estimateJan, menu: existing.menuJan },
+        { est: existing.estimateFeb, menu: existing.menuFeb },
+        { est: existing.estimateMar, menu: existing.menuMar },
+        { est: existing.estimateApr, menu: existing.menuApr },
+        { est: existing.estimateMay, menu: existing.menuMay },
+        { est: existing.estimateJun, menu: existing.menuJun },
+        { est: existing.estimateJul, menu: existing.menuJul },
+        { est: existing.estimateAug, menu: existing.menuAug },
+        { est: existing.estimateSep, menu: existing.menuSep },
+        { est: existing.estimateOct, menu: existing.menuOct },
+        { est: existing.estimateNov, menu: existing.menuNov },
+        { est: existing.estimateDec, menu: existing.menuDec },
+      ];
+      const yearAround = existing.yearAround ?? false;
+      const hasValidMonth = months.some((m) => {
+        const hasEst = m.est != null && Number(m.est) > 0;
+        const hasMenu = yearAround || m.menu === true;
+        return hasEst && hasMenu;
+      });
+
+      if (!hasValidMonth) {
+        throw new CustomerBidQueryError(
+          "Cannot confirm: at least one month must have both an estimate and a menu month selected"
+        );
+      }
+
+      const record = await this.prisma.customerBidData.update({
+        where: {
+          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
+            sourceDb: key.sourceDb,
+            siteCode: key.siteCode,
+            customerBillTo: key.customerBillTo,
+            itemNo: key.itemNo,
+            schoolYear: key.schoolYear,
+          },
         },
-        update: {
+        data: {
           confirmedBy: userEmail,
           confirmedAt: new Date(),
         },

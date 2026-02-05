@@ -23,6 +23,13 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/shadcn/components/tabs";
 import { Switch } from "@/shadcn/components/switch";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shadcn/components/select";
+import {
   getCustomerBids,
   getCustomerBidFilterOptions,
   updateCustomerBid,
@@ -99,6 +106,11 @@ function parseFiltersFromURL(
         ? false
         : undefined;
 
+  // Parse isLost param
+  const isLostParam = searchParams.get("isLost");
+  const isLost =
+    isLostParam === "true" ? true : isLostParam === "false" ? false : undefined;
+
   return {
     page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
     limit: searchParams.get("limit")
@@ -112,6 +124,7 @@ function parseFiltersFromURL(
     itemCode: searchParams.get("itemCode") || undefined,
     erpStatus: searchParams.get("erpStatus") || undefined,
     coOpCode: searchParams.get("coOpCode") || undefined,
+    isLost,
     confirmed: confirmed ?? defaultConfirmed,
   };
 }
@@ -136,6 +149,9 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.itemCode) params.set("itemCode", filters.itemCode);
   if (filters.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters.coOpCode) params.set("coOpCode", filters.coOpCode);
+  if (filters.isLost !== undefined) {
+    params.set("isLost", filters.isLost.toString());
+  }
   // Always include confirmed in URL (false is default, true means showing confirmed only)
   if (filters.confirmed !== undefined) {
     params.set("confirmed", filters.confirmed.toString());
@@ -208,6 +224,12 @@ export default function CustomerBids({
       : param === "false"
         ? false
         : defaultConfirmed;
+  });
+  const [isLostFilter, setIsLostFilter] = useState<string>(() => {
+    const param = searchParams.get("isLost");
+    if (param === "true") return "new";
+    if (param === "false") return "renewed";
+    return "all";
   });
 
   // Filter options for datalist autocomplete
@@ -317,6 +339,12 @@ export default function CustomerBids({
       itemCode: itemCodeInput || undefined,
       erpStatus: erpStatusInput || undefined,
       coOpCode: coOpCodeInput || undefined,
+      isLost:
+        isLostFilter === "renewed"
+          ? false
+          : isLostFilter === "new"
+            ? true
+            : undefined,
       confirmed: confirmedFilter,
     };
     setFilters(newFilters);
@@ -332,6 +360,7 @@ export default function CustomerBids({
     setErpStatusInput("");
     setCoOpCodeInput("");
     setConfirmedFilter(defaultConfirmed);
+    setIsLostFilter("all");
     setFilters((prev) => ({
       page: 1,
       limit: prev.limit,
@@ -356,6 +385,7 @@ export default function CustomerBids({
       itemCodeInput ||
       erpStatusInput ||
       coOpCodeInput ||
+      isLostFilter !== "all" ||
       (showConfirmedFilter && confirmedFilter)
   );
 
@@ -367,6 +397,7 @@ export default function CustomerBids({
     itemCodeInput,
     erpStatusInput,
     coOpCodeInput,
+    isLostFilter !== "all",
     showConfirmedFilter && confirmedFilter,
   ].filter(Boolean).length;
 
@@ -397,6 +428,8 @@ export default function CustomerBids({
             b.itemCode === bid.itemCode
               ? {
                   ...b,
+                  lastUpdatedAt: updated.lastUpdatedAt,
+                  lastUpdatedBy: updated.lastUpdatedBy,
                   confirmedAt: updated.confirmedAt,
                   confirmedBy: updated.confirmedBy,
                   yearAround: updated.yearAround,
@@ -449,19 +482,16 @@ export default function CustomerBids({
       const key = buildBidKey(bid, schoolYearString);
 
       try {
-        const updated = await confirmCustomerBid(key);
+        await confirmCustomerBid(key);
         setBids((prev) =>
-          prev.map((b) =>
-            b.sourceDb === bid.sourceDb &&
-            b.siteCode === bid.siteCode &&
-            b.customerBillTo === bid.customerBillTo &&
-            b.itemCode === bid.itemCode
-              ? {
-                  ...b,
-                  confirmedAt: updated.confirmedAt,
-                  confirmedBy: updated.confirmedBy,
-                }
-              : b
+          prev.filter(
+            (b) =>
+              !(
+                b.sourceDb === bid.sourceDb &&
+                b.siteCode === bid.siteCode &&
+                b.customerBillTo === bid.customerBillTo &&
+                b.itemCode === bid.itemCode
+              )
           )
         );
         toast.success("Bid confirmed");
@@ -682,6 +712,21 @@ export default function CustomerBids({
                   label="ERP Status"
                 />
               </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-foreground">
+                  Renewed/New
+                </Label>
+                <Select value={isLostFilter} onValueChange={setIsLostFilter}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="renewed">Renewed Only</SelectItem>
+                    <SelectItem value="new">New Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {showConfirmedFilter && (
                 <div className="flex items-center justify-between py-2">
                   <Label
@@ -746,7 +791,9 @@ export default function CustomerBids({
                     setTimeout(() => setColumnsDropdownOpen(true), 0);
                   }}
                 >
-                  {column.id.replace(/([A-Z])/g, " $1").trim()}
+                  {column.id === "isLost"
+                    ? "Renewed/New"
+                    : column.id.replace(/([A-Z])/g, " $1").trim()}
                 </DropdownMenuCheckboxItem>
               ))}
           </DropdownMenuContent>

@@ -4,6 +4,7 @@ import type { CustomerBidDto } from "@/types/customer-bids";
 export interface ExportColumn {
   key: string;
   header: string;
+  format?: (value: unknown) => string;
 }
 
 /**
@@ -35,8 +36,10 @@ export function exportToCSV<T extends object>(
     columns.reduce(
       (acc, col) => {
         const value = (row as Record<string, unknown>)[col.key];
-        // Format boolean values for readability
-        if (typeof value === "boolean") {
+        // Use custom format function if provided
+        if (col.format) {
+          acc[col.header] = col.format(value);
+        } else if (typeof value === "boolean") {
           acc[col.header] = value ? "Yes" : "No";
         } else if (value === null || value === undefined) {
           acc[col.header] = "";
@@ -143,7 +146,11 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "brandName", header: "Brand Name" },
   { key: "erpStatus", header: "ERP Status" },
   // Bid info
-  { key: "isLost", header: "Lost" },
+  {
+    key: "isLost",
+    header: "Renewed/New",
+    format: (v) => (v ? "New" : "Renewed"),
+  },
   { key: "bidStartDate", header: "Bid Start" },
   { key: "bidEndDate", header: "Bid End" },
   { key: "bidQuantity", header: "Bid Qty" },
@@ -153,7 +160,9 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "lyAugust", header: "LY August" },
   { key: "lySeptember", header: "LY September" },
   { key: "lyOctober", header: "LY October" },
-  // User-editable fields (always included)
+  // Tracking fields
+  { key: "lastUpdatedAt", header: "Last Updated At" },
+  { key: "lastUpdatedBy", header: "Last Updated By" },
   { key: "confirmedAt", header: "Confirmed At" },
   { key: "confirmedBy", header: "Confirmed By" },
   { key: "yearAround", header: "Year Around" },

@@ -57,6 +57,12 @@ export interface CustomerBidDto {
   /** True if item was in previous year but NOT in current year */
   isLost: boolean;
 
+  // Last updated tracking
+  /** ISO8601 UTC timestamp when last edited, or null if never edited */
+  lastUpdatedAt: string | null;
+  /** Email of user who last edited, or null if never edited */
+  lastUpdatedBy: string | null;
+
   // Confirmation fields
   /** ISO8601 UTC timestamp when confirmed, or null if unconfirmed */
   confirmedAt: string | null;
@@ -165,6 +171,8 @@ export interface CustomerBidFilters {
   coOpCode?: string;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
+  /** Filter by renewed/new status (isLost) */
+  isLost?: boolean;
   /** Filter by confirmation status - defaults to false (show unconfirmed) */
   confirmed?: boolean;
 }

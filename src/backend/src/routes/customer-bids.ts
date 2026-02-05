@@ -307,9 +307,11 @@ router.patch(
         CUSTOMER_BID_SERVICE_TOKEN
       );
 
+      const userEmail = req.user?.email || "unknown";
       const result = await customerBidService.updateBid(
         pathParsed.data,
-        bodyParsed.data
+        bodyParsed.data,
+        userEmail
       );
 
       res.json({
@@ -353,7 +355,11 @@ router.post(
         CUSTOMER_BID_SERVICE_TOKEN
       );
 
-      const result = await customerBidService.bulkUpdateBids(parsed.data);
+      const userEmail = req.user?.email || "unknown";
+      const result = await customerBidService.bulkUpdateBids(
+        parsed.data,
+        userEmail
+      );
 
       res.json({
         status: "success",
