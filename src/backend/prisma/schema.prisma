@@ -1139,6 +1139,36 @@ model CustomerBidSyncLog {
   @@schema("ait")
 }
 
+model ChatLog {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @map("user_id")
+  userEmail           String   @map("user_email")
+  question            String   @db.Text
+  answer              String   @db.Text
+  confidence          Int      @default(0)
+  confidenceReasoning String   @map("confidence_reasoning") @db.Text @default("")
+  accuracy            Int      @default(0)
+  sqlStatus           String   @map("sql_status")
+  rawSql              String?  @map("raw_sql") @db.Text
+  rawResult           Json?    @map("raw_result")
+  sqlInputTokens      Int      @map("sql_input_tokens") @default(0)
+  sqlOutputTokens     Int      @map("sql_output_tokens") @default(0)
+  answerInputTokens   Int      @map("answer_input_tokens") @default(0)
+  answerOutputTokens  Int      @map("answer_output_tokens") @default(0)
+  modelName           String   @map("model_name")
+  promptId            String   @map("prompt_id")
+  responseTimeMs      Int      @map("response_time_ms") @default(0)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  feedbackSentiment   String?  @map("feedback_sentiment")
+  feedbackReason      String?  @map("feedback_reason") @db.Text
+  feedbackAt          DateTime? @map("feedback_at") @db.Timestamptz
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("chat_log")
+  @@schema("ait")
+}
+
 // ============================================
 // SIQ SCHEMA - StockIQ Integration Tables
 // ============================================

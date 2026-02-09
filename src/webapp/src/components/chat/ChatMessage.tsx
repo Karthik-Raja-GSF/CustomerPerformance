@@ -5,18 +5,26 @@ import { User, Copy, Check, Info } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { cn } from "@/shadcn/lib/utils";
 import { markdownComponents } from "@/components/chat/markdown/MarkdownComponents";
+import { ChatMessageFeedback } from "@/components/chat/ChatMessageFeedback";
 import type { ChatMessage as ChatMessageType } from "@/hooks/use-chat";
+import type { FeedbackSentiment } from "@/apis/assistant";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   isStreaming?: boolean;
   onCopy: (messageId: string) => void;
+  onSubmitFeedback?: (
+    messageId: string,
+    sentiment: FeedbackSentiment,
+    reason?: string
+  ) => Promise<void>;
 }
 
 export function ChatMessage({
   message,
   isStreaming,
   onCopy,
+  onSubmitFeedback,
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
@@ -109,20 +117,29 @@ export function ChatMessage({
         )}
       </div>
 
-      {/* Copy button */}
+      {/* Actions: Copy + Feedback */}
       {!isUser && message.content && !isStreaming && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={handleCopy}
-        >
-          {copied ? (
-            <Check className="h-4 w-4 text-green-500" />
-          ) : (
-            <Copy className="h-4 w-4" />
+        <div className="flex items-start gap-1">
+          {onSubmitFeedback && message.metadata?.chatLogId && (
+            <ChatMessageFeedback
+              messageId={message.id}
+              feedback={message.feedback}
+              onSubmit={onSubmitFeedback}
+            />
           )}
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleCopy}
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </div>
       )}
     </div>
   );

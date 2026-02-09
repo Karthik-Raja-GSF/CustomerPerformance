@@ -1,8 +1,18 @@
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { streamChatMessage, ChatStreamMetadata } from "@/apis/assistant";
+import {
+  streamChatMessage,
+  submitChatFeedback,
+  ChatStreamMetadata,
+  FeedbackSentiment,
+} from "@/apis/assistant";
 
 const STORAGE_KEY = "starq-chat-history";
+
+export interface ChatMessageFeedback {
+  sentiment: FeedbackSentiment;
+  reason?: string;
+}
 
 export interface ChatMessage {
   id: string;
@@ -10,6 +20,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   metadata?: ChatStreamMetadata;
+  feedback?: ChatMessageFeedback;
 }
 
 interface UseChatReturn {
@@ -19,6 +30,11 @@ interface UseChatReturn {
   clearChat: () => void;
   copyMessage: (messageId: string) => void;
   exportChat: () => void;
+  submitFeedback: (
+    messageId: string,
+    sentiment: FeedbackSentiment,
+    reason?: string
+  ) => Promise<void>;
 }
 
 function generateId(): string {
@@ -140,6 +156,32 @@ export function useChat(): UseChatReturn {
     [messages]
   );
 
+  const submitFeedback = useCallback(
+    async (
+      messageId: string,
+      sentiment: FeedbackSentiment,
+      reason?: string
+    ) => {
+      const message = messages.find((m) => m.id === messageId);
+      const chatLogId = message?.metadata?.chatLogId;
+      if (!chatLogId) return;
+
+      try {
+        await submitChatFeedback(chatLogId, sentiment, reason);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, feedback: { sentiment, reason } }
+              : msg
+          )
+        );
+      } catch {
+        toast.error("Failed to submit feedback");
+      }
+    },
+    [messages]
+  );
+
   const exportChat = useCallback(() => {
     if (messages.length === 0) {
       toast.error("No messages to export");
@@ -178,5 +220,6 @@ export function useChat(): UseChatReturn {
     clearChat,
     copyMessage,
     exportChat,
+    submitFeedback,
   };
 }

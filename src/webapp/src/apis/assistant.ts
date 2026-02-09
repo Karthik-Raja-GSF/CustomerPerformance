@@ -52,6 +52,8 @@ export interface ChatStreamMetadata {
   rawSql: string | null;
   rawResult: unknown;
   sqlStatus: SqlStatus;
+  // Chat log ID for feedback
+  chatLogId: string | null;
 }
 
 export interface ModelInfo {
@@ -134,4 +136,17 @@ export async function getAvailableModels(): Promise<ModelInfo[]> {
   const response =
     await apiClient.get<ApiResponse<ModelInfo[]>>("/assistant/models");
   return response.data;
+}
+
+export type FeedbackSentiment = "like" | "dislike";
+
+export async function submitChatFeedback(
+  chatLogId: string,
+  feedbackSentiment: FeedbackSentiment,
+  feedbackReason?: string
+): Promise<void> {
+  await apiClient.patch(`/assistant/chat/${chatLogId}/feedback`, {
+    feedbackSentiment,
+    ...(feedbackReason && { feedbackReason }),
+  });
 }

@@ -38,6 +38,11 @@ import {
   CUSTOMER_BID_SERVICE_TOKEN,
 } from "@/services/ICustomerBidService";
 import { CustomerBidService } from "@/services/implementations/CustomerBidService";
+import {
+  IChatLogService,
+  CHAT_LOG_SERVICE_TOKEN,
+} from "@/services/IChatLogService";
+import { ChatLogService } from "@/services/implementations/ChatLogService";
 
 /**
  * DI Container Configuration
@@ -93,6 +98,11 @@ export function setupContainer(prisma: PrismaClient): void {
   // Register CustomerBidService for customer bid data retrieval
   container.register<ICustomerBidService>(CUSTOMER_BID_SERVICE_TOKEN, {
     useClass: CustomerBidService,
+  });
+
+  // Register ChatLogService for persisting AI chat history
+  container.register<IChatLogService>(CHAT_LOG_SERVICE_TOKEN, {
+    useClass: ChatLogService,
   });
 
   // Register SchedulerService for in-app scheduled tasks

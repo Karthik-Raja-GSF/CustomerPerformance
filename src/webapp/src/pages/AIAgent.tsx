@@ -1,23 +1,31 @@
-import { useRef, useEffect } from "react"
-import { Trash2, Download } from "lucide-react"
-import { Button } from "@/shadcn/components/button"
-import { ScrollArea } from "@/shadcn/components/scroll-area"
-import { Separator } from "@/shadcn/components/separator"
-import { ChatMessage, ChatInput, WelcomeScreen } from "@/components/chat"
-import { useChat } from "@/hooks/use-chat"
+import { useRef, useEffect } from "react";
+import { Trash2, Download } from "lucide-react";
+import { Button } from "@/shadcn/components/button";
+import { ScrollArea } from "@/shadcn/components/scroll-area";
+import { Separator } from "@/shadcn/components/separator";
+import { ChatMessage, ChatInput, WelcomeScreen } from "@/components/chat";
+import { useChat } from "@/hooks/use-chat";
 
 export default function AIAgent() {
-  const { messages, isStreaming, sendMessage, clearChat, copyMessage, exportChat } = useChat()
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const {
+    messages,
+    isStreaming,
+    sendMessage,
+    clearChat,
+    copyMessage,
+    exportChat,
+    submitFeedback,
+  } = useChat();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages])
+  }, [messages]);
 
-  const hasMessages = messages.length > 0
+  const hasMessages = messages.length > 0;
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden relative">
@@ -70,8 +78,13 @@ export default function AIAgent() {
                 <ChatMessage
                   key={message.id}
                   message={message}
-                  isStreaming={isStreaming && index === messages.length - 1 && message.role === "assistant"}
+                  isStreaming={
+                    isStreaming &&
+                    index === messages.length - 1 &&
+                    message.role === "assistant"
+                  }
                   onCopy={copyMessage}
+                  onSubmitFeedback={submitFeedback}
                 />
               ))}
             </div>
@@ -84,5 +97,5 @@ export default function AIAgent() {
       {/* Input area */}
       <ChatInput onSend={sendMessage} isStreaming={isStreaming} />
     </div>
-  )
+  );
 }
