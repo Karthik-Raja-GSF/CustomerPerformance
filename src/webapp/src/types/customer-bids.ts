@@ -133,6 +133,8 @@ export interface UpdateCustomerBidDto {
   menuOct?: boolean | null;
   menuNov?: boolean | null;
   menuDec?: boolean | null;
+  /** Virtual flag for bulk import: true → confirmBid(), false → unconfirmBid() */
+  confirmed?: boolean;
 }
 
 /**
@@ -185,6 +187,35 @@ export interface CustomerBidFilterOptions {
   salesReps: string[];
   erpStatuses: string[];
   coOpCodes: string[];
+}
+
+/**
+ * Bulk update request payload - array of records with composite key + editable fields
+ */
+export interface BulkUpdateCustomerBidDto {
+  records: Array<CustomerBidKey & UpdateCustomerBidDto>;
+}
+
+/**
+ * Bulk update preview response — identifies which records would change
+ */
+export interface BulkUpdatePreviewResultDto {
+  changed: number;
+  unchanged: number;
+  changedKeys: string[];
+}
+
+/**
+ * Bulk update response - counts of updated/failed records with error details
+ */
+export interface BulkUpdateResultDto {
+  updated: number;
+  skipped: number;
+  failed: number;
+  errors?: Array<{
+    key: string;
+    message: string;
+  }>;
 }
 
 /**

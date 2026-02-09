@@ -125,6 +125,8 @@ const bulkUpdateSchema = z.object({
         menuOct: z.boolean().nullable().optional(),
         menuNov: z.boolean().nullable().optional(),
         menuDec: z.boolean().nullable().optional(),
+        // Virtual confirmed flag: true → confirmBid(), false → unconfirmBid()
+        confirmed: z.boolean().optional(),
       })
     )
     .min(1)
@@ -317,6 +319,44 @@ router.patch(
       res.json({
         status: "success",
         data: result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * POST /customer-bids/bulk-update/preview
+ * Preview which records would actually change in a bulk update (read-only)
+ *
+ * Request Body: Same as /bulk-update
+ * Response:
+ * - changed: Number of records that would be updated
+ * - unchanged: Number of records with no changes
+ * - changedKeys: Array of composite key strings for changed records
+ */
+router.post(
+  "/bulk-update/preview",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = bulkUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid request body: ${parsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.previewBulkUpdate(parsed.data);
+
+      res.json({
+        status: "success",
+        ...result,
       });
     } catch (error) {
       handleCustomerBidError(error, res, next);

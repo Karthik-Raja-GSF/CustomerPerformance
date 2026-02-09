@@ -1,5 +1,5 @@
 import { injectable, inject } from "tsyringe";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient, Prisma, type CustomerBidData } from "@prisma/client";
 import { ICustomerBidService } from "@/services/ICustomerBidService";
 import {
   CustomerBidQueryDto,
@@ -9,6 +9,7 @@ import {
   UpdateCustomerBidDto,
   BulkUpdateCustomerBidDto,
   BulkUpdateResultDto,
+  BulkUpdatePreviewResultDto,
   CustomerBidFilterOptionsDto,
   SyncResultDto,
   SyncLogDto,
@@ -678,6 +679,183 @@ export class CustomerBidService implements ICustomerBidService {
   }
 
   /**
+   * Check if any editable fields in the incoming update differ from the existing record.
+   * Returns true if at least one field has actually changed.
+   */
+  private hasEditableChanges(
+    existing: CustomerBidData,
+    incoming: UpdateCustomerBidDto
+  ): boolean {
+    // yearAround
+    if (
+      incoming.yearAround !== undefined &&
+      incoming.yearAround !== existing.yearAround
+    )
+      return true;
+
+    // Monthly estimates (Prisma Decimal vs number comparison)
+    const estimateFields = [
+      "estimateJan",
+      "estimateFeb",
+      "estimateMar",
+      "estimateApr",
+      "estimateMay",
+      "estimateJun",
+      "estimateJul",
+      "estimateAug",
+      "estimateSep",
+      "estimateOct",
+      "estimateNov",
+      "estimateDec",
+    ] as const;
+    for (const field of estimateFields) {
+      const inc = incoming[field];
+      if (inc === undefined) continue;
+      const ext = existing[field];
+      if (ext === null && inc === null) continue;
+      if (ext === null || inc === null) return true;
+      if (ext.toNumber() !== inc) return true;
+    }
+
+    // Menu months (boolean | null comparison — treat null and false as equivalent)
+    const menuFields = [
+      "menuJan",
+      "menuFeb",
+      "menuMar",
+      "menuApr",
+      "menuMay",
+      "menuJun",
+      "menuJul",
+      "menuAug",
+      "menuSep",
+      "menuOct",
+      "menuNov",
+      "menuDec",
+    ] as const;
+    for (const field of menuFields) {
+      if (incoming[field] === undefined) continue;
+      const incMenu = incoming[field] ?? false;
+      const extMenu = existing[field] ?? false;
+      if (incMenu !== extMenu) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if an incoming update has any non-default values worth writing.
+   * Used when no existing DB record exists — only create if there's real data.
+   */
+  private hasNonDefaultValues(incoming: UpdateCustomerBidDto): boolean {
+    if (incoming.yearAround === true) return true;
+
+    const estimateFields = [
+      "estimateJan",
+      "estimateFeb",
+      "estimateMar",
+      "estimateApr",
+      "estimateMay",
+      "estimateJun",
+      "estimateJul",
+      "estimateAug",
+      "estimateSep",
+      "estimateOct",
+      "estimateNov",
+      "estimateDec",
+    ] as const;
+    for (const f of estimateFields) {
+      if (incoming[f] !== undefined && incoming[f] !== null) return true;
+    }
+
+    const menuFields = [
+      "menuJan",
+      "menuFeb",
+      "menuMar",
+      "menuApr",
+      "menuMay",
+      "menuJun",
+      "menuJul",
+      "menuAug",
+      "menuSep",
+      "menuOct",
+      "menuNov",
+      "menuDec",
+    ] as const;
+    for (const f of menuFields) {
+      if (incoming[f] === true) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Preview which records in a bulk update would actually change.
+   * Uses a single findMany query for efficiency (read-only, no writes).
+   */
+  async previewBulkUpdate(
+    data: BulkUpdateCustomerBidDto
+  ): Promise<BulkUpdatePreviewResultDto> {
+    logger.debug(
+      { event: "customer-bid.bulk-preview", recordCount: data.records.length },
+      "Previewing bulk update"
+    );
+
+    // Build OR conditions for a single batch query
+    const orConditions = data.records.map((r) => ({
+      sourceDb: r.sourceDb,
+      siteCode: r.siteCode,
+      customerBillTo: r.customerBillTo,
+      itemNo: r.itemNo,
+      schoolYear: r.schoolYear,
+    }));
+
+    const existingRecords = await this.prisma.customerBidData.findMany({
+      where: { OR: orConditions },
+    });
+
+    // Build lookup map: "sourceDb/siteCode/customerBillTo/itemNo/schoolYear" → record
+    const existingMap = new Map<string, CustomerBidData>();
+    for (const rec of existingRecords) {
+      const key = `${rec.sourceDb}/${rec.siteCode}/${rec.customerBillTo}/${rec.itemNo}/${rec.schoolYear}`;
+      existingMap.set(key, rec);
+    }
+
+    let changed = 0;
+    let unchanged = 0;
+    const changedKeys: string[] = [];
+
+    for (const record of data.records) {
+      const keyStr = `${record.sourceDb}/${record.siteCode}/${record.customerBillTo}/${record.itemNo}/${record.schoolYear}`;
+      const existing = existingMap.get(keyStr);
+
+      let needsConfirmChange = false;
+      if (record.confirmed === true && !existing?.confirmedAt) {
+        needsConfirmChange = true;
+      } else if (record.confirmed === false && existing?.confirmedAt) {
+        needsConfirmChange = true;
+      }
+
+      const needsFieldUpdate = existing
+        ? this.hasEditableChanges(existing, record)
+        : this.hasNonDefaultValues(record);
+
+      if (needsFieldUpdate || needsConfirmChange) {
+        changed++;
+        changedKeys.push(keyStr);
+      } else {
+        unchanged++;
+      }
+    }
+
+    logger.info(
+      { event: "customer-bid.bulk-preview.complete", changed, unchanged },
+      "Bulk preview completed"
+    );
+
+    return { changed, unchanged, changedKeys };
+  }
+
+  /**
    * Bulk update user-editable fields on multiple customer bid records
    */
   async bulkUpdateBids(
@@ -690,54 +868,115 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     let updated = 0;
+    let skipped = 0;
     let failed = 0;
     const errors: Array<{ key: string; message: string }> = [];
 
     for (const record of data.records) {
+      const key = {
+        sourceDb: record.sourceDb,
+        siteCode: record.siteCode,
+        customerBillTo: record.customerBillTo,
+        itemNo: record.itemNo,
+        schoolYear: record.schoolYear,
+      };
+      const keyStr = `${key.sourceDb}/${key.siteCode}/${key.customerBillTo}/${key.itemNo}/${key.schoolYear}`;
+
       try {
-        await this.updateBid(
-          {
-            sourceDb: record.sourceDb,
-            siteCode: record.siteCode,
-            customerBillTo: record.customerBillTo,
-            itemNo: record.itemNo,
-            schoolYear: record.schoolYear,
+        // Fetch existing record to check for actual changes
+        const compositeKey = {
+          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
+            sourceDb: key.sourceDb,
+            siteCode: key.siteCode,
+            customerBillTo: key.customerBillTo,
+            itemNo: key.itemNo,
+            schoolYear: key.schoolYear,
           },
-          {
-            yearAround: record.yearAround,
-            // Monthly estimates
-            estimateJan: record.estimateJan,
-            estimateFeb: record.estimateFeb,
-            estimateMar: record.estimateMar,
-            estimateApr: record.estimateApr,
-            estimateMay: record.estimateMay,
-            estimateJun: record.estimateJun,
-            estimateJul: record.estimateJul,
-            estimateAug: record.estimateAug,
-            estimateSep: record.estimateSep,
-            estimateOct: record.estimateOct,
-            estimateNov: record.estimateNov,
-            estimateDec: record.estimateDec,
-            // Menu months
-            menuJan: record.menuJan,
-            menuFeb: record.menuFeb,
-            menuMar: record.menuMar,
-            menuApr: record.menuApr,
-            menuMay: record.menuMay,
-            menuJun: record.menuJun,
-            menuJul: record.menuJul,
-            menuAug: record.menuAug,
-            menuSep: record.menuSep,
-            menuOct: record.menuOct,
-            menuNov: record.menuNov,
-            menuDec: record.menuDec,
-          },
-          userEmail
-        );
+        };
+        const existing = await this.prisma.customerBidData.findUnique({
+          where: compositeKey,
+        });
+
+        let needsConfirmChange = false;
+        if (record.confirmed === true && !existing?.confirmedAt) {
+          needsConfirmChange = true;
+        } else if (record.confirmed === false && existing?.confirmedAt) {
+          needsConfirmChange = true;
+        }
+
+        const needsFieldUpdate = existing
+          ? this.hasEditableChanges(existing, record)
+          : this.hasNonDefaultValues(record);
+
+        // Skip if nothing actually changed
+        if (!needsFieldUpdate && !needsConfirmChange) {
+          skipped++;
+          continue;
+        }
+
+        // If unconfirming, do it first so updateBid won't reject field changes
+        if (record.confirmed === false) {
+          try {
+            await this.unconfirmBid(key);
+          } catch (unconfirmError) {
+            errors.push({
+              key: keyStr,
+              message: `Unconfirm failed: ${unconfirmError instanceof Error ? unconfirmError.message : "Unknown error"}`,
+            });
+          }
+        }
+
+        // Only call updateBid if editable fields actually changed
+        if (needsFieldUpdate) {
+          await this.updateBid(
+            key,
+            {
+              yearAround: record.yearAround,
+              // Monthly estimates
+              estimateJan: record.estimateJan,
+              estimateFeb: record.estimateFeb,
+              estimateMar: record.estimateMar,
+              estimateApr: record.estimateApr,
+              estimateMay: record.estimateMay,
+              estimateJun: record.estimateJun,
+              estimateJul: record.estimateJul,
+              estimateAug: record.estimateAug,
+              estimateSep: record.estimateSep,
+              estimateOct: record.estimateOct,
+              estimateNov: record.estimateNov,
+              estimateDec: record.estimateDec,
+              // Menu months
+              menuJan: record.menuJan,
+              menuFeb: record.menuFeb,
+              menuMar: record.menuMar,
+              menuApr: record.menuApr,
+              menuMay: record.menuMay,
+              menuJun: record.menuJun,
+              menuJul: record.menuJul,
+              menuAug: record.menuAug,
+              menuSep: record.menuSep,
+              menuOct: record.menuOct,
+              menuNov: record.menuNov,
+              menuDec: record.menuDec,
+            },
+            userEmail
+          );
+        }
         updated++;
+
+        // If confirming, do it after fields are saved (confirm validates estimates + menus)
+        if (record.confirmed === true) {
+          try {
+            await this.confirmBid(key, userEmail);
+          } catch (confirmError) {
+            errors.push({
+              key: keyStr,
+              message: `Fields updated but confirmation failed: ${confirmError instanceof Error ? confirmError.message : "Unknown error"}`,
+            });
+          }
+        }
       } catch (error) {
         failed++;
-        const keyStr = `${record.sourceDb}/${record.siteCode}/${record.customerBillTo}/${record.itemNo}/${record.schoolYear}`;
         errors.push({
           key: keyStr,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -746,12 +985,13 @@ export class CustomerBidService implements ICustomerBidService {
     }
 
     logger.info(
-      { event: "customer-bid.bulk-update.complete", updated, failed },
+      { event: "customer-bid.bulk-update.complete", updated, skipped, failed },
       "Bulk update completed"
     );
 
     return {
       updated,
+      skipped,
       failed,
       errors: errors.length > 0 ? errors : undefined,
     };

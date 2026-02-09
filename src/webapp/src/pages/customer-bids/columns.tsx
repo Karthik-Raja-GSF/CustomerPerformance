@@ -95,6 +95,34 @@ function formatNumber(value: number | null | undefined): React.ReactNode {
   return value.toLocaleString();
 }
 
+/**
+ * Check whether a bid meets the requirements for confirmation:
+ * at least one month with an estimate > 0 AND that month on the menu.
+ */
+export function canConfirmBid(bid: CustomerBidDto): boolean {
+  const months = [
+    { estimate: "estimateJan", menu: "menuJan" },
+    { estimate: "estimateFeb", menu: "menuFeb" },
+    { estimate: "estimateMar", menu: "menuMar" },
+    { estimate: "estimateApr", menu: "menuApr" },
+    { estimate: "estimateMay", menu: "menuMay" },
+    { estimate: "estimateJun", menu: "menuJun" },
+    { estimate: "estimateJul", menu: "menuJul" },
+    { estimate: "estimateAug", menu: "menuAug" },
+    { estimate: "estimateSep", menu: "menuSep" },
+    { estimate: "estimateOct", menu: "menuOct" },
+    { estimate: "estimateNov", menu: "menuNov" },
+    { estimate: "estimateDec", menu: "menuDec" },
+  ] as const;
+
+  return months.some((m) => {
+    const est = bid[m.estimate];
+    const hasEstimate = est != null && est > 0;
+    const hasMenu = bid.yearAround || bid[m.menu] === true;
+    return hasEstimate && hasMenu;
+  });
+}
+
 function ConfirmCell({
   bid,
   onConfirm,
@@ -109,29 +137,7 @@ function ConfirmCell({
   const [isLoading, setIsLoading] = useState(false);
   const isConfirmed = !!bid.confirmedAt;
 
-  const canConfirm = useMemo(() => {
-    const months = [
-      { estimate: "estimateJan", menu: "menuJan" },
-      { estimate: "estimateFeb", menu: "menuFeb" },
-      { estimate: "estimateMar", menu: "menuMar" },
-      { estimate: "estimateApr", menu: "menuApr" },
-      { estimate: "estimateMay", menu: "menuMay" },
-      { estimate: "estimateJun", menu: "menuJun" },
-      { estimate: "estimateJul", menu: "menuJul" },
-      { estimate: "estimateAug", menu: "menuAug" },
-      { estimate: "estimateSep", menu: "menuSep" },
-      { estimate: "estimateOct", menu: "menuOct" },
-      { estimate: "estimateNov", menu: "menuNov" },
-      { estimate: "estimateDec", menu: "menuDec" },
-    ] as const;
-
-    return months.some((m) => {
-      const est = bid[m.estimate];
-      const hasEstimate = est != null && est > 0;
-      const hasMenu = bid.yearAround || bid[m.menu] === true;
-      return hasEstimate && hasMenu;
-    });
-  }, [bid]);
+  const canConfirm = useMemo(() => canConfirmBid(bid), [bid]);
 
   const handleAction = async (action: () => Promise<void>) => {
     setIsLoading(true);

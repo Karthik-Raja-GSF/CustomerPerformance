@@ -1,12 +1,31 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronDown, Download, Filter, RefreshCw } from "lucide-react";
+import {
+  CheckCheck,
+  ChevronDown,
+  Download,
+  Upload,
+  Filter,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Input } from "@/shadcn/components/input";
 import { Label } from "@/shadcn/components/label";
 import { FilterCombobox } from "@/components/filter-combobox";
 import { Badge } from "@/shadcn/components/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/shadcn/components/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -35,6 +54,7 @@ import {
   updateCustomerBid,
   confirmCustomerBid,
   unconfirmCustomerBid,
+  bulkUpdateCustomerBids,
   buildBidKey,
 } from "@/apis/customer-bids";
 import type {
@@ -50,12 +70,13 @@ import {
   DataTable,
   type VisibilityState,
 } from "@/pages/customer-bids/data-table";
-import { createColumns } from "@/pages/customer-bids/columns";
+import { createColumns, canConfirmBid } from "@/pages/customer-bids/columns";
 import {
   exportToCSV,
   exportToSIQCSV,
   customerBidExportColumns,
 } from "@/utils/export-csv";
+import { CSVImportDialog } from "@/components/csv-import-dialog";
 import type { Table } from "@tanstack/react-table";
 
 /**
@@ -168,6 +189,7 @@ interface CustomerBidsProps {
   canUnconfirm?: boolean;
   showSIQExport?: boolean;
   showCSVExport?: boolean;
+  showCSVImport?: boolean;
   showConfirmedFilter?: boolean;
 }
 
@@ -179,6 +201,7 @@ export default function CustomerBids({
   canUnconfirm = true,
   showSIQExport = false,
   showCSVExport = true,
+  showCSVImport = true,
   showConfirmedFilter = true,
 }: CustomerBidsProps) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -250,6 +273,12 @@ export default function CustomerBids({
     useState<Table<CustomerBidDto> | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [columnsDropdownOpen, setColumnsDropdownOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const schoolYearString = useMemo(
+    () => getSchoolYearString((filters.schoolYear as SchoolYear) || "next"),
+    [filters.schoolYear]
+  );
 
   const fetchData = useCallback(async (currentFilters: CustomerBidFilters) => {
     setIsLoading(true);
@@ -539,6 +568,54 @@ export default function CustomerBids({
     [filters.schoolYear]
   );
 
+  // Bulk confirm — bids eligible for confirmation on the current page
+  const confirmableBids = useMemo(
+    () => bids.filter((b) => !b.confirmedAt && canConfirmBid(b)),
+    [bids]
+  );
+
+  const [isConfirmingAll, setIsConfirmingAll] = useState(false);
+
+  const handleConfirmAll = useCallback(async () => {
+    const schoolYearString = getSchoolYearString(filters.schoolYear || "next");
+    const records = confirmableBids.map((bid) => ({
+      ...buildBidKey(bid, schoolYearString),
+      confirmed: true as const,
+    }));
+
+    setIsConfirmingAll(true);
+    try {
+      const result = await bulkUpdateCustomerBids({ records });
+      const confirmedKeys = new Set(
+        confirmableBids.map(
+          (b) => `${b.sourceDb}/${b.siteCode}/${b.customerBillTo}/${b.itemCode}`
+        )
+      );
+      setBids((prev) =>
+        prev.filter(
+          (b) =>
+            !confirmedKeys.has(
+              `${b.sourceDb}/${b.siteCode}/${b.customerBillTo}/${b.itemCode}`
+            )
+        )
+      );
+      toast.success(
+        `${result.updated} bid${result.updated !== 1 ? "s" : ""} confirmed`
+      );
+      if (result.failed > 0) {
+        toast.error(
+          `${result.failed} record${result.failed !== 1 ? "s" : ""} failed`
+        );
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to confirm bids";
+      toast.error(message);
+    } finally {
+      setIsConfirmingAll(false);
+    }
+  }, [confirmableBids, filters.schoolYear]);
+
   // Create columns with the cell update handler
   const tableColumns = useMemo(
     () =>
@@ -806,8 +883,23 @@ export default function CustomerBids({
             size="sm"
             disabled={bids.length === 0 || isLoading}
             onClick={() => {
-              exportToCSV(bids, customerBidExportColumns, "customer-bids");
-              toast.success("CSV exported successfully");
+              const exportable = bids.filter(
+                (b) =>
+                  b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
+              );
+              exportToCSV(
+                exportable,
+                customerBidExportColumns,
+                "customer-bids"
+              );
+              const skipped = bids.length - exportable.length;
+              if (skipped > 0) {
+                toast.success(
+                  `CSV exported (${skipped} record${skipped > 1 ? "s" : ""} skipped — missing key fields)`
+                );
+              } else {
+                toast.success("CSV exported successfully");
+              }
             }}
           >
             <Download className="h-4 w-4 mr-2" />
@@ -827,6 +919,57 @@ export default function CustomerBids({
             <Download className="h-4 w-4 mr-2" />
             Export SIQ
           </Button>
+        )}
+
+        {/* Import button */}
+        {showCSVImport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import CSV
+          </Button>
+        )}
+
+        {/* Confirm All button — only when viewing unconfirmed bids */}
+        {!filters.confirmed && confirmableBids.length > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="default"
+                size="sm"
+                disabled={isLoading || isConfirmingAll}
+              >
+                {isConfirmingAll ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-4 w-4 mr-2" />
+                )}
+                Confirm All ({confirmableBids.length})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Confirm {confirmableBids.length} record
+                  {confirmableBids.length !== 1 ? "s" : ""}?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will mark {confirmableBids.length} bid record
+                  {confirmableBids.length !== 1 ? "s" : ""} as confirmed with
+                  your email and the current timestamp.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void handleConfirmAll()}>
+                  Confirm
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
 
         {/* Refresh button */}
@@ -864,6 +1007,16 @@ export default function CustomerBids({
           onTableReady={setTableInstance}
         />
       </div>
+
+      {/* CSV Import Dialog */}
+      {showCSVImport && (
+        <CSVImportDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          schoolYear={schoolYearString}
+          onImportComplete={() => fetchData(filters)}
+        />
+      )}
     </div>
   );
 }

@@ -163,8 +163,11 @@ export const customerBidExportColumns: ExportColumn[] = [
   // Tracking fields
   { key: "lastUpdatedAt", header: "Last Updated At" },
   { key: "lastUpdatedBy", header: "Last Updated By" },
-  { key: "confirmedAt", header: "Confirmed At" },
-  { key: "confirmedBy", header: "Confirmed By" },
+  {
+    key: "confirmedAt",
+    header: "Confirmed",
+    format: (v) => (v ? "Yes" : "No"),
+  },
   { key: "yearAround", header: "Year Around" },
   // Monthly estimates
   { key: "estimateJan", header: "Jan Estimate" },
@@ -179,17 +182,4 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "estimateOct", header: "Oct Estimate" },
   { key: "estimateNov", header: "Nov Estimate" },
   { key: "estimateDec", header: "Dec Estimate" },
-  // Menu months
-  { key: "menuJan", header: "Menu Jan" },
-  { key: "menuFeb", header: "Menu Feb" },
-  { key: "menuMar", header: "Menu Mar" },
-  { key: "menuApr", header: "Menu Apr" },
-  { key: "menuMay", header: "Menu May" },
-  { key: "menuJun", header: "Menu Jun" },
-  { key: "menuJul", header: "Menu Jul" },
-  { key: "menuAug", header: "Menu Aug" },
-  { key: "menuSep", header: "Menu Sep" },
-  { key: "menuOct", header: "Menu Oct" },
-  { key: "menuNov", header: "Menu Nov" },
-  { key: "menuDec", header: "Menu Dec" },
 ];

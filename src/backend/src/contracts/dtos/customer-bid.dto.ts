@@ -199,6 +199,8 @@ export interface UpdateCustomerBidDto {
   menuOct?: boolean | null;
   menuNov?: boolean | null;
   menuDec?: boolean | null;
+  /** Virtual flag for bulk import: true → confirmBid(), false → unconfirmBid() */
+  confirmed?: boolean;
 }
 
 /**
@@ -209,10 +211,21 @@ export interface BulkUpdateCustomerBidDto {
 }
 
 /**
+ * Response for bulk update preview — identifies which records would change
+ */
+export interface BulkUpdatePreviewResultDto {
+  changed: number;
+  unchanged: number;
+  /** Composite key strings: "sourceDb/siteCode/customerBillTo/itemNo/schoolYear" */
+  changedKeys: string[];
+}
+
+/**
  * Response for bulk update operation
  */
 export interface BulkUpdateResultDto {
   updated: number;
+  skipped: number;
   failed: number;
   errors?: Array<{
     key: string;

@@ -5,6 +5,7 @@ import {
   UpdateCustomerBidDto,
   BulkUpdateCustomerBidDto,
   BulkUpdateResultDto,
+  BulkUpdatePreviewResultDto,
   CustomerBidDto,
   CustomerBidFilterOptionsDto,
   SyncResultDto,
@@ -55,6 +56,16 @@ export interface ICustomerBidService {
     data: BulkUpdateCustomerBidDto,
     userEmail: string
   ): Promise<BulkUpdateResultDto>;
+
+  /**
+   * Preview which records in a bulk update payload would actually change
+   *
+   * @param data - Bulk update payload to preview
+   * @returns Promise resolving to preview result with changed/unchanged counts and keys
+   */
+  previewBulkUpdate(
+    data: BulkUpdateCustomerBidDto
+  ): Promise<BulkUpdatePreviewResultDto>;
 
   /**
    * Confirm a customer bid record

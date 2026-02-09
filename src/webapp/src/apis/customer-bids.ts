@@ -12,6 +12,9 @@ import type {
   CustomerBidFilterOptions,
   CustomerBidListResponse,
   UpdateCustomerBidDto,
+  BulkUpdateCustomerBidDto,
+  BulkUpdateResultDto,
+  BulkUpdatePreviewResultDto,
 } from "@/types/customer-bids";
 
 // API response wrapper type
@@ -109,6 +112,40 @@ export async function unconfirmCustomerBid(
  * @param schoolYear - The school year string (e.g., "2026-2027")
  * @returns CustomerBidKey for API calls
  */
+/**
+ * Bulk update multiple customer bid records
+ * Sends to POST /customer-bids/bulk-update (max 1000 records per request)
+ */
+export async function bulkUpdateCustomerBids(
+  payload: BulkUpdateCustomerBidDto
+): Promise<BulkUpdateResultDto> {
+  const response = await apiClient.post<
+    { status: string } & BulkUpdateResultDto
+  >("/customer-bids/bulk-update", payload);
+  return {
+    updated: response.updated,
+    skipped: response.skipped,
+    failed: response.failed,
+    errors: response.errors,
+  };
+}
+
+/**
+ * Preview which records in a bulk update would actually change (read-only)
+ */
+export async function previewBulkUpdateBids(
+  payload: BulkUpdateCustomerBidDto
+): Promise<BulkUpdatePreviewResultDto> {
+  const response = await apiClient.post<
+    { status: string } & BulkUpdatePreviewResultDto
+  >("/customer-bids/bulk-update/preview", payload);
+  return {
+    changed: response.changed,
+    unchanged: response.unchanged,
+    changedKeys: response.changedKeys,
+  };
+}
+
 /**
  * Fetch distinct filter option values for autocomplete suggestions
  */

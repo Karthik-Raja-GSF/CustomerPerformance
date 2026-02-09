@@ -9,6 +9,7 @@ export default function ConfirmedBidItems() {
       canUnconfirm={false}
       showSIQExport={true}
       showCSVExport={false}
+      showCSVImport={false}
       showConfirmedFilter={false}
       defaultColumnVisibility={{
         isLost: false,
