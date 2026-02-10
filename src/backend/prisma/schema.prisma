@@ -1087,20 +1087,6 @@ model CustomerBidData {
   estimateNov Decimal? @map("estimate_nov")
   estimateDec Decimal? @map("estimate_dec")
 
-  // Menu months - which months the item is on the menu (when not year-around)
-  menuJan         Boolean? @default(false) @map("jan")
-  menuFeb         Boolean? @default(false) @map("feb")
-  menuMar         Boolean? @default(false) @map("mar")
-  menuApr         Boolean? @default(false) @map("apr")
-  menuMay         Boolean? @default(false) @map("may")
-  menuJun         Boolean? @default(false) @map("jun")
-  menuJul         Boolean? @default(false) @map("jul")
-  menuAug         Boolean? @default(false) @map("aug")
-  menuSep         Boolean? @default(false) @map("sep")
-  menuOct         Boolean? @default(false) @map("oct")
-  menuNov         Boolean? @default(false) @map("nov")
-  menuDec         Boolean? @default(false) @map("dec")
-
   // Last updated tracking
   lastUpdatedAt DateTime? @map("last_updated_at")
   lastUpdatedBy String?   @map("last_updated_by")

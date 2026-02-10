@@ -10,54 +10,42 @@ import {
 } from "@/shadcn/components/dropdown-menu";
 import {
   MENU_MONTHS,
+  ESTIMATE_MONTHS,
   formatMonthsDisplay,
   type MonthKey,
 } from "@/utils/menu-months";
 import type { UpdateCustomerBidDto } from "@/types/customer-bids";
 
 interface EditableMonthsCellProps {
-  /** Current month values from the row data */
-  data: Partial<Record<MonthKey, boolean | null>>;
+  /** Current menu month selections (from local state, derived from estimates) */
+  monthValues: Record<MonthKey, boolean>;
   /** Whether this is a year-around item (disables editing) */
   yearAround: boolean;
   /** Whether editing is disabled (e.g., confirmed bids) */
   disabled?: boolean;
-  /** Callback when months are saved */
+  /** Callback to persist changes via API (clear estimates, set yearAround) */
   onSave: (updates: UpdateCustomerBidDto) => Promise<void>;
+  /** Callback to update local menu month state in parent (no API call) */
+  onMonthsChange: (months: Record<MonthKey, boolean>) => void;
 }
 
 export function EditableMonthsCell({
-  data,
+  monthValues,
   yearAround,
   disabled = false,
   onSave,
+  onMonthsChange,
 }: EditableMonthsCellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [localMonths, setLocalMonths] = useState<Record<MonthKey, boolean>>(
-    () =>
-      MENU_MONTHS.reduce(
-        (acc, m) => {
-          acc[m.key] = data[m.key] === true;
-          return acc;
-        },
-        {} as Record<MonthKey, boolean>
-      )
+    () => ({ ...monthValues })
   );
 
   // Reset local state when dropdown opens
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      // Reset to current data state when opening
-      setLocalMonths(
-        MENU_MONTHS.reduce(
-          (acc, m) => {
-            acc[m.key] = data[m.key] === true;
-            return acc;
-          },
-          {} as Record<MonthKey, boolean>
-        )
-      );
+      setLocalMonths({ ...monthValues });
     }
     setIsOpen(open);
   };
@@ -96,29 +84,36 @@ export function EditableMonthsCell({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Check if all 12 months are selected
       const allMonthsSelected = MENU_MONTHS.every(
         (month) => localMonths[month.key] === true
       );
 
-      let updates: UpdateCustomerBidDto;
+      // Build API updates for months that need data changes
+      const updates: UpdateCustomerBidDto = {};
+      let hasApiUpdates = false;
 
       if (allMonthsSelected) {
         // All months selected = Year Around
-        // Set yearAround to true and clear all menu months
-        updates = { yearAround: true };
-        for (const month of MENU_MONTHS) {
-          updates[month.key] = false;
-        }
-      } else {
-        // Normal save: just the month values
-        updates = {};
-        for (const month of MENU_MONTHS) {
-          updates[month.key] = localMonths[month.key];
+        updates.yearAround = true;
+        hasApiUpdates = true;
+      }
+
+      // For months toggled OFF (were ON, now OFF), clear the estimate
+      for (const em of ESTIMATE_MONTHS) {
+        if (monthValues[em.menuKey] && !localMonths[em.menuKey]) {
+          (updates as Record<string, unknown>)[em.estimateKey] = null;
+          hasApiUpdates = true;
         }
       }
 
-      await onSave(updates);
+      // Update parent's local state first (shows/hides columns immediately)
+      onMonthsChange(localMonths);
+
+      // Then persist data changes if any
+      if (hasApiUpdates) {
+        await onSave(updates);
+      }
+
       setIsOpen(false);
     } catch {
       // Error is handled by parent (toast shown)
@@ -136,7 +131,7 @@ export function EditableMonthsCell({
     );
   }
 
-  const displayText = formatMonthsDisplay(data);
+  const displayText = formatMonthsDisplay(monthValues);
 
   if (disabled) {
     return (

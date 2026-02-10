@@ -1,6 +1,9 @@
 /**
  * Menu Months Utilities
- * Helper functions for working with month selection fields
+ *
+ * Menu months are a frontend-only UI concept — they are NOT stored in the database.
+ * They control which estimate columns are visible in the table.
+ * On page load, menu months are derived from estimates (estimate > 0 → month selected).
  */
 
 export const MENU_MONTHS = [
@@ -41,7 +44,7 @@ export const ESTIMATE_MONTHS = [
 export type EstimateKey = (typeof ESTIMATE_MONTHS)[number]["estimateKey"];
 
 /**
- * Default months to show for Year Around items: Aug, Oct, Dec
+ * Default months to show for Year Around items: Aug, Sep, Oct
  */
 export const YEAR_AROUND_ESTIMATE_MONTHS = [
   "menuAug",
@@ -50,14 +53,16 @@ export const YEAR_AROUND_ESTIMATE_MONTHS = [
 ] as const;
 
 /**
- * Extract month values from a data object containing month boolean fields
+ * Derive menu month selections from estimate values.
+ * A month is "selected" if its estimate is > 0.
  */
-export function getMonthValues(
-  data: Partial<Record<MonthKey, boolean | null>>
+export function deriveMenuMonthsFromEstimates(
+  data: Partial<Record<EstimateKey, number | null>>
 ): Record<MonthKey, boolean> {
-  return MENU_MONTHS.reduce(
+  return ESTIMATE_MONTHS.reduce(
     (acc, month) => {
-      acc[month.key] = data[month.key] === true;
+      const estimate = data[month.estimateKey];
+      acc[month.menuKey] = estimate != null && estimate > 0;
       return acc;
     },
     {} as Record<MonthKey, boolean>
@@ -66,12 +71,12 @@ export function getMonthValues(
 
 /**
  * Format selected months for display
- * Returns compact display string like "Aug, Sep, Oct" or "All" or "-"
+ * Returns compact display string like "Aug, Sep, Oct" or "All" or "Select Month"
  */
 export function formatMonthsDisplay(
-  data: Partial<Record<MonthKey, boolean | null>>
+  monthValues: Record<MonthKey, boolean>
 ): string {
-  const selected = MENU_MONTHS.filter((m) => data[m.key] === true);
+  const selected = MENU_MONTHS.filter((m) => monthValues[m.key]);
 
   if (selected.length === 0) return "Select Month";
   if (selected.length === 12) return "All";
@@ -85,7 +90,7 @@ export function formatMonthsDisplay(
  * Count selected months
  */
 export function countSelectedMonths(
-  data: Partial<Record<MonthKey, boolean | null>>
+  monthValues: Record<MonthKey, boolean>
 ): number {
-  return MENU_MONTHS.filter((m) => data[m.key] === true).length;
+  return MENU_MONTHS.filter((m) => monthValues[m.key]).length;
 }

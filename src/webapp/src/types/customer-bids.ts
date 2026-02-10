@@ -86,20 +86,6 @@ export interface CustomerBidDto {
   estimateOct: number | null;
   estimateNov: number | null;
   estimateDec: number | null;
-
-  // Menu months - which months the item is on the menu (when not year-around)
-  menuJan: boolean | null;
-  menuFeb: boolean | null;
-  menuMar: boolean | null;
-  menuApr: boolean | null;
-  menuMay: boolean | null;
-  menuJun: boolean | null;
-  menuJul: boolean | null;
-  menuAug: boolean | null;
-  menuSep: boolean | null;
-  menuOct: boolean | null;
-  menuNov: boolean | null;
-  menuDec: boolean | null;
 }
 
 /**
@@ -120,19 +106,6 @@ export interface UpdateCustomerBidDto {
   estimateOct?: number | null;
   estimateNov?: number | null;
   estimateDec?: number | null;
-  // Menu months
-  menuJan?: boolean | null;
-  menuFeb?: boolean | null;
-  menuMar?: boolean | null;
-  menuApr?: boolean | null;
-  menuMay?: boolean | null;
-  menuJun?: boolean | null;
-  menuJul?: boolean | null;
-  menuAug?: boolean | null;
-  menuSep?: boolean | null;
-  menuOct?: boolean | null;
-  menuNov?: boolean | null;
-  menuDec?: boolean | null;
   /** Virtual flag for bulk import: true → confirmBid(), false → unconfirmBid() */
   confirmed?: boolean;
 }

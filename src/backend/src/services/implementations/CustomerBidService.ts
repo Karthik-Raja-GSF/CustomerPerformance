@@ -69,19 +69,6 @@ interface BaseBidRow {
   estimateOct: Prisma.Decimal | null;
   estimateNov: Prisma.Decimal | null;
   estimateDec: Prisma.Decimal | null;
-  // Menu months
-  menuJan: boolean | null;
-  menuFeb: boolean | null;
-  menuMar: boolean | null;
-  menuApr: boolean | null;
-  menuMay: boolean | null;
-  menuJun: boolean | null;
-  menuJul: boolean | null;
-  menuAug: boolean | null;
-  menuSep: boolean | null;
-  menuOct: boolean | null;
-  menuNov: boolean | null;
-  menuDec: boolean | null;
 }
 
 /**
@@ -254,20 +241,7 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.estimate_sep AS "estimateSep",
             cbd.estimate_oct AS "estimateOct",
             cbd.estimate_nov AS "estimateNov",
-            cbd.estimate_dec AS "estimateDec",
-            -- Menu months
-            cbd.jan AS "menuJan",
-            cbd.feb AS "menuFeb",
-            cbd.mar AS "menuMar",
-            cbd.apr AS "menuApr",
-            cbd.may AS "menuMay",
-            cbd.jun AS "menuJun",
-            cbd.jul AS "menuJul",
-            cbd.aug AS "menuAug",
-            cbd.sep AS "menuSep",
-            cbd.oct AS "menuOct",
-            cbd.nov AS "menuNov",
-            cbd.dec AS "menuDec"
+            cbd.estimate_dec AS "estimateDec"
         FROM filtered_sales sp
         INNER JOIN dw2_nav.customer c
             ON sp.sales_code = c.no_
@@ -281,7 +255,10 @@ export class CustomerBidService implements ICustomerBidService {
             AND c.no_ = cbd.customer_bill_to
             AND sp.item_no_ = cbd.item_no
             AND cbd.school_year = ${schoolYearString}
-        WHERE 1=1 ${additionalWhere}
+        WHERE 1=1
+          AND c.location_code IS NOT NULL
+          AND c.location_code != ''
+          ${additionalWhere}
         GROUP BY
             sp.source_db,
             c.location_code,
@@ -321,19 +298,7 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.estimate_sep,
             cbd.estimate_oct,
             cbd.estimate_nov,
-            cbd.estimate_dec,
-            cbd.jan,
-            cbd.feb,
-            cbd.mar,
-            cbd.apr,
-            cbd.may,
-            cbd.jun,
-            cbd.jul,
-            cbd.aug,
-            cbd.sep,
-            cbd.oct,
-            cbd.nov,
-            cbd.dec
+            cbd.estimate_dec
         ORDER BY c.location_code, sp.item_no_, c.no_
         LIMIT ${limit + 1} OFFSET ${offset}
       `;
@@ -390,19 +355,6 @@ export class CustomerBidService implements ICustomerBidService {
         estimateOct: row.estimateOct ? Number(row.estimateOct) : null,
         estimateNov: row.estimateNov ? Number(row.estimateNov) : null,
         estimateDec: row.estimateDec ? Number(row.estimateDec) : null,
-        // Menu months
-        menuJan: row.menuJan,
-        menuFeb: row.menuFeb,
-        menuMar: row.menuMar,
-        menuApr: row.menuApr,
-        menuMay: row.menuMay,
-        menuJun: row.menuJun,
-        menuJul: row.menuJul,
-        menuAug: row.menuAug,
-        menuSep: row.menuSep,
-        menuOct: row.menuOct,
-        menuNov: row.menuNov,
-        menuDec: row.menuDec,
       }));
 
       logger.info(
@@ -528,57 +480,6 @@ export class CustomerBidService implements ICustomerBidService {
             "Cannot update Year Around on a confirmed bid"
           );
         }
-
-        // Reject menu month changes on confirmed bids
-        const menuFields = [
-          "menuJan",
-          "menuFeb",
-          "menuMar",
-          "menuApr",
-          "menuMay",
-          "menuJun",
-          "menuJul",
-          "menuAug",
-          "menuSep",
-          "menuOct",
-          "menuNov",
-          "menuDec",
-        ] as const;
-        for (const field of menuFields) {
-          if (data[field] !== undefined) {
-            throw new CustomerBidQueryError(
-              "Cannot update menu months on a confirmed bid"
-            );
-          }
-        }
-
-        // For estimates: only allow updates for months where menu is selected (or yearAround)
-        const estimateToMenu = [
-          { est: "estimateJan", menu: existing.menuJan },
-          { est: "estimateFeb", menu: existing.menuFeb },
-          { est: "estimateMar", menu: existing.menuMar },
-          { est: "estimateApr", menu: existing.menuApr },
-          { est: "estimateMay", menu: existing.menuMay },
-          { est: "estimateJun", menu: existing.menuJun },
-          { est: "estimateJul", menu: existing.menuJul },
-          { est: "estimateAug", menu: existing.menuAug },
-          { est: "estimateSep", menu: existing.menuSep },
-          { est: "estimateOct", menu: existing.menuOct },
-          { est: "estimateNov", menu: existing.menuNov },
-          { est: "estimateDec", menu: existing.menuDec },
-        ] as const;
-        const isYearAround = existing.yearAround ?? false;
-
-        for (const { est, menu } of estimateToMenu) {
-          if (data[est] !== undefined) {
-            const hasMenu = isYearAround || menu === true;
-            if (!hasMenu) {
-              throw new CustomerBidQueryError(
-                `Cannot update ${est} — menu month is not selected`
-              );
-            }
-          }
-        }
       }
 
       const now = new Date();
@@ -608,19 +509,6 @@ export class CustomerBidService implements ICustomerBidService {
           estimateOct: data.estimateOct,
           estimateNov: data.estimateNov,
           estimateDec: data.estimateDec,
-          // Menu months
-          menuJan: data.menuJan,
-          menuFeb: data.menuFeb,
-          menuMar: data.menuMar,
-          menuApr: data.menuApr,
-          menuMay: data.menuMay,
-          menuJun: data.menuJun,
-          menuJul: data.menuJul,
-          menuAug: data.menuAug,
-          menuSep: data.menuSep,
-          menuOct: data.menuOct,
-          menuNov: data.menuNov,
-          menuDec: data.menuDec,
         },
         update: {
           yearAround: data.yearAround,
@@ -639,19 +527,6 @@ export class CustomerBidService implements ICustomerBidService {
           estimateOct: data.estimateOct,
           estimateNov: data.estimateNov,
           estimateDec: data.estimateDec,
-          // Menu months
-          menuJan: data.menuJan,
-          menuFeb: data.menuFeb,
-          menuMar: data.menuMar,
-          menuApr: data.menuApr,
-          menuMay: data.menuMay,
-          menuJun: data.menuJun,
-          menuJul: data.menuJul,
-          menuAug: data.menuAug,
-          menuSep: data.menuSep,
-          menuOct: data.menuOct,
-          menuNov: data.menuNov,
-          menuDec: data.menuDec,
         },
       });
 
@@ -717,28 +592,6 @@ export class CustomerBidService implements ICustomerBidService {
       if (ext.toNumber() !== inc) return true;
     }
 
-    // Menu months (boolean | null comparison — treat null and false as equivalent)
-    const menuFields = [
-      "menuJan",
-      "menuFeb",
-      "menuMar",
-      "menuApr",
-      "menuMay",
-      "menuJun",
-      "menuJul",
-      "menuAug",
-      "menuSep",
-      "menuOct",
-      "menuNov",
-      "menuDec",
-    ] as const;
-    for (const field of menuFields) {
-      if (incoming[field] === undefined) continue;
-      const incMenu = incoming[field] ?? false;
-      const extMenu = existing[field] ?? false;
-      if (incMenu !== extMenu) return true;
-    }
-
     return false;
   }
 
@@ -765,24 +618,6 @@ export class CustomerBidService implements ICustomerBidService {
     ] as const;
     for (const f of estimateFields) {
       if (incoming[f] !== undefined && incoming[f] !== null) return true;
-    }
-
-    const menuFields = [
-      "menuJan",
-      "menuFeb",
-      "menuMar",
-      "menuApr",
-      "menuMay",
-      "menuJun",
-      "menuJul",
-      "menuAug",
-      "menuSep",
-      "menuOct",
-      "menuNov",
-      "menuDec",
-    ] as const;
-    for (const f of menuFields) {
-      if (incoming[f] === true) return true;
     }
 
     return false;
@@ -945,19 +780,6 @@ export class CustomerBidService implements ICustomerBidService {
               estimateOct: record.estimateOct,
               estimateNov: record.estimateNov,
               estimateDec: record.estimateDec,
-              // Menu months
-              menuJan: record.menuJan,
-              menuFeb: record.menuFeb,
-              menuMar: record.menuMar,
-              menuApr: record.menuApr,
-              menuMay: record.menuMay,
-              menuJun: record.menuJun,
-              menuJul: record.menuJul,
-              menuAug: record.menuAug,
-              menuSep: record.menuSep,
-              menuOct: record.menuOct,
-              menuNov: record.menuNov,
-              menuDec: record.menuDec,
             },
             userEmail
           );
@@ -1028,18 +850,6 @@ export class CustomerBidService implements ICustomerBidService {
     estimateOct: Prisma.Decimal | null;
     estimateNov: Prisma.Decimal | null;
     estimateDec: Prisma.Decimal | null;
-    menuJan: boolean | null;
-    menuFeb: boolean | null;
-    menuMar: boolean | null;
-    menuApr: boolean | null;
-    menuMay: boolean | null;
-    menuJun: boolean | null;
-    menuJul: boolean | null;
-    menuAug: boolean | null;
-    menuSep: boolean | null;
-    menuOct: boolean | null;
-    menuNov: boolean | null;
-    menuDec: boolean | null;
   }): CustomerBidDto {
     return {
       sourceDb: record.sourceDb,
@@ -1086,18 +896,6 @@ export class CustomerBidService implements ICustomerBidService {
       estimateOct: record.estimateOct ? Number(record.estimateOct) : null,
       estimateNov: record.estimateNov ? Number(record.estimateNov) : null,
       estimateDec: record.estimateDec ? Number(record.estimateDec) : null,
-      menuJan: record.menuJan,
-      menuFeb: record.menuFeb,
-      menuMar: record.menuMar,
-      menuApr: record.menuApr,
-      menuMay: record.menuMay,
-      menuJun: record.menuJun,
-      menuJul: record.menuJul,
-      menuAug: record.menuAug,
-      menuSep: record.menuSep,
-      menuOct: record.menuOct,
-      menuNov: record.menuNov,
-      menuDec: record.menuDec,
     };
   }
 
@@ -1126,34 +924,31 @@ export class CustomerBidService implements ICustomerBidService {
 
       if (!existing) {
         throw new CustomerBidQueryError(
-          "Cannot confirm: no estimate or menu month data exists for this bid"
+          "Cannot confirm: no estimate data exists for this bid"
         );
       }
 
-      const months = [
-        { est: existing.estimateJan, menu: existing.menuJan },
-        { est: existing.estimateFeb, menu: existing.menuFeb },
-        { est: existing.estimateMar, menu: existing.menuMar },
-        { est: existing.estimateApr, menu: existing.menuApr },
-        { est: existing.estimateMay, menu: existing.menuMay },
-        { est: existing.estimateJun, menu: existing.menuJun },
-        { est: existing.estimateJul, menu: existing.menuJul },
-        { est: existing.estimateAug, menu: existing.menuAug },
-        { est: existing.estimateSep, menu: existing.menuSep },
-        { est: existing.estimateOct, menu: existing.menuOct },
-        { est: existing.estimateNov, menu: existing.menuNov },
-        { est: existing.estimateDec, menu: existing.menuDec },
+      const estimates = [
+        existing.estimateJan,
+        existing.estimateFeb,
+        existing.estimateMar,
+        existing.estimateApr,
+        existing.estimateMay,
+        existing.estimateJun,
+        existing.estimateJul,
+        existing.estimateAug,
+        existing.estimateSep,
+        existing.estimateOct,
+        existing.estimateNov,
+        existing.estimateDec,
       ];
-      const yearAround = existing.yearAround ?? false;
-      const hasValidMonth = months.some((m) => {
-        const hasEst = m.est != null && Number(m.est) > 0;
-        const hasMenu = yearAround || m.menu === true;
-        return hasEst && hasMenu;
-      });
+      const hasValidMonth = estimates.some(
+        (est) => est != null && Number(est) > 0
+      );
 
       if (!hasValidMonth) {
         throw new CustomerBidQueryError(
-          "Cannot confirm: at least one month must have both an estimate and a menu month selected"
+          "Cannot confirm: at least one month must have an estimate greater than 0"
         );
       }
 
@@ -1329,6 +1124,8 @@ export class CustomerBidService implements ICustomerBidService {
             AND sp.source_db = c.source_db
         WHERE sp.starting_date >= ${startDateStr}::date
           AND sp.ending_date <= ${endDateStr}::date
+          AND c.location_code IS NOT NULL
+          AND c.location_code != ''
         GROUP BY sp.source_db, c.location_code, sp.sales_code, sp.item_no_
       `);
 
@@ -1364,6 +1161,8 @@ export class CustomerBidService implements ICustomerBidService {
             AND sp.source_db = c.source_db
         WHERE sp.starting_date >= ${lastYearStartStr}::date
           AND sp.ending_date <= ${lastYearEndStr}::date
+          AND c.location_code IS NOT NULL
+          AND c.location_code != ''
         GROUP BY sp.source_db, c.location_code, sp.sales_code, sp.item_no_
       `);
 
@@ -1415,6 +1214,8 @@ export class CustomerBidService implements ICustomerBidService {
         WHERE ile.entry_type = 1
           AND sih.posting_date >= ${lastYearStartStr}::date
           AND sih.posting_date <= ${lastYearEndStr}::date
+          AND c.location_code IS NOT NULL
+          AND c.location_code != ''
         GROUP BY ile.source_db, c.location_code, sih.bill_to_customer_no_, ile.item_no_
       `);
 

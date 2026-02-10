@@ -71,19 +71,6 @@ const updateBidSchema = z.object({
   estimateOct: z.number().nullable().optional(),
   estimateNov: z.number().nullable().optional(),
   estimateDec: z.number().nullable().optional(),
-  // Menu months
-  menuJan: z.boolean().nullable().optional(),
-  menuFeb: z.boolean().nullable().optional(),
-  menuMar: z.boolean().nullable().optional(),
-  menuApr: z.boolean().nullable().optional(),
-  menuMay: z.boolean().nullable().optional(),
-  menuJun: z.boolean().nullable().optional(),
-  menuJul: z.boolean().nullable().optional(),
-  menuAug: z.boolean().nullable().optional(),
-  menuSep: z.boolean().nullable().optional(),
-  menuOct: z.boolean().nullable().optional(),
-  menuNov: z.boolean().nullable().optional(),
-  menuDec: z.boolean().nullable().optional(),
 });
 
 /**
@@ -112,19 +99,6 @@ const bulkUpdateSchema = z.object({
         estimateOct: z.number().nullable().optional(),
         estimateNov: z.number().nullable().optional(),
         estimateDec: z.number().nullable().optional(),
-        // Menu months
-        menuJan: z.boolean().nullable().optional(),
-        menuFeb: z.boolean().nullable().optional(),
-        menuMar: z.boolean().nullable().optional(),
-        menuApr: z.boolean().nullable().optional(),
-        menuMay: z.boolean().nullable().optional(),
-        menuJun: z.boolean().nullable().optional(),
-        menuJul: z.boolean().nullable().optional(),
-        menuAug: z.boolean().nullable().optional(),
-        menuSep: z.boolean().nullable().optional(),
-        menuOct: z.boolean().nullable().optional(),
-        menuNov: z.boolean().nullable().optional(),
-        menuDec: z.boolean().nullable().optional(),
         // Virtual confirmed flag: true → confirmBid(), false → unconfirmBid()
         confirmed: z.boolean().optional(),
       })

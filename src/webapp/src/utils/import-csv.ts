@@ -68,22 +68,6 @@ const ESTIMATE_FIELDS = new Set<string>([
   "estimateDec",
 ]);
 
-/** Maps estimate fields to their corresponding menu month fields */
-const ESTIMATE_TO_MENU: Record<string, string> = {
-  estimateJan: "menuJan",
-  estimateFeb: "menuFeb",
-  estimateMar: "menuMar",
-  estimateApr: "menuApr",
-  estimateMay: "menuMay",
-  estimateJun: "menuJun",
-  estimateJul: "menuJul",
-  estimateAug: "menuAug",
-  estimateSep: "menuSep",
-  estimateOct: "menuOct",
-  estimateNov: "menuNov",
-  estimateDec: "menuDec",
-};
-
 /**
  * Build a case-insensitive header → key map from the export column config.
  * e.g. "jan estimate" → "estimateJan"
@@ -358,14 +342,6 @@ export async function parseImportFile(
           (updates as Record<string, unknown>)[field] = parsed.value;
           hasUpdates = true;
         }
-      }
-    }
-
-    // --- Derive menu months from estimates (estimate > 0 → menu = true) ---
-    for (const [estField, menuField] of Object.entries(ESTIMATE_TO_MENU)) {
-      const estValue = (updates as Record<string, unknown>)[estField];
-      if (estValue != null && typeof estValue === "number" && estValue > 0) {
-        (updates as Record<string, unknown>)[menuField] = true;
       }
     }
 

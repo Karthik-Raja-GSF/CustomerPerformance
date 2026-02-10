@@ -67,6 +67,10 @@ import type {
   UpdateCustomerBidDto,
 } from "@/types/customer-bids";
 import {
+  deriveMenuMonthsFromEstimates,
+  type MonthKey,
+} from "@/utils/menu-months";
+import {
   DataTable,
   type VisibilityState,
 } from "@/pages/customer-bids/data-table";
@@ -275,6 +279,12 @@ export default function CustomerBids({
   const [columnsDropdownOpen, setColumnsDropdownOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
+  // Local menu month overrides — keyed by composite bid key
+  // Cleared on full data fetch; updated when user toggles months in the dropdown
+  const [menuMonthOverrides, setMenuMonthOverrides] = useState<
+    Map<string, Record<MonthKey, boolean>>
+  >(new Map());
+
   const schoolYearString = useMemo(
     () => getSchoolYearString((filters.schoolYear as SchoolYear) || "next"),
     [filters.schoolYear]
@@ -286,6 +296,7 @@ export default function CustomerBids({
     try {
       const response = await getCustomerBids(currentFilters);
       setBids(response.data);
+      setMenuMonthOverrides(new Map());
       setPagination(response.pagination);
       setDateRange(response.dateRange);
     } catch (err) {
@@ -475,19 +486,6 @@ export default function CustomerBids({
                   estimateOct: updated.estimateOct,
                   estimateNov: updated.estimateNov,
                   estimateDec: updated.estimateDec,
-                  // Menu months
-                  menuJan: updated.menuJan,
-                  menuFeb: updated.menuFeb,
-                  menuMar: updated.menuMar,
-                  menuApr: updated.menuApr,
-                  menuMay: updated.menuMay,
-                  menuJun: updated.menuJun,
-                  menuJul: updated.menuJul,
-                  menuAug: updated.menuAug,
-                  menuSep: updated.menuSep,
-                  menuOct: updated.menuOct,
-                  menuNov: updated.menuNov,
-                  menuDec: updated.menuDec,
                 }
               : b
           )
@@ -568,6 +566,30 @@ export default function CustomerBids({
     [filters.schoolYear]
   );
 
+  // Get menu month state for a bid: use override if available, otherwise derive from estimates
+  const getMenuMonths = useCallback(
+    (bid: CustomerBidDto): Record<MonthKey, boolean> => {
+      const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
+      const override = menuMonthOverrides.get(key);
+      if (override) return override;
+      return deriveMenuMonthsFromEstimates(bid);
+    },
+    [menuMonthOverrides]
+  );
+
+  // Update local menu month state for a bid (frontend-only, no API call)
+  const onMenuMonthsChange = useCallback(
+    (bid: CustomerBidDto, months: Record<MonthKey, boolean>) => {
+      const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
+      setMenuMonthOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(key, months);
+        return next;
+      });
+    },
+    []
+  );
+
   // Bulk confirm — bids eligible for confirmation on the current page
   const confirmableBids = useMemo(
     () => bids.filter((b) => !b.confirmedAt && canConfirmBid(b)),
@@ -624,8 +646,17 @@ export default function CustomerBids({
         onConfirm: handleConfirm,
         onUnconfirm: handleUnconfirm,
         canUnconfirm,
+        getMenuMonths,
+        onMenuMonthsChange,
       }),
-    [handleCellUpdate, handleConfirm, handleUnconfirm, canUnconfirm]
+    [
+      handleCellUpdate,
+      handleConfirm,
+      handleUnconfirm,
+      canUnconfirm,
+      getMenuMonths,
+      onMenuMonthsChange,
+    ]
   );
 
   return (

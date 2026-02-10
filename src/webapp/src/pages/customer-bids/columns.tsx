@@ -30,18 +30,21 @@ import { EditableMonthsCell } from "@/components/editable-cells/EditableMonthsCe
 import {
   ESTIMATE_MONTHS,
   YEAR_AROUND_ESTIMATE_MONTHS,
+  type MonthKey,
 } from "@/utils/menu-months";
 
 /** Conversion rate color thresholds (%). Green if within range, red otherwise. */
 const CONVERSION_RATE_THRESHOLDS = { min: 70, max: 100 } as const;
 
 /**
- * Get visible estimate months based on yearAround and menuMonths selection
+ * Get visible estimate months based on yearAround flag and local menu month state.
  * - If yearAround=true: show Aug, Sep, Oct
- * - If yearAround=false: show months selected in menuMonths
+ * - If yearAround=false: show months selected in local menu state
+ * - If no months selected: show all 12 (so user can start entering estimates)
  */
 function getVisibleEstimateMonths(
-  data: CustomerBidDto
+  data: CustomerBidDto,
+  menuMonths: Record<MonthKey, boolean>
 ): (typeof ESTIMATE_MONTHS)[number][] {
   if (data.yearAround) {
     // Year Around = true: show Aug, Sep, Oct
@@ -51,8 +54,8 @@ function getVisibleEstimateMonths(
       )
     );
   }
-  // Year Around = false: show selected menu months
-  return ESTIMATE_MONTHS.filter((m) => data[m.menuKey] === true);
+  // Show only months selected in local menu month state
+  return ESTIMATE_MONTHS.filter((m) => menuMonths[m.menuKey]);
 }
 
 interface SortableHeaderProps<TData, TValue> {
@@ -97,29 +100,27 @@ function formatNumber(value: number | null | undefined): React.ReactNode {
 
 /**
  * Check whether a bid meets the requirements for confirmation:
- * at least one month with an estimate > 0 AND that month on the menu.
+ * at least one month with an estimate > 0.
  */
 export function canConfirmBid(bid: CustomerBidDto): boolean {
-  const months = [
-    { estimate: "estimateJan", menu: "menuJan" },
-    { estimate: "estimateFeb", menu: "menuFeb" },
-    { estimate: "estimateMar", menu: "menuMar" },
-    { estimate: "estimateApr", menu: "menuApr" },
-    { estimate: "estimateMay", menu: "menuMay" },
-    { estimate: "estimateJun", menu: "menuJun" },
-    { estimate: "estimateJul", menu: "menuJul" },
-    { estimate: "estimateAug", menu: "menuAug" },
-    { estimate: "estimateSep", menu: "menuSep" },
-    { estimate: "estimateOct", menu: "menuOct" },
-    { estimate: "estimateNov", menu: "menuNov" },
-    { estimate: "estimateDec", menu: "menuDec" },
+  const estimateKeys = [
+    "estimateJan",
+    "estimateFeb",
+    "estimateMar",
+    "estimateApr",
+    "estimateMay",
+    "estimateJun",
+    "estimateJul",
+    "estimateAug",
+    "estimateSep",
+    "estimateOct",
+    "estimateNov",
+    "estimateDec",
   ] as const;
 
-  return months.some((m) => {
-    const est = bid[m.estimate];
-    const hasEstimate = est != null && est > 0;
-    const hasMenu = bid.yearAround || bid[m.menu] === true;
-    return hasEstimate && hasMenu;
+  return estimateKeys.some((key) => {
+    const est = bid[key];
+    return est != null && est > 0;
   });
 }
 
@@ -214,7 +215,7 @@ function ConfirmCell({
           </span>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Add at least one estimate with a menu month to confirm</p>
+          <p>Add at least one estimate to confirm</p>
         </TooltipContent>
       </Tooltip>
     );
@@ -258,12 +259,26 @@ export interface ColumnsConfig {
   onConfirm: (bid: CustomerBidDto) => Promise<void>;
   onUnconfirm: (bid: CustomerBidDto) => Promise<void>;
   canUnconfirm?: boolean;
+  /** Get the current local menu month state for a bid */
+  getMenuMonths: (bid: CustomerBidDto) => Record<MonthKey, boolean>;
+  /** Update the local menu month state for a bid (frontend-only, no API call) */
+  onMenuMonthsChange: (
+    bid: CustomerBidDto,
+    months: Record<MonthKey, boolean>
+  ) => void;
 }
 
 export function createColumns(
   config: ColumnsConfig
 ): ColumnDef<CustomerBidDto>[] {
-  const { onCellUpdate, onConfirm, onUnconfirm, canUnconfirm = true } = config;
+  const {
+    onCellUpdate,
+    onConfirm,
+    onUnconfirm,
+    canUnconfirm = true,
+    getMenuMonths,
+    onMenuMonthsChange,
+  } = config;
 
   return [
     // Source DB - hidden by default
@@ -572,19 +587,23 @@ export function createColumns(
       ),
       cell: ({ row }) => {
         const isConfirmed = !!row.original.confirmedAt;
+        const menuMonths = getMenuMonths(row.original);
         return (
           <EditableMonthsCell
-            data={row.original}
+            monthValues={menuMonths}
             yearAround={row.original.yearAround}
             disabled={isConfirmed}
             onSave={async (updates) => {
               await onCellUpdate(row.original, updates);
             }}
+            onMonthsChange={(months) => {
+              onMenuMonthsChange(row.original, months);
+            }}
           />
         );
       },
     },
-    // Dynamic Estimates column - shows based on yearAround and menuMonths
+    // Dynamic Estimates column - shows based on yearAround and local menu months
     {
       id: "estimates",
       header: () => (
@@ -593,7 +612,11 @@ export function createColumns(
         </div>
       ),
       cell: ({ row }) => {
-        const visibleMonths = getVisibleEstimateMonths(row.original);
+        const menuMonths = getMenuMonths(row.original);
+        const visibleMonths = getVisibleEstimateMonths(
+          row.original,
+          menuMonths
+        );
 
         if (visibleMonths.length === 0) {
           return <div className="text-center text-muted-foreground">-</div>;
@@ -683,4 +706,20 @@ export const columns: ColumnDef<CustomerBidDto>[] = createColumns({
   onUnconfirm: async () => {
     console.warn("Unconfirm not configured");
   },
+  getMenuMonths: () =>
+    ({
+      menuJan: false,
+      menuFeb: false,
+      menuMar: false,
+      menuApr: false,
+      menuMay: false,
+      menuJun: false,
+      menuJul: false,
+      menuAug: false,
+      menuSep: false,
+      menuOct: false,
+      menuNov: false,
+      menuDec: false,
+    }) as Record<MonthKey, boolean>,
+  onMenuMonthsChange: () => {},
 });
