@@ -1102,6 +1102,7 @@ model CustomerBidData {
   @@index([schoolYear])
   @@index([confirmedAt])
   @@index([isLost])
+  @@index([schoolYear, siteCode, itemNo, customerBillTo])
   @@map("customer_bid_data")
   @@schema("ait")
 }

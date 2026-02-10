@@ -101,10 +101,11 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
-      // Calculate school year boundaries
-      const { startDate, endDate } = this.getSchoolYearBoundaries(schoolYear);
+      // Calculate school year string for query (e.g., "2025-2026")
+      const schoolYearString = this.getSchoolYearString(schoolYear);
 
-      // Format dates for SQL (YYYY-MM-DD)
+      // Calculate date boundaries for the response dateRange field
+      const { startDate, endDate } = this.getSchoolYearBoundaries(schoolYear);
       const startDateStr = startDate.toISOString().slice(0, 10);
       const endDateStr = endDate.toISOString().slice(0, 10);
 
@@ -112,22 +113,21 @@ export class CustomerBidService implements ICustomerBidService {
         {
           event: "customer-bid.school-year",
           schoolYear,
-          startDate: startDateStr,
-          endDate: endDateStr,
+          schoolYearString,
         },
-        "Calculated school year boundaries"
+        "Querying customer bids by school year"
       );
 
       // Build WHERE clause conditions for filters
       const whereConditions: Prisma.Sql[] = [];
 
       if (query.siteCode) {
-        whereConditions.push(Prisma.sql`c.location_code = ${query.siteCode}`);
+        whereConditions.push(Prisma.sql`cbd.site_code = ${query.siteCode}`);
       }
 
       if (query.customerBillTo) {
         whereConditions.push(
-          Prisma.sql`c.no_ ILIKE ${"%" + query.customerBillTo + "%"}`
+          Prisma.sql`cbd.customer_bill_to ILIKE ${"%" + query.customerBillTo + "%"}`
         );
       }
 
@@ -144,17 +144,17 @@ export class CustomerBidService implements ICustomerBidService {
       }
 
       if (query.itemCode) {
-        whereConditions.push(Prisma.sql`sp.item_no_ = ${query.itemCode}`);
+        whereConditions.push(Prisma.sql`cbd.item_no = ${query.itemCode}`);
       }
 
       if (query.erpStatus) {
         whereConditions.push(
-          Prisma.sql`sku_latest.status ILIKE ${"%" + query.erpStatus + "%"}`
+          Prisma.sql`cbd.erp_status ILIKE ${"%" + query.erpStatus + "%"}`
         );
       }
 
       if (query.sourceDb) {
-        whereConditions.push(Prisma.sql`sp.source_db = ${query.sourceDb}`);
+        whereConditions.push(Prisma.sql`cbd.source_db = ${query.sourceDb}`);
       }
 
       if (query.coOpCode) {
@@ -162,17 +162,20 @@ export class CustomerBidService implements ICustomerBidService {
       }
 
       if (query.isLost !== undefined) {
+        whereConditions.push(Prisma.sql`cbd.is_lost = ${query.isLost}`);
+      }
+
+      // Filter out rows with NULL bid dates unless explicitly viewing lost bids
+      if (query.isLost !== true) {
         whereConditions.push(
-          Prisma.sql`COALESCE(cbd.is_lost, false) = ${query.isLost}`
+          Prisma.sql`cbd.bid_start IS NOT NULL AND cbd.bid_end IS NOT NULL`
         );
       }
 
       if (query.confirmed !== undefined) {
         if (query.confirmed) {
-          // Show only confirmed items (confirmed_at is NOT NULL)
           whereConditions.push(Prisma.sql`cbd.confirmed_at IS NOT NULL`);
         } else {
-          // Show only unconfirmed items (confirmed_at IS NULL)
           whereConditions.push(Prisma.sql`cbd.confirmed_at IS NULL`);
         }
       }
@@ -182,54 +185,36 @@ export class CustomerBidService implements ICustomerBidService {
           ? Prisma.sql`AND ${Prisma.join(whereConditions, " AND ")}`
           : Prisma.empty;
 
-      // Calculate school year string for JOIN (e.g., "2025-2026")
-      const schoolYearString = `${startDate.getFullYear()}-${startDate.getFullYear() + 1}`;
-
-      // Execute the new simplified query with materialized CTE
+      // Query from pre-aggregated customer_bid_data, joining customer/item for metadata
       const baseQuery = Prisma.sql`
-        WITH filtered_sales AS MATERIALIZED (
-            SELECT DISTINCT
-                item_no_,
-                source_db,
-                sales_code,
-                starting_date,
-                ending_date
-            FROM dw2_nav.sales_price
-            WHERE starting_date >= ${startDateStr}::date
-                AND ending_date <= ${endDateStr}::date
-        )
         SELECT
-            sp.source_db AS "sourceDb",
-            c.location_code AS "siteCode",
+            cbd.source_db AS "sourceDb",
+            cbd.site_code AS "siteCode",
             c."name" AS "customerName",
-            c.no_ AS "customerBillTo",
+            cbd.customer_bill_to AS "customerBillTo",
             c.co_op_code AS "coOpCode",
             c.contact AS "contactName",
             c.e_mail AS "contactEmail",
             c.phone_no_ AS "contactPhone",
             c.salesperson_code AS "salesRep",
-            sp.item_no_ AS "itemNo",
+            cbd.item_no AS "itemNo",
             i.description AS "itemDescription",
             i.description_2 AS "brandName",
             cbd.bid_qty AS "bidQty",
             cbd.bid_start AS "bidStart",
             cbd.bid_end AS "bidEnd",
             cbd.erp_status AS "erpStatus",
-            -- From customer_bid_data table (pre-calculated by sync)
             cbd.last_year_bid_qty AS "lastYearBidQty",
             cbd.last_year_actual AS "lastYearActual",
             cbd.ly_august AS "lyAugust",
             cbd.ly_september AS "lySeptember",
             cbd.ly_october AS "lyOctober",
-            COALESCE(cbd.is_lost, false) AS "isLost",
-            -- Last updated tracking
+            cbd.is_lost AS "isLost",
             cbd.last_updated_at AS "lastUpdatedAt",
             cbd.last_updated_by AS "lastUpdatedBy",
-            -- User-editable fields
             cbd.confirmed_at AS "confirmedAt",
             cbd.confirmed_by AS "confirmedBy",
-            COALESCE(cbd.year_around, false) AS "yearAround",
-            -- Monthly estimates
+            cbd.year_around AS "yearAround",
             cbd.estimate_jan AS "estimateJan",
             cbd.estimate_feb AS "estimateFeb",
             cbd.estimate_mar AS "estimateMar",
@@ -242,64 +227,16 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.estimate_oct AS "estimateOct",
             cbd.estimate_nov AS "estimateNov",
             cbd.estimate_dec AS "estimateDec"
-        FROM filtered_sales sp
+        FROM ait.customer_bid_data cbd
         INNER JOIN dw2_nav.customer c
-            ON sp.sales_code = c.no_
-            AND sp.source_db = c.source_db
+            ON cbd.customer_bill_to = c.no_
+            AND cbd.source_db = c.source_db
         INNER JOIN dw2_nav.item i
-            ON sp.item_no_ = i.no_
-            AND sp.source_db = i.source_db
-        LEFT JOIN ait.customer_bid_data cbd
-            ON sp.source_db = cbd.source_db
-            AND c.location_code = cbd.site_code
-            AND c.no_ = cbd.customer_bill_to
-            AND sp.item_no_ = cbd.item_no
-            AND cbd.school_year = ${schoolYearString}
-        WHERE 1=1
-          AND c.location_code IS NOT NULL
-          AND c.location_code != ''
+            ON cbd.item_no = i.no_
+            AND cbd.source_db = i.source_db
+        WHERE cbd.school_year = ${schoolYearString}
           ${additionalWhere}
-        GROUP BY
-            sp.source_db,
-            c.location_code,
-            sp.item_no_,
-            i.description,
-            i.description_2,
-            c.no_,
-            c.co_op_code,
-            c."name",
-            c.contact,
-            c.e_mail,
-            c.phone_no_,
-            c.salesperson_code,
-            cbd.bid_qty,
-            cbd.bid_start,
-            cbd.bid_end,
-            cbd.erp_status,
-            cbd.last_year_bid_qty,
-            cbd.last_year_actual,
-            cbd.ly_august,
-            cbd.ly_september,
-            cbd.ly_october,
-            cbd.is_lost,
-            cbd.last_updated_at,
-            cbd.last_updated_by,
-            cbd.confirmed_at,
-            cbd.confirmed_by,
-            cbd.year_around,
-            cbd.estimate_jan,
-            cbd.estimate_feb,
-            cbd.estimate_mar,
-            cbd.estimate_apr,
-            cbd.estimate_may,
-            cbd.estimate_jun,
-            cbd.estimate_jul,
-            cbd.estimate_aug,
-            cbd.estimate_sep,
-            cbd.estimate_oct,
-            cbd.estimate_nov,
-            cbd.estimate_dec
-        ORDER BY c.location_code, sp.item_no_, c.no_
+        ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
         LIMIT ${limit + 1} OFFSET ${offset}
       `;
 
@@ -327,22 +264,17 @@ export class CustomerBidService implements ICustomerBidService {
         brandName: row.brandName,
         erpStatus: row.erpStatus,
         bidQuantity: row.bidQty ? Number(row.bidQty) : null,
-        // Pre-calculated fields (from sync)
         lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
         lastYearActual: row.lastYearActual ? Number(row.lastYearActual) : null,
         lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
         lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
         lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
         isLost: row.isLost ?? false,
-        // Last updated tracking
         lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
         lastUpdatedBy: row.lastUpdatedBy ?? null,
-        // Confirmation fields
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
         confirmedBy: row.confirmedBy ?? null,
-        // User-editable fields
         yearAround: row.yearAround ?? false,
-        // Monthly estimates
         estimateJan: row.estimateJan ? Number(row.estimateJan) : null,
         estimateFeb: row.estimateFeb ? Number(row.estimateFeb) : null,
         estimateMar: row.estimateMar ? Number(row.estimateMar) : null,
@@ -365,7 +297,7 @@ export class CustomerBidService implements ICustomerBidService {
           returnedCount: data.length,
           hasMore,
           schoolYear,
-          dateRange: { startDate: startDateStr, endDate: endDateStr },
+          schoolYearString,
         },
         "Customer bids fetched successfully"
       );
