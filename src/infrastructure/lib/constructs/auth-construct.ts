@@ -97,12 +97,12 @@ export class AuthConstruct extends Construct {
             "gsfoodsgroup.com",
           ],
           attributeMapping: {
-            // Map name claim to email (contains user@domain.com format)
-            // Note: emailaddress claim is empty for users without Azure AD mail attribute
+            // Standard attribute mappings
+            // Note: name claim (UPN) used for email because emailaddress claim
+            // is empty for users without Azure AD mail attribute
             email: cognito.ProviderAttribute.other(
               "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
             ),
-            // Map name claim to fullname as well
             fullname: cognito.ProviderAttribute.other(
               "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
             ),
@@ -112,8 +112,58 @@ export class AuthConstruct extends Construct {
             familyName: cognito.ProviderAttribute.other(
               "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
             ),
-            // Note: custom:idp_email → emailaddress claim configured via AWS CLI
-            // CDK cannot add custom attributes to existing User Pools
+            preferredUsername: cognito.ProviderAttribute.other(
+              "http://schemas.microsoft.com/identity/claims/displayname"
+            ),
+            nickname: cognito.ProviderAttribute.other(
+              "http://schemas.microsoft.com/identity/claims/nickname"
+            ),
+
+            // Custom attribute mappings
+            // Note: custom attributes must be added to User Pool schema via CLI first
+            // (aws cognito-idp add-custom-attributes) since CDK cannot add them to existing pools
+            // Keys must include "custom:" prefix — CDK does not add it automatically
+            custom: {
+              "custom:idp_email": cognito.ProviderAttribute.other(
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+              ),
+              "custom:mail": cognito.ProviderAttribute.other(
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+              ),
+              "custom:name_id": cognito.ProviderAttribute.other(
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+              ),
+              "custom:auth_instant": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant"
+              ),
+              "custom:auth_method": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationmethod"
+              ),
+              "custom:object_id": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/identity/claims/objectidentifier"
+              ),
+              "custom:idp": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/identity/claims/identityprovider"
+              ),
+              "custom:groups": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+              ),
+              "custom:token_exp": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/expiration"
+              ),
+              "custom:openid2_id": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/identity/claims/openid2_id"
+              ),
+              "custom:groups_link": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/claims/groups.link"
+              ),
+              "custom:role": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
+              ),
+              "custom:wids": cognito.ProviderAttribute.other(
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/wids"
+              ),
+            },
           },
         }
       );
