@@ -155,28 +155,6 @@ export class BackendConstruct extends Construct {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Pre-create OTEL metrics log group with retention
-    // This log group is used by awsemf exporter in otel-collector-config.yaml
-    const otelMetricsLogGroup = new logs.LogGroup(this, "OtelMetricsLogGroup", {
-      logGroupName: `/ait/${naming.env}/backend/metrics`,
-      retention:
-        naming.env === "prd"
-          ? logs.RetentionDays.ONE_MONTH
-          : logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    // Pre-create OTEL logs log group with retention
-    // This log group is used by otlphttp/cloudwatch-logs exporter
-    const otelLogsLogGroup = new logs.LogGroup(this, "OtelLogsLogGroup", {
-      logGroupName: `/ait/${naming.env}/backend/otel-logs`,
-      retention:
-        naming.env === "prd"
-          ? logs.RetentionDays.ONE_MONTH
-          : logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
     // Container
     const container = taskDefinition.addContainer("backend", {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, "latest"),
@@ -589,16 +567,7 @@ export class BackendConstruct extends Construct {
     addStandardTags(serviceSecurityGroup, naming.env, ecsSgName);
     addStandardTags(targetGroup, naming.env, tgName);
     addStandardTags(logGroup, naming.env, logGroupName);
-    addStandardTags(
-      otelMetricsLogGroup,
-      naming.env,
-      `/ait/${naming.env}/backend/metrics`
-    );
-    addStandardTags(
-      otelLogsLogGroup,
-      naming.env,
-      `/ait/${naming.env}/backend/otel-logs`
-    );
+    // OTEL log groups are imported (not CDK-managed), tags set via AWS CLI
     // Only tag certificate if it was created (not imported)
     if (!certificateArn) {
       addStandardTags(

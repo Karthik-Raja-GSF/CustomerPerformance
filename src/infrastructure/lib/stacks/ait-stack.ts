@@ -18,6 +18,7 @@ import { EventBridgeConstruct } from "../constructs/eventbridge-construct";
 import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
 import { WafConstruct } from "../constructs/waf-construct";
+import { PrivateHostedZoneConstruct } from "../constructs/private-hosted-zone-construct";
 import { defaultWafConfigs } from "../config/waf-config";
 
 export interface CrossAccountRoute53Config {
@@ -98,6 +99,23 @@ export class AitStack extends cdk.Stack {
       config: config.vpc,
       naming,
     });
+
+    // ===================
+    // Private Hosted Zone (goldstarfoods.com)
+    // ===================
+    let privateHostedZoneConstruct: PrivateHostedZoneConstruct | undefined;
+    if (config.privateDomain) {
+      privateHostedZoneConstruct = new PrivateHostedZoneConstruct(
+        this,
+        "PrivateHostedZone",
+        {
+          envName: config.envName,
+          zoneName: config.privateDomain,
+          vpc: vpcConstruct.vpc,
+          naming,
+        }
+      );
+    }
 
     // ===================
     // VPC Peering (imported - manually created)
@@ -455,6 +473,13 @@ export class AitStack extends cdk.Stack {
       new cdk.CfnOutput(this, "AlbWafArn", {
         value: albWaf.getWebAclArn(),
         description: "ALB WAF WebACL ARN",
+      });
+    }
+
+    if (privateHostedZoneConstruct) {
+      new cdk.CfnOutput(this, "PrivateHostedZoneId", {
+        value: privateHostedZoneConstruct.hostedZone.hostedZoneId,
+        description: `Private Hosted Zone ID (${config.privateDomain})`,
       });
     }
   }

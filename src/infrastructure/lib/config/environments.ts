@@ -92,6 +92,7 @@ export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
   baseDomain: string; // 'tratin.com'
+  privateDomain?: string; // Private hosted zone domain (e.g., 'stg-ait.goldstarfoods.com')
   aurora: AuroraConfig;
   ecs: EcsConfig;
   vpc: VpcConfig;
@@ -105,6 +106,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     envName: "dev",
     domainPrefix: "dev", // dev.tratin.com, dev-be.tratin.com
     baseDomain: "tratin.com",
+    privateDomain: "stg-ait.goldstarfoods.com",
     aurora: {
       minCapacity: 0.5, // Min 0.5 ACU (~$0.06/hour when active)
       maxCapacity: 2, // Max 2 ACU
@@ -165,6 +167,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     envName: "prd",
     domainPrefix: "", // ait.tratin.com (без префикса dev)
     baseDomain: "tratin.com",
+    privateDomain: "ait.goldstarfoods.com",
     aurora: {
       minCapacity: 0.5, // Scales to 0.5 at idle
       maxCapacity: 8, // Max 8 ACU for load
