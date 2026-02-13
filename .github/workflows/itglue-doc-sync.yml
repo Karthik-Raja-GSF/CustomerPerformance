@@ -1,0 +1,30 @@
+# .github/workflows/itglue-doc-sync.yml
+name: Sync repo docs to IT Glue
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: "0 3 * * *"  # 3:00 UTC ~ 9pm America/Chicago (adjust as needed)
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install requests
+
+      - name: Sync to IT Glue
+        env:
+          ITGLUE_API_KEY: ${{ secrets.ITGLUE_API_KEY }}
+          ITGLUE_ORG_ID: ${{ secrets.ITGLUE_ORG_ID }}
+          ITGLUE_DOC_FOLDER_ID: ${{ secrets.ITGLUE_DOC_FOLDER_ID }}
+          SYNC_ROOT: .docs   
+        run: python itglue_sync.py
