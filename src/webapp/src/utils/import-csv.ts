@@ -353,13 +353,31 @@ export async function parseImportFile(
         { field: "estimateSep", header: "Sep Estimate" },
         { field: "estimateOct", header: "Oct Estimate" },
       ];
-      for (const { field, header } of requiredMonths) {
+      const hasMissingMonths = requiredMonths.some(({ field }) => {
         const val = (updates as Record<string, unknown>)[field];
-        if (val == null || val === 0) {
+        return val == null || val === 0;
+      });
+
+      if (hasMissingMonths) {
+        for (const { field, header } of requiredMonths) {
+          const val = (updates as Record<string, unknown>)[field];
+          if (val == null || val === 0) {
+            errors.push({
+              row: rowNum,
+              column: header,
+              message: "Required when Year Around is Yes",
+            });
+          }
+        }
+
+        // Strip confirmed so the record is saved but not confirmed
+        if ((updates as Record<string, unknown>).confirmed === true) {
+          delete (updates as Record<string, unknown>).confirmed;
           errors.push({
             row: rowNum,
-            column: header,
-            message: "Required when Year Around is Yes",
+            column: "Confirmed",
+            message:
+              "Confirmation skipped: Aug/Sep/Oct estimates required when Year Around is Yes",
           });
         }
       }

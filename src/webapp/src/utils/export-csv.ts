@@ -5,6 +5,8 @@ export interface ExportColumn {
   key: string;
   header: string;
   format?: (value: unknown) => string;
+  /** Compute value from the full row (for derived/calculated columns) */
+  computeValue?: (row: Record<string, unknown>) => unknown;
 }
 
 /**
@@ -35,7 +37,9 @@ export function exportToCSV<T extends object>(
   const exportData = data.map((row) =>
     columns.reduce(
       (acc, col) => {
-        const value = (row as Record<string, unknown>)[col.key];
+        const value = col.computeValue
+          ? col.computeValue(row as Record<string, unknown>)
+          : (row as Record<string, unknown>)[col.key];
         // Use custom format function if provided
         if (col.format) {
           acc[col.header] = col.format(value);
@@ -157,6 +161,16 @@ export const customerBidExportColumns: ExportColumn[] = [
   // Last year data
   { key: "lastYearBidQty", header: "LY Bid Qty" },
   { key: "lastYearActual", header: "LY Actual" },
+  {
+    key: "conversionRate",
+    header: "Conversion Rate (%)",
+    computeValue: (row) => {
+      const lyActual = row.lastYearActual as number | null;
+      const lyBidQty = row.lastYearBidQty as number | null;
+      if (!lyBidQty || lyActual == null) return "";
+      return ((lyActual / lyBidQty) * 100).toFixed(1);
+    },
+  },
   { key: "lyAugust", header: "LY August" },
   { key: "lySeptember", header: "LY September" },
   { key: "lyOctober", header: "LY October" },
