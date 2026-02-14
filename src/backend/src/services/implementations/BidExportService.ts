@@ -17,6 +17,12 @@ import {
 } from "@/contracts/dtos/bid-export.dto";
 import { CustomerBidDto } from "@/contracts/dtos/customer-bid.dto";
 import { createChildLogger } from "@/telemetry/logger";
+import { buildCompositeKeyWhere } from "@/services/helpers/bid-keys";
+import {
+  decimalToNumber,
+  mapEstimates,
+} from "@/services/helpers/bid-converters";
+import { buildBidFilterConditions } from "@/services/helpers/bid-filters";
 
 const logger = createChildLogger("bid-export");
 
@@ -138,69 +144,7 @@ export class BidExportService implements IBidExportService {
   }
 
   async getQueuedBidData(exportType: BidExportType): Promise<CustomerBidDto[]> {
-    // Join QUEUED export items with CustomerBidData + Customer + Item tables
-    // to return full DTO shape for SIQ/CSV generation
-    const rows = await this.prisma.$queryRaw<QueuedBidRow[]>(Prisma.sql`
-      SELECT DISTINCT
-          cbd.source_db AS "sourceDb",
-          cbd.site_code AS "siteCode",
-          c."name" AS "customerName",
-          cbd.customer_bill_to AS "customerBillTo",
-          c.co_op_code AS "coOpCode",
-          c.contact AS "contactName",
-          c.e_mail AS "contactEmail",
-          c.phone_no_ AS "contactPhone",
-          c.salesperson_code AS "salesRep",
-          cbd.item_no AS "itemNo",
-          i.description AS "itemDescription",
-          i.description_2 AS "brandName",
-          cbd.bid_qty AS "bidQty",
-          cbd.bid_start AS "bidStart",
-          cbd.bid_end AS "bidEnd",
-          cbd.erp_status AS "erpStatus",
-          cbd.last_year_bid_qty AS "lastYearBidQty",
-          cbd.last_year_actual AS "lastYearActual",
-          cbd.ly_august AS "lyAugust",
-          cbd.ly_september AS "lySeptember",
-          cbd.ly_october AS "lyOctober",
-          cbd.is_lost AS "isLost",
-          cbd.last_updated_at AS "lastUpdatedAt",
-          cbd.last_updated_by AS "lastUpdatedBy",
-          cbd.confirmed_at AS "confirmedAt",
-          cbd.confirmed_by AS "confirmedBy",
-          cbd.last_exported_at AS "lastExportedAt",
-          cbd.last_exported_by AS "lastExportedBy",
-          cbd.year_around AS "yearAround",
-          cbd.estimate_jan AS "estimateJan",
-          cbd.estimate_feb AS "estimateFeb",
-          cbd.estimate_mar AS "estimateMar",
-          cbd.estimate_apr AS "estimateApr",
-          cbd.estimate_may AS "estimateMay",
-          cbd.estimate_jun AS "estimateJun",
-          cbd.estimate_jul AS "estimateJul",
-          cbd.estimate_aug AS "estimateAug",
-          cbd.estimate_sep AS "estimateSep",
-          cbd.estimate_oct AS "estimateOct",
-          cbd.estimate_nov AS "estimateNov",
-          cbd.estimate_dec AS "estimateDec"
-      FROM ait.customer_bid_export_item ei
-      INNER JOIN ait.customer_bid_data cbd
-          ON ei.source_db = cbd.source_db
-          AND ei.site_code = cbd.site_code
-          AND ei.customer_bill_to = cbd.customer_bill_to
-          AND ei.item_no = cbd.item_no
-          AND ei.school_year = cbd.school_year
-      INNER JOIN dw2_nav.customer c
-          ON cbd.customer_bill_to = c.no_
-          AND cbd.source_db = c.source_db
-      INNER JOIN dw2_nav.item i
-          ON cbd.item_no = i.no_
-          AND cbd.source_db = i.source_db
-      WHERE ei.status = 'QUEUED'
-        AND ei.export_type = ${exportType}::"ait"."BidExportType"
-      ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
-    `);
-
+    const rows = await this.getQueuedBidRows(exportType);
     return rows.map((row) => this.mapRowToDto(row));
   }
 
@@ -270,24 +214,7 @@ export class BidExportService implements IBidExportService {
       });
 
       // 4. Update lastExportedAt/lastExportedBy on CustomerBidData
-      // Build composite key conditions for batch update
-      for (const item of queuedItems) {
-        await tx.customerBidData.update({
-          where: {
-            sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-              sourceDb: item.sourceDb,
-              siteCode: item.siteCode,
-              customerBillTo: item.customerBillTo,
-              itemNo: item.itemNo,
-              schoolYear: item.schoolYear,
-            },
-          },
-          data: {
-            lastExportedAt: new Date(),
-            lastExportedBy: userEmail,
-          },
-        });
-      }
+      await this.updateBidDataExportTracking(tx, queuedItems, userEmail);
 
       // 5. Complete the run
       const durationMs = Date.now() - startTime;
@@ -407,68 +334,8 @@ export class BidExportService implements IBidExportService {
     );
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // 1. Fetch full bid data for QUEUED items (same query as getQueuedBidData)
-      const rows = await tx.$queryRaw<QueuedBidRow[]>(Prisma.sql`
-        SELECT DISTINCT
-            cbd.source_db AS "sourceDb",
-            cbd.site_code AS "siteCode",
-            c."name" AS "customerName",
-            cbd.customer_bill_to AS "customerBillTo",
-            c.co_op_code AS "coOpCode",
-            c.contact AS "contactName",
-            c.e_mail AS "contactEmail",
-            c.phone_no_ AS "contactPhone",
-            c.salesperson_code AS "salesRep",
-            cbd.item_no AS "itemNo",
-            i.description AS "itemDescription",
-            i.description_2 AS "brandName",
-            cbd.bid_qty AS "bidQty",
-            cbd.bid_start AS "bidStart",
-            cbd.bid_end AS "bidEnd",
-            cbd.erp_status AS "erpStatus",
-            cbd.last_year_bid_qty AS "lastYearBidQty",
-            cbd.last_year_actual AS "lastYearActual",
-            cbd.ly_august AS "lyAugust",
-            cbd.ly_september AS "lySeptember",
-            cbd.ly_october AS "lyOctober",
-            cbd.is_lost AS "isLost",
-            cbd.last_updated_at AS "lastUpdatedAt",
-            cbd.last_updated_by AS "lastUpdatedBy",
-            cbd.confirmed_at AS "confirmedAt",
-            cbd.confirmed_by AS "confirmedBy",
-            cbd.last_exported_at AS "lastExportedAt",
-            cbd.last_exported_by AS "lastExportedBy",
-            cbd.year_around AS "yearAround",
-            cbd.estimate_jan AS "estimateJan",
-            cbd.estimate_feb AS "estimateFeb",
-            cbd.estimate_mar AS "estimateMar",
-            cbd.estimate_apr AS "estimateApr",
-            cbd.estimate_may AS "estimateMay",
-            cbd.estimate_jun AS "estimateJun",
-            cbd.estimate_jul AS "estimateJul",
-            cbd.estimate_aug AS "estimateAug",
-            cbd.estimate_sep AS "estimateSep",
-            cbd.estimate_oct AS "estimateOct",
-            cbd.estimate_nov AS "estimateNov",
-            cbd.estimate_dec AS "estimateDec"
-        FROM ait.customer_bid_export_item ei
-        INNER JOIN ait.customer_bid_data cbd
-            ON ei.source_db = cbd.source_db
-            AND ei.site_code = cbd.site_code
-            AND ei.customer_bill_to = cbd.customer_bill_to
-            AND ei.item_no = cbd.item_no
-            AND ei.school_year = cbd.school_year
-        INNER JOIN dw2_nav.customer c
-            ON cbd.customer_bill_to = c.no_
-            AND cbd.source_db = c.source_db
-        INNER JOIN dw2_nav.item i
-            ON cbd.item_no = i.no_
-            AND cbd.source_db = i.source_db
-        WHERE ei.status = 'QUEUED'
-          AND ei.export_type = ${exportType}::"ait"."BidExportType"
-        ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
-      `);
-
+      // 1. Fetch full bid data for QUEUED items
+      const rows = await this.getQueuedBidRows(exportType, tx);
       const bidData = rows.map((row) => this.mapRowToDto(row));
 
       if (rows.length === 0) {
@@ -512,23 +379,7 @@ export class BidExportService implements IBidExportService {
       });
 
       // 5. Update lastExportedAt/lastExportedBy on CustomerBidData
-      for (const item of queuedItems) {
-        await tx.customerBidData.update({
-          where: {
-            sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-              sourceDb: item.sourceDb,
-              siteCode: item.siteCode,
-              customerBillTo: item.customerBillTo,
-              itemNo: item.itemNo,
-              schoolYear: item.schoolYear,
-            },
-          },
-          data: {
-            lastExportedAt: new Date(),
-            lastExportedBy: userEmail,
-          },
-        });
-      }
+      await this.updateBidDataExportTracking(tx, queuedItems, userEmail);
 
       // 6. Complete the run
       const durationMs = Date.now() - startTime;
@@ -651,15 +502,7 @@ export class BidExportService implements IBidExportService {
     await this.prisma.$transaction(async (tx) => {
       for (const key of keys) {
         await tx.customerBidData.update({
-          where: {
-            sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-              sourceDb: key.sourceDb,
-              siteCode: key.siteCode,
-              customerBillTo: key.customerBillTo,
-              itemNo: key.itemNo,
-              schoolYear: key.schoolYear,
-            },
-          },
+          where: buildCompositeKeyWhere(key),
           data: {
             lastExportedAt: null,
             lastExportedBy: null,
@@ -690,6 +533,102 @@ export class BidExportService implements IBidExportService {
   }
 
   /**
+   * Fetch full bid data rows for all QUEUED items of a given export type.
+   * Accepts optional transaction client for use within $transaction blocks.
+   */
+  private async getQueuedBidRows(
+    exportType: BidExportType,
+    client?: Prisma.TransactionClient
+  ): Promise<QueuedBidRow[]> {
+    const db = client ?? this.prisma;
+    return db.$queryRaw<QueuedBidRow[]>(Prisma.sql`
+      SELECT DISTINCT
+          cbd.source_db AS "sourceDb",
+          cbd.site_code AS "siteCode",
+          c."name" AS "customerName",
+          cbd.customer_bill_to AS "customerBillTo",
+          c.co_op_code AS "coOpCode",
+          c.contact AS "contactName",
+          c.e_mail AS "contactEmail",
+          c.phone_no_ AS "contactPhone",
+          c.salesperson_code AS "salesRep",
+          cbd.item_no AS "itemNo",
+          i.description AS "itemDescription",
+          i.description_2 AS "brandName",
+          cbd.bid_qty AS "bidQty",
+          cbd.bid_start AS "bidStart",
+          cbd.bid_end AS "bidEnd",
+          cbd.erp_status AS "erpStatus",
+          cbd.last_year_bid_qty AS "lastYearBidQty",
+          cbd.last_year_actual AS "lastYearActual",
+          cbd.ly_august AS "lyAugust",
+          cbd.ly_september AS "lySeptember",
+          cbd.ly_october AS "lyOctober",
+          cbd.is_lost AS "isLost",
+          cbd.last_updated_at AS "lastUpdatedAt",
+          cbd.last_updated_by AS "lastUpdatedBy",
+          cbd.confirmed_at AS "confirmedAt",
+          cbd.confirmed_by AS "confirmedBy",
+          cbd.last_exported_at AS "lastExportedAt",
+          cbd.last_exported_by AS "lastExportedBy",
+          cbd.year_around AS "yearAround",
+          cbd.estimate_jan AS "estimateJan",
+          cbd.estimate_feb AS "estimateFeb",
+          cbd.estimate_mar AS "estimateMar",
+          cbd.estimate_apr AS "estimateApr",
+          cbd.estimate_may AS "estimateMay",
+          cbd.estimate_jun AS "estimateJun",
+          cbd.estimate_jul AS "estimateJul",
+          cbd.estimate_aug AS "estimateAug",
+          cbd.estimate_sep AS "estimateSep",
+          cbd.estimate_oct AS "estimateOct",
+          cbd.estimate_nov AS "estimateNov",
+          cbd.estimate_dec AS "estimateDec"
+      FROM ait.customer_bid_export_item ei
+      INNER JOIN ait.customer_bid_data cbd
+          ON ei.source_db = cbd.source_db
+          AND ei.site_code = cbd.site_code
+          AND ei.customer_bill_to = cbd.customer_bill_to
+          AND ei.item_no = cbd.item_no
+          AND ei.school_year = cbd.school_year
+      INNER JOIN dw2_nav.customer c
+          ON cbd.customer_bill_to = c.no_
+          AND cbd.source_db = c.source_db
+      INNER JOIN dw2_nav.item i
+          ON cbd.item_no = i.no_
+          AND cbd.source_db = i.source_db
+      WHERE ei.status = 'QUEUED'
+        AND ei.export_type = ${exportType}::"ait"."BidExportType"
+      ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
+    `);
+  }
+
+  /**
+   * Update lastExportedAt/lastExportedBy on CustomerBidData for a set of items.
+   */
+  private async updateBidDataExportTracking(
+    tx: Prisma.TransactionClient,
+    items: Array<{
+      sourceDb: string;
+      siteCode: string;
+      customerBillTo: string;
+      itemNo: string;
+      schoolYear: string;
+    }>,
+    userEmail: string
+  ): Promise<void> {
+    for (const item of items) {
+      await tx.customerBidData.update({
+        where: buildCompositeKeyWhere(item),
+        data: {
+          lastExportedAt: new Date(),
+          lastExportedBy: userEmail,
+        },
+      });
+    }
+  }
+
+  /**
    * Resolve filter criteria to matching bid composite keys.
    * Uses the same WHERE clause logic as CustomerBidService.getCustomerBids
    * but only SELECTs the 5 PK columns.
@@ -698,72 +637,29 @@ export class BidExportService implements IBidExportService {
     schoolYear: string,
     filters: Record<string, unknown>
   ): Promise<BidKeyRow[]> {
-    const whereConditions: Prisma.Sql[] = [];
-
-    if (filters.siteCode) {
-      whereConditions.push(
-        Prisma.sql`cbd.site_code = ${String(filters.siteCode)}`
-      );
-    }
-    if (filters.customerBillTo) {
-      whereConditions.push(
-        Prisma.sql`cbd.customer_bill_to ILIKE ${"%" + String(filters.customerBillTo) + "%"}`
-      );
-    }
-    if (filters.customerName) {
-      whereConditions.push(
-        Prisma.sql`c."name" ILIKE ${"%" + String(filters.customerName) + "%"}`
-      );
-    }
-    if (filters.salesRep) {
-      whereConditions.push(
-        Prisma.sql`c.salesperson_code = ${String(filters.salesRep)}`
-      );
-    }
-    if (filters.itemCode) {
-      whereConditions.push(
-        Prisma.sql`cbd.item_no = ${String(filters.itemCode)}`
-      );
-    }
-    if (filters.erpStatus) {
-      whereConditions.push(
-        Prisma.sql`cbd.erp_status ILIKE ${"%" + String(filters.erpStatus) + "%"}`
-      );
-    }
-    if (filters.sourceDb) {
-      whereConditions.push(
-        Prisma.sql`cbd.source_db = ${String(filters.sourceDb)}`
-      );
-    }
-    if (filters.coOpCode) {
-      whereConditions.push(
-        Prisma.sql`c.co_op_code = ${String(filters.coOpCode)}`
-      );
-    }
-    if (filters.isLost !== undefined) {
-      whereConditions.push(
-        Prisma.sql`cbd.is_lost = ${Boolean(filters.isLost)}`
-      );
-    }
-    if (filters.isLost !== true) {
-      whereConditions.push(
-        Prisma.sql`cbd.bid_start IS NOT NULL AND cbd.bid_end IS NOT NULL`
-      );
-    }
-    if (filters.confirmed !== undefined) {
-      if (filters.confirmed) {
-        whereConditions.push(Prisma.sql`cbd.confirmed_at IS NOT NULL`);
-      } else {
-        whereConditions.push(Prisma.sql`cbd.confirmed_at IS NULL`);
-      }
-    }
-    if (filters.exported !== undefined) {
-      if (filters.exported) {
-        whereConditions.push(Prisma.sql`cbd.last_exported_at IS NOT NULL`);
-      } else {
-        whereConditions.push(Prisma.sql`cbd.last_exported_at IS NULL`);
-      }
-    }
+    // Cast untyped filter record to typed params for shared builder
+    const whereConditions = buildBidFilterConditions({
+      siteCode: filters.siteCode ? String(filters.siteCode) : undefined,
+      customerBillTo: filters.customerBillTo
+        ? String(filters.customerBillTo)
+        : undefined,
+      customerName: filters.customerName
+        ? String(filters.customerName)
+        : undefined,
+      salesRep: filters.salesRep ? String(filters.salesRep) : undefined,
+      itemCode: filters.itemCode ? String(filters.itemCode) : undefined,
+      erpStatus: filters.erpStatus ? String(filters.erpStatus) : undefined,
+      sourceDb: filters.sourceDb ? String(filters.sourceDb) : undefined,
+      coOpCode: filters.coOpCode ? String(filters.coOpCode) : undefined,
+      isLost:
+        filters.isLost !== undefined ? Boolean(filters.isLost) : undefined,
+      confirmed:
+        filters.confirmed !== undefined
+          ? Boolean(filters.confirmed)
+          : undefined,
+      exported:
+        filters.exported !== undefined ? Boolean(filters.exported) : undefined,
+    });
 
     const additionalWhere =
       whereConditions.length > 0
@@ -806,12 +702,12 @@ export class BidExportService implements IBidExportService {
       itemDescription: row.itemDescription,
       brandName: row.brandName,
       erpStatus: row.erpStatus,
-      bidQuantity: row.bidQty ? Number(row.bidQty) : null,
-      lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
-      lastYearActual: row.lastYearActual ? Number(row.lastYearActual) : null,
-      lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
-      lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
-      lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
+      bidQuantity: decimalToNumber(row.bidQty),
+      lastYearBidQty: decimalToNumber(row.lastYearBidQty),
+      lastYearActual: decimalToNumber(row.lastYearActual),
+      lyAugust: decimalToNumber(row.lyAugust),
+      lySeptember: decimalToNumber(row.lySeptember),
+      lyOctober: decimalToNumber(row.lyOctober),
       isLost: row.isLost ?? false,
       lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: row.lastUpdatedBy ?? null,
@@ -820,18 +716,7 @@ export class BidExportService implements IBidExportService {
       lastExportedAt: row.lastExportedAt?.toISOString() ?? null,
       lastExportedBy: row.lastExportedBy ?? null,
       yearAround: row.yearAround ?? false,
-      estimateJan: row.estimateJan ? Number(row.estimateJan) : null,
-      estimateFeb: row.estimateFeb ? Number(row.estimateFeb) : null,
-      estimateMar: row.estimateMar ? Number(row.estimateMar) : null,
-      estimateApr: row.estimateApr ? Number(row.estimateApr) : null,
-      estimateMay: row.estimateMay ? Number(row.estimateMay) : null,
-      estimateJun: row.estimateJun ? Number(row.estimateJun) : null,
-      estimateJul: row.estimateJul ? Number(row.estimateJul) : null,
-      estimateAug: row.estimateAug ? Number(row.estimateAug) : null,
-      estimateSep: row.estimateSep ? Number(row.estimateSep) : null,
-      estimateOct: row.estimateOct ? Number(row.estimateOct) : null,
-      estimateNov: row.estimateNov ? Number(row.estimateNov) : null,
-      estimateDec: row.estimateDec ? Number(row.estimateDec) : null,
+      ...mapEstimates(row),
     };
   }
 }

@@ -21,6 +21,16 @@ import {
   CustomerBidSyncInProgressError,
 } from "@/utils/errors/customer-bid-errors";
 import { createChildLogger } from "@/telemetry/logger";
+import {
+  buildCompositeKeyWhere,
+  buildMapKey,
+} from "@/services/helpers/bid-keys";
+import {
+  ESTIMATE_FIELDS,
+  decimalToNumber,
+  mapEstimates,
+} from "@/services/helpers/bid-converters";
+import { buildBidFilterConditions } from "@/services/helpers/bid-filters";
 
 const logger = createChildLogger("customer-bid");
 
@@ -120,75 +130,8 @@ export class CustomerBidService implements ICustomerBidService {
         "Querying customer bids by school year"
       );
 
-      // Build WHERE clause conditions for filters
-      const whereConditions: Prisma.Sql[] = [];
-
-      if (query.siteCode) {
-        whereConditions.push(Prisma.sql`cbd.site_code = ${query.siteCode}`);
-      }
-
-      if (query.customerBillTo) {
-        whereConditions.push(
-          Prisma.sql`cbd.customer_bill_to ILIKE ${"%" + query.customerBillTo + "%"}`
-        );
-      }
-
-      if (query.customerName) {
-        whereConditions.push(
-          Prisma.sql`c."name" ILIKE ${"%" + query.customerName + "%"}`
-        );
-      }
-
-      if (query.salesRep) {
-        whereConditions.push(
-          Prisma.sql`c.salesperson_code = ${query.salesRep}`
-        );
-      }
-
-      if (query.itemCode) {
-        whereConditions.push(Prisma.sql`cbd.item_no = ${query.itemCode}`);
-      }
-
-      if (query.erpStatus) {
-        whereConditions.push(
-          Prisma.sql`cbd.erp_status ILIKE ${"%" + query.erpStatus + "%"}`
-        );
-      }
-
-      if (query.sourceDb) {
-        whereConditions.push(Prisma.sql`cbd.source_db = ${query.sourceDb}`);
-      }
-
-      if (query.coOpCode) {
-        whereConditions.push(Prisma.sql`c.co_op_code = ${query.coOpCode}`);
-      }
-
-      if (query.isLost !== undefined) {
-        whereConditions.push(Prisma.sql`cbd.is_lost = ${query.isLost}`);
-      }
-
-      // Filter out rows with NULL bid dates unless explicitly viewing lost bids
-      if (query.isLost !== true) {
-        whereConditions.push(
-          Prisma.sql`cbd.bid_start IS NOT NULL AND cbd.bid_end IS NOT NULL`
-        );
-      }
-
-      if (query.confirmed !== undefined) {
-        if (query.confirmed) {
-          whereConditions.push(Prisma.sql`cbd.confirmed_at IS NOT NULL`);
-        } else {
-          whereConditions.push(Prisma.sql`cbd.confirmed_at IS NULL`);
-        }
-      }
-
-      if (query.exported !== undefined) {
-        if (query.exported) {
-          whereConditions.push(Prisma.sql`cbd.last_exported_at IS NOT NULL`);
-        } else {
-          whereConditions.push(Prisma.sql`cbd.last_exported_at IS NULL`);
-        }
-      }
+      // Build WHERE clause conditions from shared filter builder + queued filter
+      const whereConditions = buildBidFilterConditions(query);
 
       if (query.queued !== undefined) {
         const queuedSubquery = Prisma.sql`
@@ -421,15 +364,7 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
-      const compositeKey = {
-        sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-          sourceDb: key.sourceDb,
-          siteCode: key.siteCode,
-          customerBillTo: key.customerBillTo,
-          itemNo: key.itemNo,
-          schoolYear: key.schoolYear,
-        },
-      };
+      const compositeKey = buildCompositeKeyWhere(key);
 
       // Check if bid is confirmed — enforce restrictions
       const existing = await this.prisma.customerBidData.findUnique({
@@ -532,21 +467,7 @@ export class CustomerBidService implements ICustomerBidService {
       return true;
 
     // Monthly estimates (Prisma Decimal vs number comparison)
-    const estimateFields = [
-      "estimateJan",
-      "estimateFeb",
-      "estimateMar",
-      "estimateApr",
-      "estimateMay",
-      "estimateJun",
-      "estimateJul",
-      "estimateAug",
-      "estimateSep",
-      "estimateOct",
-      "estimateNov",
-      "estimateDec",
-    ] as const;
-    for (const field of estimateFields) {
+    for (const field of ESTIMATE_FIELDS) {
       const inc = incoming[field];
       if (inc === undefined) continue;
       const ext = existing[field];
@@ -565,21 +486,7 @@ export class CustomerBidService implements ICustomerBidService {
   private hasNonDefaultValues(incoming: UpdateCustomerBidDto): boolean {
     if (incoming.yearAround === true) return true;
 
-    const estimateFields = [
-      "estimateJan",
-      "estimateFeb",
-      "estimateMar",
-      "estimateApr",
-      "estimateMay",
-      "estimateJun",
-      "estimateJul",
-      "estimateAug",
-      "estimateSep",
-      "estimateOct",
-      "estimateNov",
-      "estimateDec",
-    ] as const;
-    for (const f of estimateFields) {
+    for (const f of ESTIMATE_FIELDS) {
       if (incoming[f] !== undefined && incoming[f] !== null) return true;
     }
 
@@ -682,17 +589,8 @@ export class CustomerBidService implements ICustomerBidService {
 
       try {
         // Fetch existing record to check for actual changes
-        const compositeKey = {
-          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-            sourceDb: key.sourceDb,
-            siteCode: key.siteCode,
-            customerBillTo: key.customerBillTo,
-            itemNo: key.itemNo,
-            schoolYear: key.schoolYear,
-          },
-        };
         const existing = await this.prisma.customerBidData.findUnique({
-          where: compositeKey,
+          where: buildCompositeKeyWhere(key),
         });
 
         let needsConfirmChange = false;
@@ -833,15 +731,11 @@ export class CustomerBidService implements ICustomerBidService {
       brandName: null,
       erpStatus: null,
       bidQuantity: null,
-      lastYearBidQty: record.lastYearBidQty
-        ? Number(record.lastYearBidQty)
-        : null,
-      lastYearActual: record.lastYearActual
-        ? Number(record.lastYearActual)
-        : null,
-      lyAugust: record.lyAugust ? Number(record.lyAugust) : null,
-      lySeptember: record.lySeptember ? Number(record.lySeptember) : null,
-      lyOctober: record.lyOctober ? Number(record.lyOctober) : null,
+      lastYearBidQty: decimalToNumber(record.lastYearBidQty),
+      lastYearActual: decimalToNumber(record.lastYearActual),
+      lyAugust: decimalToNumber(record.lyAugust),
+      lySeptember: decimalToNumber(record.lySeptember),
+      lyOctober: decimalToNumber(record.lyOctober),
       isLost: record.isLost,
       lastUpdatedAt: record.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: record.lastUpdatedBy ?? null,
@@ -850,19 +744,7 @@ export class CustomerBidService implements ICustomerBidService {
       lastExportedAt: record.lastExportedAt?.toISOString() ?? null,
       lastExportedBy: record.lastExportedBy ?? null,
       yearAround: record.yearAround,
-      // Monthly estimates
-      estimateJan: record.estimateJan ? Number(record.estimateJan) : null,
-      estimateFeb: record.estimateFeb ? Number(record.estimateFeb) : null,
-      estimateMar: record.estimateMar ? Number(record.estimateMar) : null,
-      estimateApr: record.estimateApr ? Number(record.estimateApr) : null,
-      estimateMay: record.estimateMay ? Number(record.estimateMay) : null,
-      estimateJun: record.estimateJun ? Number(record.estimateJun) : null,
-      estimateJul: record.estimateJul ? Number(record.estimateJul) : null,
-      estimateAug: record.estimateAug ? Number(record.estimateAug) : null,
-      estimateSep: record.estimateSep ? Number(record.estimateSep) : null,
-      estimateOct: record.estimateOct ? Number(record.estimateOct) : null,
-      estimateNov: record.estimateNov ? Number(record.estimateNov) : null,
-      estimateDec: record.estimateDec ? Number(record.estimateDec) : null,
+      ...mapEstimates(record),
     };
   }
 
@@ -878,15 +760,7 @@ export class CustomerBidService implements ICustomerBidService {
     try {
       // Validate: at least 1 month must have both an estimate and a menu month
       const existing = await this.prisma.customerBidData.findUnique({
-        where: {
-          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-            sourceDb: key.sourceDb,
-            siteCode: key.siteCode,
-            customerBillTo: key.customerBillTo,
-            itemNo: key.itemNo,
-            schoolYear: key.schoolYear,
-          },
-        },
+        where: buildCompositeKeyWhere(key),
       });
 
       if (!existing) {
@@ -895,22 +769,8 @@ export class CustomerBidService implements ICustomerBidService {
         );
       }
 
-      const estimates = [
-        existing.estimateJan,
-        existing.estimateFeb,
-        existing.estimateMar,
-        existing.estimateApr,
-        existing.estimateMay,
-        existing.estimateJun,
-        existing.estimateJul,
-        existing.estimateAug,
-        existing.estimateSep,
-        existing.estimateOct,
-        existing.estimateNov,
-        existing.estimateDec,
-      ];
-      const hasValidMonth = estimates.some(
-        (est) => est != null && Number(est) > 0
+      const hasValidMonth = ESTIMATE_FIELDS.some(
+        (field) => existing[field] != null && Number(existing[field]) > 0
       );
 
       if (!hasValidMonth) {
@@ -920,15 +780,7 @@ export class CustomerBidService implements ICustomerBidService {
       }
 
       const record = await this.prisma.customerBidData.update({
-        where: {
-          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-            sourceDb: key.sourceDb,
-            siteCode: key.siteCode,
-            customerBillTo: key.customerBillTo,
-            itemNo: key.itemNo,
-            schoolYear: key.schoolYear,
-          },
-        },
+        where: buildCompositeKeyWhere(key),
         data: {
           confirmedBy: userEmail,
           confirmedAt: new Date(),
@@ -962,15 +814,7 @@ export class CustomerBidService implements ICustomerBidService {
 
     try {
       const record = await this.prisma.customerBidData.update({
-        where: {
-          sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
-            sourceDb: key.sourceDb,
-            siteCode: key.siteCode,
-            customerBillTo: key.customerBillTo,
-            itemNo: key.itemNo,
-            schoolYear: key.schoolYear,
-          },
-        },
+        where: buildCompositeKeyWhere(key),
         data: {
           confirmedBy: null,
           confirmedAt: null,
@@ -1134,7 +978,12 @@ export class CustomerBidService implements ICustomerBidService {
       `);
 
       for (const row of lastYearBids) {
-        const key = `${row.source_db}|${row.site_code}|${row.customer_bill_to}|${row.item_no}`;
+        const key = buildMapKey(
+          row.source_db,
+          row.site_code,
+          row.customer_bill_to,
+          row.item_no
+        );
         lastYearBidsMap.set(key, row.bid_qty);
       }
 
@@ -1196,7 +1045,12 @@ export class CustomerBidService implements ICustomerBidService {
       );
 
       for (const row of lastYearSales) {
-        const key = `${row.source_db}|${row.site_code}|${row.customer_bill_to}|${row.item_no}`;
+        const key = buildMapKey(
+          row.source_db,
+          row.site_code,
+          row.customer_bill_to,
+          row.item_no
+        );
         lastYearSalesMap.set(key, {
           totalQty: row.total_quantity,
           augQty: row.august_qty,
@@ -1238,9 +1092,8 @@ export class CustomerBidService implements ICustomerBidService {
 
       // Create set of current year keys for isLost calculation
       const currentYearKeys = new Set(
-        currentYearBids.map(
-          (b) =>
-            `${b.source_db}|${b.site_code}|${b.customer_bill_to}|${b.item_no}`
+        currentYearBids.map((b) =>
+          buildMapKey(b.source_db, b.site_code, b.customer_bill_to, b.item_no)
         )
       );
 
@@ -1256,7 +1109,12 @@ export class CustomerBidService implements ICustomerBidService {
 
         // Build batch data with all computed values
         const batchData = batch.map((bid) => {
-          const key = `${bid.source_db}|${bid.site_code}|${bid.customer_bill_to}|${bid.item_no}`;
+          const key = buildMapKey(
+            bid.source_db,
+            bid.site_code,
+            bid.customer_bill_to,
+            bid.item_no
+          );
           const erpKey = `${bid.source_db}|${bid.item_no}`;
           const lastYearBidQty = lastYearBidsMap.get(key) ?? null;
           const salesData = lastYearSalesMap.get(key);
@@ -1342,7 +1200,12 @@ export class CustomerBidService implements ICustomerBidService {
 
       // Process LOST bids: bids that existed last year but NOT in current year
       const lostBids = lastYearBids.filter((lyBid) => {
-        const key = `${lyBid.source_db}|${lyBid.site_code}|${lyBid.customer_bill_to}|${lyBid.item_no}`;
+        const key = buildMapKey(
+          lyBid.source_db,
+          lyBid.site_code,
+          lyBid.customer_bill_to,
+          lyBid.item_no
+        );
         return !currentYearKeys.has(key);
       });
 
@@ -1361,7 +1224,12 @@ export class CustomerBidService implements ICustomerBidService {
 
         // Build batch data with computed values
         const batchData = batch.map((bid) => {
-          const key = `${bid.source_db}|${bid.site_code}|${bid.customer_bill_to}|${bid.item_no}`;
+          const key = buildMapKey(
+            bid.source_db,
+            bid.site_code,
+            bid.customer_bill_to,
+            bid.item_no
+          );
           const erpKey = `${bid.source_db}|${bid.item_no}`;
           const salesData = lastYearSalesMap.get(key);
           const erpStatus = erpStatusMap.get(erpKey) ?? null;

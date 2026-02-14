@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Download,
   Upload,
-  Filter,
   Loader2,
   RefreshCw,
   ListPlus,
@@ -14,9 +13,6 @@ import {
   SendHorizonal,
 } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
-import { Input } from "@/shadcn/components/input";
-import { Label } from "@/shadcn/components/label";
-import { FilterCombobox } from "@/components/filter-combobox";
 import { Badge } from "@/shadcn/components/badge";
 import {
   AlertDialog,
@@ -35,22 +31,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/shadcn/components/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/shadcn/components/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/shadcn/components/tabs";
-import { Switch } from "@/shadcn/components/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shadcn/components/select";
 import {
   getCustomerBids,
   getCustomerBidFilterOptions,
@@ -84,14 +65,12 @@ import {
   customerBidExportColumns,
 } from "@/utils/export-csv";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
+import { useExportQueue } from "@/pages/customer-bids/use-export-queue";
 import {
-  queueBidExportByKeys,
-  cancelBidExportByKeys,
-  clearExportByKeys,
-  exportAndReturn,
-  getQueueSummary,
-} from "@/apis/bid-exports";
-import type { QueueSummary } from "@/types/bid-export";
+  FilterSheet,
+  EMPTY_FILTER_INPUTS,
+  type FilterInputs,
+} from "@/pages/customer-bids/filter-sheet";
 import type { Table } from "@tanstack/react-table";
 
 /**
@@ -272,27 +251,15 @@ export default function CustomerBids({
   );
 
   // Local filter inputs (before applying) - initialized from URL params
-  const [siteCodeInput, setSiteCodeInput] = useState(
-    () => searchParams.get("siteCode") || ""
-  );
-  const [customerBillToInput, setCustomerBillToInput] = useState(
-    () => searchParams.get("customerBillTo") || ""
-  );
-  const [customerNameInput, setCustomerNameInput] = useState(
-    () => searchParams.get("customerName") || ""
-  );
-  const [salesRepInput, setSalesRepInput] = useState(
-    () => searchParams.get("salesRep") || ""
-  );
-  const [itemCodeInput, setItemCodeInput] = useState(
-    () => searchParams.get("itemCode") || ""
-  );
-  const [erpStatusInput, setErpStatusInput] = useState(
-    () => searchParams.get("erpStatus") || ""
-  );
-  const [coOpCodeInput, setCoOpCodeInput] = useState(
-    () => searchParams.get("coOpCode") || ""
-  );
+  const [filterInputs, setFilterInputs] = useState<FilterInputs>(() => ({
+    siteCode: searchParams.get("siteCode") || "",
+    customerBillTo: searchParams.get("customerBillTo") || "",
+    customerName: searchParams.get("customerName") || "",
+    salesRep: searchParams.get("salesRep") || "",
+    itemCode: searchParams.get("itemCode") || "",
+    erpStatus: searchParams.get("erpStatus") || "",
+    coOpCode: searchParams.get("coOpCode") || "",
+  }));
   const [confirmedFilter, setConfirmedFilter] = useState<boolean>(() => {
     const param = searchParams.get("confirmed");
     return param === "true"
@@ -323,20 +290,6 @@ export default function CustomerBids({
     const param = searchParams.get("queued");
     return param === "true" ? true : param === "false" ? false : defaultQueued;
   });
-
-  // Export queue state — local queue (no API) + backend queue summary (for Export SIQ badge)
-  const [queuedKeys, setQueuedKeys] = useState<Set<string>>(new Set());
-  const [showPendingQueue, setShowPendingQueue] = useState(false);
-  const [queueSummary, setQueueSummary] = useState<QueueSummary | null>(null);
-  const [isConfirmingQueue, setIsConfirmingQueue] = useState(false);
-  const [isExportingSIQ, setIsExportingSIQ] = useState(false);
-
-  // Auto-reset pending queue view when queue becomes empty
-  useEffect(() => {
-    if (showPendingQueue && queuedKeys.size === 0) {
-      setShowPendingQueue(false);
-    }
-  }, [showPendingQueue, queuedKeys.size]);
 
   // Filter options for datalist autocomplete
   const [filterOptions, setFilterOptions] =
@@ -392,20 +345,31 @@ export default function CustomerBids({
     void fetchData(filters);
   }, [filters, fetchData]);
 
-  // Fetch export queue summary when showQueueExport is enabled
-  const fetchQueueSummary = useCallback(async () => {
-    if (!showQueueExport) return;
-    try {
-      const summary = await getQueueSummary();
-      setQueueSummary(summary);
-    } catch {
-      // Queue summary is informational; silently degrade
-    }
-  }, [showQueueExport]);
-
-  useEffect(() => {
-    void fetchQueueSummary();
-  }, [fetchQueueSummary]);
+  // Export queue — local queue + backend queue operations
+  const {
+    queuedKeys,
+    showPendingQueue,
+    setShowPendingQueue,
+    isConfirmingQueue,
+    isExportingSIQ,
+    queueSummary,
+    displayedBids,
+    isQueued,
+    handleToggleQueue,
+    handleQueueAll,
+    handleRemoveAllQueued,
+    handleConfirmQueue,
+    handleExportSIQ,
+    handleDequeue,
+    handleCancelExport,
+  } = useExportQueue({
+    bids,
+    setBids,
+    schoolYearString,
+    filters,
+    fetchData,
+    enabled: showQueueExport,
+  });
 
   // Fetch filter options when filter sheet is opened
   useEffect(() => {
@@ -458,13 +422,15 @@ export default function CustomerBids({
     if (urlFiltersStr !== currentFiltersStr) {
       setFilters(urlFilters);
       // Sync local inputs
-      setSiteCodeInput(urlFilters.siteCode || "");
-      setCustomerBillToInput(urlFilters.customerBillTo || "");
-      setCustomerNameInput(urlFilters.customerName || "");
-      setSalesRepInput(urlFilters.salesRep || "");
-      setItemCodeInput(urlFilters.itemCode || "");
-      setErpStatusInput(urlFilters.erpStatus || "");
-      setCoOpCodeInput(urlFilters.coOpCode || "");
+      setFilterInputs({
+        siteCode: urlFilters.siteCode || "",
+        customerBillTo: urlFilters.customerBillTo || "",
+        customerName: urlFilters.customerName || "",
+        salesRep: urlFilters.salesRep || "",
+        itemCode: urlFilters.itemCode || "",
+        erpStatus: urlFilters.erpStatus || "",
+        coOpCode: urlFilters.coOpCode || "",
+      });
       setExportedFilter(urlFilters.exported);
       setQueuedFilter(urlFilters.queued);
     }
@@ -476,13 +442,13 @@ export default function CustomerBids({
       page: 1,
       limit: filters.limit,
       schoolYear: filters.schoolYear,
-      siteCode: siteCodeInput || undefined,
-      customerBillTo: customerBillToInput || undefined,
-      customerName: customerNameInput || undefined,
-      salesRep: salesRepInput || undefined,
-      itemCode: itemCodeInput || undefined,
-      erpStatus: erpStatusInput || undefined,
-      coOpCode: coOpCodeInput || undefined,
+      siteCode: filterInputs.siteCode || undefined,
+      customerBillTo: filterInputs.customerBillTo || undefined,
+      customerName: filterInputs.customerName || undefined,
+      salesRep: filterInputs.salesRep || undefined,
+      itemCode: filterInputs.itemCode || undefined,
+      erpStatus: filterInputs.erpStatus || undefined,
+      coOpCode: filterInputs.coOpCode || undefined,
       isLost:
         isLostFilter === "renewed"
           ? false
@@ -498,13 +464,7 @@ export default function CustomerBids({
   };
 
   const handleClearFilters = () => {
-    setSiteCodeInput("");
-    setCustomerBillToInput("");
-    setCustomerNameInput("");
-    setSalesRepInput("");
-    setItemCodeInput("");
-    setErpStatusInput("");
-    setCoOpCodeInput("");
+    setFilterInputs(EMPTY_FILTER_INPUTS);
     setConfirmedFilter(defaultConfirmed);
     setExportedFilter(defaultExported);
     setQueuedFilter(defaultQueued);
@@ -529,34 +489,28 @@ export default function CustomerBids({
   };
 
   const hasActiveFilters = Boolean(
-    siteCodeInput ||
-      customerBillToInput ||
-      customerNameInput ||
-      salesRepInput ||
-      itemCodeInput ||
-      erpStatusInput ||
-      coOpCodeInput ||
+    filterInputs.siteCode ||
+      filterInputs.customerBillTo ||
+      filterInputs.customerName ||
+      filterInputs.salesRep ||
+      filterInputs.itemCode ||
+      filterInputs.erpStatus ||
+      filterInputs.coOpCode ||
       isLostFilter !== "all" ||
       (showConfirmedFilter && confirmedFilter)
   );
 
   const activeFilterCount = [
-    siteCodeInput,
-    customerBillToInput,
-    customerNameInput,
-    salesRepInput,
-    itemCodeInput,
-    erpStatusInput,
-    coOpCodeInput,
+    filterInputs.siteCode,
+    filterInputs.customerBillTo,
+    filterInputs.customerName,
+    filterInputs.salesRep,
+    filterInputs.itemCode,
+    filterInputs.erpStatus,
+    filterInputs.coOpCode,
     isLostFilter !== "all",
     showConfirmedFilter && confirmedFilter,
   ].filter(Boolean).length;
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
 
   // Handle cell updates for editable columns
   const handleCellUpdate = useCallback(
@@ -749,190 +703,6 @@ export default function CustomerBids({
     }
   }, [confirmableBids, filters.schoolYear]);
 
-  // --- Local queue helpers (no API calls) ---
-  const bidKeyString = useCallback(
-    (bid: CustomerBidDto) =>
-      `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`,
-    []
-  );
-
-  // Client-side filter: hide locally queued items (or show only them)
-  const displayedBids = useMemo(() => {
-    if (showPendingQueue) {
-      return bids.filter((bid) => queuedKeys.has(bidKeyString(bid)));
-    }
-    if (queuedKeys.size === 0) return bids;
-    return bids.filter((bid) => !queuedKeys.has(bidKeyString(bid)));
-  }, [bids, queuedKeys, bidKeyString, showPendingQueue]);
-
-  const isQueued = useCallback(
-    (bid: CustomerBidDto) => queuedKeys.has(bidKeyString(bid)),
-    [queuedKeys, bidKeyString]
-  );
-
-  const handleToggleQueue = useCallback(
-    (bid: CustomerBidDto) => {
-      const key = bidKeyString(bid);
-      setQueuedKeys((prev) => {
-        const next = new Set(prev);
-        if (next.has(key)) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-        return next;
-      });
-    },
-    [bidKeyString]
-  );
-
-  const handleQueueAll = useCallback(() => {
-    setQueuedKeys((prev) => {
-      const next = new Set(prev);
-      for (const bid of displayedBids) {
-        next.add(bidKeyString(bid));
-      }
-      return next;
-    });
-  }, [displayedBids, bidKeyString]);
-
-  const handleRemoveAllQueued = useCallback(() => {
-    setQueuedKeys(new Set());
-  }, []);
-
-  // Confirm local queue → batch API call to backend
-  const handleConfirmQueue = useCallback(async () => {
-    if (queuedKeys.size === 0) return;
-
-    setIsConfirmingQueue(true);
-    try {
-      const keys = Array.from(queuedKeys).map((keyStr) => {
-        const parts = keyStr.split("/");
-        return {
-          sourceDb: parts[0] ?? "",
-          siteCode: parts[1] ?? "",
-          customerBillTo: parts[2] ?? "",
-          itemNo: parts[3] ?? "",
-          schoolYear: schoolYearString,
-        };
-      });
-
-      const result = await queueBidExportByKeys({
-        exportType: "SIQ",
-        keys,
-      });
-
-      setQueuedKeys(new Set());
-      setShowPendingQueue(false);
-      toast.success(
-        `${result.itemsQueued} item${result.itemsQueued !== 1 ? "s" : ""} queued for export`
-      );
-      void fetchQueueSummary();
-      void fetchData(filters);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to queue for export";
-      toast.error(message);
-    } finally {
-      setIsConfirmingQueue(false);
-    }
-  }, [queuedKeys, schoolYearString, fetchQueueSummary, fetchData, filters]);
-
-  // Export SIQ: atomic backend call — marks exported + returns bid data for CSV
-  const handleExportSIQ = useCallback(async () => {
-    setIsExportingSIQ(true);
-    try {
-      const result = await exportAndReturn("SIQ");
-      if (result.totalExported === 0) {
-        toast.info(
-          "No items queued for SIQ export. Queue items for export first."
-        );
-        return;
-      }
-      exportToSIQCSV(result.data, "customer-bids-siq");
-      toast.success(
-        `Exported ${result.totalExported} item${result.totalExported !== 1 ? "s" : ""}`
-      );
-      void fetchQueueSummary();
-      void fetchData(filters);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to export";
-      toast.error(message);
-    } finally {
-      setIsExportingSIQ(false);
-    }
-  }, [fetchQueueSummary, fetchData, filters]);
-
-  // Dequeue a single item from the backend export queue
-  const handleDequeue = useCallback(
-    async (bid: CustomerBidDto) => {
-      const key = {
-        sourceDb: bid.sourceDb || "",
-        siteCode: bid.siteCode || "",
-        customerBillTo: bid.customerBillTo || "",
-        itemNo: bid.itemCode,
-        schoolYear: schoolYearString,
-      };
-
-      try {
-        await cancelBidExportByKeys({ keys: [key] });
-        // Remove the dequeued item from the local bids list
-        setBids((prev) =>
-          prev.filter(
-            (b) =>
-              !(
-                b.sourceDb === bid.sourceDb &&
-                b.siteCode === bid.siteCode &&
-                b.customerBillTo === bid.customerBillTo &&
-                b.itemCode === bid.itemCode
-              )
-          )
-        );
-        toast.success("Item removed from export queue");
-        void fetchQueueSummary();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to dequeue item";
-        toast.error(message);
-      }
-    },
-    [schoolYearString, fetchQueueSummary]
-  );
-
-  // Clear export status on a single exported item
-  const handleCancelExport = useCallback(
-    async (bid: CustomerBidDto) => {
-      const key = {
-        sourceDb: bid.sourceDb || "",
-        siteCode: bid.siteCode || "",
-        customerBillTo: bid.customerBillTo || "",
-        itemNo: bid.itemCode,
-        schoolYear: schoolYearString,
-      };
-
-      try {
-        await clearExportByKeys([key]);
-        setBids((prev) =>
-          prev.filter(
-            (b) =>
-              !(
-                b.sourceDb === bid.sourceDb &&
-                b.siteCode === bid.siteCode &&
-                b.customerBillTo === bid.customerBillTo &&
-                b.itemCode === bid.itemCode
-              )
-          )
-        );
-        toast.success("Export status cleared");
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to clear export status";
-        toast.error(message);
-      }
-    },
-    [schoolYearString]
-  );
-
   // Determine which view mode we're in for column rendering
   const isViewingQueued = queuedFilter === true;
   const isViewingExported = exportedFilter === true;
@@ -1028,234 +798,30 @@ export default function CustomerBids({
         <div className="flex-1" />
 
         {/* Filter Sheet */}
-        <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1.5">
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="sm:max-w-lg px-8">
-            <SheetHeader className="pt-8 pb-10">
-              <SheetTitle className="text-xl font-semibold tracking-tight">
-                Filter Results
-              </SheetTitle>
-              <p className="text-muted-foreground mt-2">
-                Narrow down results by applying filters below
-              </p>
-            </SheetHeader>
-            <div className="space-y-6 overflow-y-auto flex-1 min-h-0">
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground">
-                  Site Code
-                </Label>
-                <FilterCombobox
-                  options={filterOptions?.siteCodes ?? []}
-                  value={siteCodeInput}
-                  onValueChange={setSiteCodeInput}
-                  placeholder="e.g. ATL, DFW, CHI"
-                  label="Site Code"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground">
-                  Co-Op Code
-                </Label>
-                <FilterCombobox
-                  options={filterOptions?.coOpCodes ?? []}
-                  value={coOpCodeInput}
-                  onValueChange={setCoOpCodeInput}
-                  placeholder="e.g. COOP001"
-                  label="Co-Op Code"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label
-                  htmlFor="customerBillTo"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Customer Bill To
-                </Label>
-                <Input
-                  id="customerBillTo"
-                  placeholder="e.g. CUST001"
-                  value={customerBillToInput}
-                  onChange={(e) => setCustomerBillToInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label
-                  htmlFor="customerName"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Customer Name
-                </Label>
-                <Input
-                  id="customerName"
-                  placeholder="e.g. School District"
-                  value={customerNameInput}
-                  onChange={(e) => setCustomerNameInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground">
-                  Sales Representative
-                </Label>
-                <FilterCombobox
-                  options={filterOptions?.salesReps ?? []}
-                  value={salesRepInput}
-                  onValueChange={setSalesRepInput}
-                  placeholder="e.g. JSMITH"
-                  label="Sales Representative"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label
-                  htmlFor="itemCode"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Item Code
-                </Label>
-                <Input
-                  id="itemCode"
-                  placeholder="e.g. SKU-12345"
-                  value={itemCodeInput}
-                  onChange={(e) => setItemCodeInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground">
-                  ERP Status
-                </Label>
-                <FilterCombobox
-                  options={filterOptions?.erpStatuses ?? []}
-                  value={erpStatusInput}
-                  onValueChange={setErpStatusInput}
-                  placeholder="e.g. Active, Blocked"
-                  label="ERP Status"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground">
-                  Renewed/New
-                </Label>
-                <Select value={isLostFilter} onValueChange={setIsLostFilter}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="renewed">Renewed Only</SelectItem>
-                    <SelectItem value="new">New Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {showConfirmedFilter && (
-                <div className="flex items-center justify-between py-2">
-                  <Label
-                    htmlFor="confirmed-filter"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Show Confirmed Only
-                  </Label>
-                  <Switch
-                    id="confirmed-filter"
-                    checked={confirmedFilter}
-                    onCheckedChange={setConfirmedFilter}
-                  />
-                </div>
-              )}
-              {showExportedFilter && (
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-foreground">
-                    Export Status
-                  </Label>
-                  <Select
-                    value={
-                      showPendingQueue
-                        ? "pending-queue"
-                        : queuedFilter === true
-                          ? "queued"
-                          : exportedFilter === true
-                            ? "exported"
-                            : exportedFilter === false && queuedFilter === false
-                              ? "not-exported"
-                              : "all"
-                    }
-                    onValueChange={(v) => {
-                      setShowPendingQueue(v === "pending-queue");
-                      switch (v) {
-                        case "all":
-                          setExportedFilter(undefined);
-                          setQueuedFilter(undefined);
-                          break;
-                        case "not-exported":
-                          setExportedFilter(false);
-                          setQueuedFilter(false);
-                          break;
-                        case "queued":
-                          setExportedFilter(undefined);
-                          setQueuedFilter(true);
-                          break;
-                        case "exported":
-                          setExportedFilter(true);
-                          setQueuedFilter(undefined);
-                          break;
-                        case "pending-queue":
-                          setExportedFilter(false);
-                          setQueuedFilter(false);
-                          break;
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="not-exported">
-                        Not Exported & Not Queued
-                      </SelectItem>
-                      <SelectItem
-                        value="pending-queue"
-                        disabled={queuedKeys.size === 0}
-                      >
-                        Selected to be Queued ({queuedKeys.size})
-                      </SelectItem>
-                      <SelectItem value="queued">Queued for Export</SelectItem>
-                      <SelectItem value="exported">Exported</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 pt-8 pb-8">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={handleClearFilters}
-                disabled={!hasActiveFilters}
-              >
-                Clear All
-              </Button>
-              <Button type="button" className="flex-1" onClick={handleSearch}>
-                Apply Filters
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+        <FilterSheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          filterInputs={filterInputs}
+          setFilterInputs={setFilterInputs}
+          filterOptions={filterOptions}
+          activeFilterCount={activeFilterCount}
+          hasActiveFilters={hasActiveFilters}
+          onSearch={handleSearch}
+          onClear={handleClearFilters}
+          showConfirmedFilter={showConfirmedFilter}
+          confirmedFilter={confirmedFilter}
+          onConfirmedFilterChange={setConfirmedFilter}
+          isLostFilter={isLostFilter}
+          onIsLostFilterChange={setIsLostFilter}
+          showExportedFilter={showExportedFilter}
+          showPendingQueue={showPendingQueue}
+          onShowPendingQueueChange={setShowPendingQueue}
+          queuedFilter={queuedFilter}
+          onQueuedFilterChange={setQueuedFilter}
+          exportedFilter={exportedFilter}
+          onExportedFilterChange={setExportedFilter}
+          queuedKeysSize={queuedKeys.size}
+        />
 
         {/* Column visibility dropdown */}
         <DropdownMenu
