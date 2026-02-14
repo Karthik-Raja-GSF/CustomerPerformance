@@ -8,6 +8,7 @@ import CustomerBidsSync from "@/pages/CustomerBidsSync";
 import CustomerBids from "@/pages/CustomerBids";
 import MonthlyForecast from "@/pages/MonthlyForecast";
 import ConfirmedBidItems from "@/pages/ConfirmedBidItems";
+import BidExportHistory from "@/pages/BidExportHistory";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import ForceChangePassword from "@/pages/ForceChangePassword";
@@ -23,6 +24,7 @@ export const routes = [
     path: "/demand-planning/confirmed-bid-items",
     title: "Confirmed Bid Items",
   },
+  { path: "/bid-export-history", title: "Bid Items Export History" },
   { path: "/settings", title: "Settings - Prompts" },
 ];
 
@@ -52,6 +54,7 @@ function App() {
             path="/demand-planning/confirmed-bid-items"
             element={<ConfirmedBidItems />}
           />
+          <Route path="/bid-export-history" element={<BidExportHistory />} />
           <Route path="/settings" element={<Settings />}>
             <Route index element={<Prompts />} />
           </Route>

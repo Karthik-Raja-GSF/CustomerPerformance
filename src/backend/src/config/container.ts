@@ -43,6 +43,11 @@ import {
   CHAT_LOG_SERVICE_TOKEN,
 } from "@/services/IChatLogService";
 import { ChatLogService } from "@/services/implementations/ChatLogService";
+import {
+  IBidExportService,
+  BID_EXPORT_SERVICE_TOKEN,
+} from "@/services/IBidExportService";
+import { BidExportService } from "@/services/implementations/BidExportService";
 
 /**
  * DI Container Configuration
@@ -103,6 +108,11 @@ export function setupContainer(prisma: PrismaClient): void {
   // Register ChatLogService for persisting AI chat history
   container.register<IChatLogService>(CHAT_LOG_SERVICE_TOKEN, {
     useClass: ChatLogService,
+  });
+
+  // Register BidExportService for export queue management
+  container.register<IBidExportService>(BID_EXPORT_SERVICE_TOKEN, {
+    useClass: BidExportService,
   });
 
   // Register SchedulerService for in-app scheduled tasks

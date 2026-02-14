@@ -55,6 +55,8 @@ interface BaseBidRow {
   lastUpdatedBy: string | null;
   confirmedAt: Date | null;
   confirmedBy: string | null;
+  lastExportedAt: Date | null;
+  lastExportedBy: string | null;
   yearAround: boolean | null;
   // Monthly estimates
   estimateJan: Prisma.Decimal | null;
@@ -180,6 +182,31 @@ export class CustomerBidService implements ICustomerBidService {
         }
       }
 
+      if (query.exported !== undefined) {
+        if (query.exported) {
+          whereConditions.push(Prisma.sql`cbd.last_exported_at IS NOT NULL`);
+        } else {
+          whereConditions.push(Prisma.sql`cbd.last_exported_at IS NULL`);
+        }
+      }
+
+      if (query.queued !== undefined) {
+        const queuedSubquery = Prisma.sql`
+          SELECT 1 FROM ait.customer_bid_export_item bei
+          WHERE bei.source_db = cbd.source_db
+            AND bei.site_code = cbd.site_code
+            AND bei.customer_bill_to = cbd.customer_bill_to
+            AND bei.item_no = cbd.item_no
+            AND bei.school_year = cbd.school_year
+            AND bei.status = 'QUEUED'
+        `;
+        if (query.queued) {
+          whereConditions.push(Prisma.sql`EXISTS (${queuedSubquery})`);
+        } else {
+          whereConditions.push(Prisma.sql`NOT EXISTS (${queuedSubquery})`);
+        }
+      }
+
       const additionalWhere =
         whereConditions.length > 0
           ? Prisma.sql`AND ${Prisma.join(whereConditions, " AND ")}`
@@ -214,6 +241,8 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.last_updated_by AS "lastUpdatedBy",
             cbd.confirmed_at AS "confirmedAt",
             cbd.confirmed_by AS "confirmedBy",
+            cbd.last_exported_at AS "lastExportedAt",
+            cbd.last_exported_by AS "lastExportedBy",
             cbd.year_around AS "yearAround",
             cbd.estimate_jan AS "estimateJan",
             cbd.estimate_feb AS "estimateFeb",
@@ -274,6 +303,8 @@ export class CustomerBidService implements ICustomerBidService {
         lastUpdatedBy: row.lastUpdatedBy ?? null,
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
         confirmedBy: row.confirmedBy ?? null,
+        lastExportedAt: row.lastExportedAt?.toISOString() ?? null,
+        lastExportedBy: row.lastExportedBy ?? null,
         yearAround: row.yearAround ?? false,
         estimateJan: row.estimateJan ? Number(row.estimateJan) : null,
         estimateFeb: row.estimateFeb ? Number(row.estimateFeb) : null,
@@ -769,6 +800,8 @@ export class CustomerBidService implements ICustomerBidService {
     lastUpdatedBy: string | null;
     confirmedAt: Date | null;
     confirmedBy: string | null;
+    lastExportedAt: Date | null;
+    lastExportedBy: string | null;
     yearAround: boolean;
     estimateJan: Prisma.Decimal | null;
     estimateFeb: Prisma.Decimal | null;
@@ -814,6 +847,8 @@ export class CustomerBidService implements ICustomerBidService {
       lastUpdatedBy: record.lastUpdatedBy ?? null,
       confirmedAt: record.confirmedAt?.toISOString() ?? null,
       confirmedBy: record.confirmedBy ?? null,
+      lastExportedAt: record.lastExportedAt?.toISOString() ?? null,
+      lastExportedBy: record.lastExportedBy ?? null,
       yearAround: record.yearAround,
       // Monthly estimates
       estimateJan: record.estimateJan ? Number(record.estimateJan) : null,

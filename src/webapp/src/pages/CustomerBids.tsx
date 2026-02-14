@@ -9,6 +9,9 @@ import {
   Filter,
   Loader2,
   RefreshCw,
+  ListPlus,
+  ListMinus,
+  SendHorizonal,
 } from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Input } from "@/shadcn/components/input";
@@ -81,6 +84,14 @@ import {
   customerBidExportColumns,
 } from "@/utils/export-csv";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
+import {
+  queueBidExportByKeys,
+  cancelBidExportByKeys,
+  clearExportByKeys,
+  exportAndReturn,
+  getQueueSummary,
+} from "@/apis/bid-exports";
+import type { QueueSummary } from "@/types/bid-export";
 import type { Table } from "@tanstack/react-table";
 
 /**
@@ -120,7 +131,9 @@ const DEFAULT_LIMIT = 50;
  */
 function parseFiltersFromURL(
   searchParams: URLSearchParams,
-  defaultConfirmed = false
+  defaultConfirmed = false,
+  defaultExported?: boolean,
+  defaultQueued?: boolean
 ): CustomerBidFilters {
   // Parse confirmed param: "true" -> true, "false" -> false, missing -> use default
   const confirmedParam = searchParams.get("confirmed");
@@ -135,6 +148,20 @@ function parseFiltersFromURL(
   const isLostParam = searchParams.get("isLost");
   const isLost =
     isLostParam === "true" ? true : isLostParam === "false" ? false : undefined;
+
+  // Parse exported param
+  const exportedParam = searchParams.get("exported");
+  const exported =
+    exportedParam === "true"
+      ? true
+      : exportedParam === "false"
+        ? false
+        : undefined;
+
+  // Parse queued param
+  const queuedParam = searchParams.get("queued");
+  const queued =
+    queuedParam === "true" ? true : queuedParam === "false" ? false : undefined;
 
   return {
     page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
@@ -151,6 +178,8 @@ function parseFiltersFromURL(
     coOpCode: searchParams.get("coOpCode") || undefined,
     isLost,
     confirmed: confirmed ?? defaultConfirmed,
+    exported: exported ?? defaultExported,
+    queued: queued ?? defaultQueued,
   };
 }
 
@@ -181,6 +210,12 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.confirmed !== undefined) {
     params.set("confirmed", filters.confirmed.toString());
   }
+  if (filters.exported !== undefined) {
+    params.set("exported", filters.exported.toString());
+  }
+  if (filters.queued !== undefined) {
+    params.set("queued", filters.queued.toString());
+  }
 
   return params;
 }
@@ -189,27 +224,36 @@ interface CustomerBidsProps {
   pageTitle?: string;
   pageDescription?: string;
   defaultConfirmed?: boolean;
+  defaultExported?: boolean;
+  defaultQueued?: boolean;
   defaultColumnVisibility?: VisibilityState;
   canUnconfirm?: boolean;
   showSIQExport?: boolean;
   showCSVExport?: boolean;
   showCSVImport?: boolean;
   showConfirmedFilter?: boolean;
+  showExportedFilter?: boolean;
+  showQueueExport?: boolean;
 }
 
 export default function CustomerBids({
   pageTitle = "Back to School",
   pageDescription = "View and filter customer bid data",
   defaultConfirmed = false,
+  defaultExported,
+  defaultQueued,
   defaultColumnVisibility,
   canUnconfirm = true,
   showSIQExport = false,
   showCSVExport = true,
   showCSVImport = true,
   showConfirmedFilter = true,
+  showExportedFilter = false,
+  showQueueExport = false,
 }: CustomerBidsProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const isInitialMount = useRef(true);
+  const isUrlSyncInitMount = useRef(true);
 
   const [bids, setBids] = useState<CustomerBidDto[]>([]);
   const [pagination, setPagination] = useState<PaginationDto | null>(null);
@@ -219,7 +263,12 @@ export default function CustomerBids({
 
   // Filter state - initialized from URL params
   const [filters, setFilters] = useState<CustomerBidFilters>(() =>
-    parseFiltersFromURL(searchParams, defaultConfirmed)
+    parseFiltersFromURL(
+      searchParams,
+      defaultConfirmed,
+      defaultExported,
+      defaultQueued
+    )
   );
 
   // Local filter inputs (before applying) - initialized from URL params
@@ -258,6 +307,36 @@ export default function CustomerBids({
     if (param === "false") return "renewed";
     return "all";
   });
+
+  const [exportedFilter, setExportedFilter] = useState<boolean | undefined>(
+    () => {
+      const param = searchParams.get("exported");
+      return param === "true"
+        ? true
+        : param === "false"
+          ? false
+          : defaultExported;
+    }
+  );
+
+  const [queuedFilter, setQueuedFilter] = useState<boolean | undefined>(() => {
+    const param = searchParams.get("queued");
+    return param === "true" ? true : param === "false" ? false : defaultQueued;
+  });
+
+  // Export queue state — local queue (no API) + backend queue summary (for Export SIQ badge)
+  const [queuedKeys, setQueuedKeys] = useState<Set<string>>(new Set());
+  const [showPendingQueue, setShowPendingQueue] = useState(false);
+  const [queueSummary, setQueueSummary] = useState<QueueSummary | null>(null);
+  const [isConfirmingQueue, setIsConfirmingQueue] = useState(false);
+  const [isExportingSIQ, setIsExportingSIQ] = useState(false);
+
+  // Auto-reset pending queue view when queue becomes empty
+  useEffect(() => {
+    if (showPendingQueue && queuedKeys.size === 0) {
+      setShowPendingQueue(false);
+    }
+  }, [showPendingQueue, queuedKeys.size]);
 
   // Filter options for datalist autocomplete
   const [filterOptions, setFilterOptions] =
@@ -313,6 +392,21 @@ export default function CustomerBids({
     void fetchData(filters);
   }, [filters, fetchData]);
 
+  // Fetch export queue summary when showQueueExport is enabled
+  const fetchQueueSummary = useCallback(async () => {
+    if (!showQueueExport) return;
+    try {
+      const summary = await getQueueSummary();
+      setQueueSummary(summary);
+    } catch {
+      // Queue summary is informational; silently degrade
+    }
+  }, [showQueueExport]);
+
+  useEffect(() => {
+    void fetchQueueSummary();
+  }, [fetchQueueSummary]);
+
   // Fetch filter options when filter sheet is opened
   useEffect(() => {
     if (!filterSheetOpen) return;
@@ -339,6 +433,14 @@ export default function CustomerBids({
 
   // Sync URL changes back to filters (for browser back/forward)
   useEffect(() => {
+    // Skip initial mount — useState initializer already applied defaults
+    if (isUrlSyncInitMount.current) {
+      isUrlSyncInitMount.current = false;
+      return;
+    }
+    // Don't pass defaultExported/defaultQueued here: missing URL params
+    // should mean "no filter" (All), not fall back to page defaults.
+    // Defaults are only applied on initial mount via useState.
     const urlFilters = parseFiltersFromURL(searchParams, defaultConfirmed);
     const currentFiltersStr = JSON.stringify({
       ...filters,
@@ -363,6 +465,8 @@ export default function CustomerBids({
       setItemCodeInput(urlFilters.itemCode || "");
       setErpStatusInput(urlFilters.erpStatus || "");
       setCoOpCodeInput(urlFilters.coOpCode || "");
+      setExportedFilter(urlFilters.exported);
+      setQueuedFilter(urlFilters.queued);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Intentionally not including filters to avoid loop
@@ -386,6 +490,8 @@ export default function CustomerBids({
             ? true
             : undefined,
       confirmed: confirmedFilter,
+      exported: exportedFilter,
+      queued: queuedFilter,
     };
     setFilters(newFilters);
     setFilterSheetOpen(false);
@@ -400,12 +506,17 @@ export default function CustomerBids({
     setErpStatusInput("");
     setCoOpCodeInput("");
     setConfirmedFilter(defaultConfirmed);
+    setExportedFilter(defaultExported);
+    setQueuedFilter(defaultQueued);
     setIsLostFilter("all");
+    setShowPendingQueue(false);
     setFilters((prev) => ({
       page: 1,
       limit: prev.limit,
       schoolYear: prev.schoolYear,
       confirmed: defaultConfirmed,
+      exported: defaultExported,
+      queued: defaultQueued,
     }));
   };
 
@@ -638,6 +749,202 @@ export default function CustomerBids({
     }
   }, [confirmableBids, filters.schoolYear]);
 
+  // --- Local queue helpers (no API calls) ---
+  const bidKeyString = useCallback(
+    (bid: CustomerBidDto) =>
+      `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`,
+    []
+  );
+
+  // Client-side filter: hide locally queued items (or show only them)
+  const displayedBids = useMemo(() => {
+    if (showPendingQueue) {
+      return bids.filter((bid) => queuedKeys.has(bidKeyString(bid)));
+    }
+    if (queuedKeys.size === 0) return bids;
+    return bids.filter((bid) => !queuedKeys.has(bidKeyString(bid)));
+  }, [bids, queuedKeys, bidKeyString, showPendingQueue]);
+
+  const isQueued = useCallback(
+    (bid: CustomerBidDto) => queuedKeys.has(bidKeyString(bid)),
+    [queuedKeys, bidKeyString]
+  );
+
+  const handleToggleQueue = useCallback(
+    (bid: CustomerBidDto) => {
+      const key = bidKeyString(bid);
+      setQueuedKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        return next;
+      });
+    },
+    [bidKeyString]
+  );
+
+  const handleQueueAll = useCallback(() => {
+    setQueuedKeys((prev) => {
+      const next = new Set(prev);
+      for (const bid of displayedBids) {
+        next.add(bidKeyString(bid));
+      }
+      return next;
+    });
+  }, [displayedBids, bidKeyString]);
+
+  const handleRemoveAllQueued = useCallback(() => {
+    setQueuedKeys(new Set());
+  }, []);
+
+  // Confirm local queue → batch API call to backend
+  const handleConfirmQueue = useCallback(async () => {
+    if (queuedKeys.size === 0) return;
+
+    setIsConfirmingQueue(true);
+    try {
+      const keys = Array.from(queuedKeys).map((keyStr) => {
+        const parts = keyStr.split("/");
+        return {
+          sourceDb: parts[0] ?? "",
+          siteCode: parts[1] ?? "",
+          customerBillTo: parts[2] ?? "",
+          itemNo: parts[3] ?? "",
+          schoolYear: schoolYearString,
+        };
+      });
+
+      const result = await queueBidExportByKeys({
+        exportType: "SIQ",
+        keys,
+      });
+
+      setQueuedKeys(new Set());
+      setShowPendingQueue(false);
+      toast.success(
+        `${result.itemsQueued} item${result.itemsQueued !== 1 ? "s" : ""} queued for export`
+      );
+      void fetchQueueSummary();
+      void fetchData(filters);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to queue for export";
+      toast.error(message);
+    } finally {
+      setIsConfirmingQueue(false);
+    }
+  }, [queuedKeys, schoolYearString, fetchQueueSummary, fetchData, filters]);
+
+  // Export SIQ: atomic backend call — marks exported + returns bid data for CSV
+  const handleExportSIQ = useCallback(async () => {
+    setIsExportingSIQ(true);
+    try {
+      const result = await exportAndReturn("SIQ");
+      if (result.totalExported === 0) {
+        toast.info(
+          "No items queued for SIQ export. Queue items for export first."
+        );
+        return;
+      }
+      exportToSIQCSV(result.data, "customer-bids-siq");
+      toast.success(
+        `Exported ${result.totalExported} item${result.totalExported !== 1 ? "s" : ""}`
+      );
+      void fetchQueueSummary();
+      void fetchData(filters);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to export";
+      toast.error(message);
+    } finally {
+      setIsExportingSIQ(false);
+    }
+  }, [fetchQueueSummary, fetchData, filters]);
+
+  // Dequeue a single item from the backend export queue
+  const handleDequeue = useCallback(
+    async (bid: CustomerBidDto) => {
+      const key = {
+        sourceDb: bid.sourceDb || "",
+        siteCode: bid.siteCode || "",
+        customerBillTo: bid.customerBillTo || "",
+        itemNo: bid.itemCode,
+        schoolYear: schoolYearString,
+      };
+
+      try {
+        await cancelBidExportByKeys({ keys: [key] });
+        // Remove the dequeued item from the local bids list
+        setBids((prev) =>
+          prev.filter(
+            (b) =>
+              !(
+                b.sourceDb === bid.sourceDb &&
+                b.siteCode === bid.siteCode &&
+                b.customerBillTo === bid.customerBillTo &&
+                b.itemCode === bid.itemCode
+              )
+          )
+        );
+        toast.success("Item removed from export queue");
+        void fetchQueueSummary();
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to dequeue item";
+        toast.error(message);
+      }
+    },
+    [schoolYearString, fetchQueueSummary]
+  );
+
+  // Clear export status on a single exported item
+  const handleCancelExport = useCallback(
+    async (bid: CustomerBidDto) => {
+      const key = {
+        sourceDb: bid.sourceDb || "",
+        siteCode: bid.siteCode || "",
+        customerBillTo: bid.customerBillTo || "",
+        itemNo: bid.itemCode,
+        schoolYear: schoolYearString,
+      };
+
+      try {
+        await clearExportByKeys([key]);
+        setBids((prev) =>
+          prev.filter(
+            (b) =>
+              !(
+                b.sourceDb === bid.sourceDb &&
+                b.siteCode === bid.siteCode &&
+                b.customerBillTo === bid.customerBillTo &&
+                b.itemCode === bid.itemCode
+              )
+          )
+        );
+        toast.success("Export status cleared");
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to clear export status";
+        toast.error(message);
+      }
+    },
+    [schoolYearString]
+  );
+
+  // Determine which view mode we're in for column rendering
+  const isViewingQueued = queuedFilter === true;
+  const isViewingExported = exportedFilter === true;
+
+  // Resolve the per-row action callback and label based on current filter view
+  const dequeueHandler = isViewingQueued
+    ? handleDequeue
+    : isViewingExported
+      ? handleCancelExport
+      : undefined;
+  const dequeueLabel = isViewingQueued ? "Dequeue" : "Cancel";
+
   // Create columns with the cell update handler
   const tableColumns = useMemo(
     () =>
@@ -648,6 +955,17 @@ export default function CustomerBids({
         canUnconfirm,
         getMenuMonths,
         onMenuMonthsChange,
+        isQueued:
+          showQueueExport && !isViewingQueued && !isViewingExported
+            ? isQueued
+            : undefined,
+        onToggleQueue:
+          showQueueExport && !isViewingQueued && !isViewingExported
+            ? handleToggleQueue
+            : undefined,
+        onDequeue:
+          showQueueExport || showExportedFilter ? dequeueHandler : undefined,
+        dequeueLabel,
       }),
     [
       handleCellUpdate,
@@ -656,6 +974,14 @@ export default function CustomerBids({
       canUnconfirm,
       getMenuMonths,
       onMenuMonthsChange,
+      showQueueExport,
+      showExportedFilter,
+      isViewingQueued,
+      isViewingExported,
+      isQueued,
+      handleToggleQueue,
+      dequeueHandler,
+      dequeueLabel,
     ]
   );
 
@@ -850,6 +1176,69 @@ export default function CustomerBids({
                   />
                 </div>
               )}
+              {showExportedFilter && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-foreground">
+                    Export Status
+                  </Label>
+                  <Select
+                    value={
+                      showPendingQueue
+                        ? "pending-queue"
+                        : queuedFilter === true
+                          ? "queued"
+                          : exportedFilter === true
+                            ? "exported"
+                            : exportedFilter === false && queuedFilter === false
+                              ? "not-exported"
+                              : "all"
+                    }
+                    onValueChange={(v) => {
+                      setShowPendingQueue(v === "pending-queue");
+                      switch (v) {
+                        case "all":
+                          setExportedFilter(undefined);
+                          setQueuedFilter(undefined);
+                          break;
+                        case "not-exported":
+                          setExportedFilter(false);
+                          setQueuedFilter(false);
+                          break;
+                        case "queued":
+                          setExportedFilter(undefined);
+                          setQueuedFilter(true);
+                          break;
+                        case "exported":
+                          setExportedFilter(true);
+                          setQueuedFilter(undefined);
+                          break;
+                        case "pending-queue":
+                          setExportedFilter(false);
+                          setQueuedFilter(false);
+                          break;
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="not-exported">
+                        Not Exported & Not Queued
+                      </SelectItem>
+                      <SelectItem
+                        value="pending-queue"
+                        disabled={queuedKeys.size === 0}
+                      >
+                        Selected to be Queued ({queuedKeys.size})
+                      </SelectItem>
+                      <SelectItem value="queued">Queued for Export</SelectItem>
+                      <SelectItem value="exported">Exported</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 pt-8 pb-8">
               <Button
@@ -937,7 +1326,113 @@ export default function CustomerBids({
             Export CSV
           </Button>
         )}
-        {showSIQExport && (
+
+        {/* Queue-based SIQ export (Confirmed Bid Items page) */}
+        {showQueueExport && (
+          <>
+            {/* Local queue buttons — hidden when viewing backend-queued or exported items */}
+            {!isViewingQueued && !isViewingExported && (
+              <>
+                {/* Select All — add all visible bids to local queue */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={displayedBids.length === 0 || isLoading}
+                  onClick={handleQueueAll}
+                >
+                  <ListPlus className="h-4 w-4 mr-2" />
+                  Select All
+                </Button>
+
+                {/* Deselect All — clear local queue */}
+                {queuedKeys.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveAllQueued}
+                  >
+                    <ListMinus className="h-4 w-4 mr-2" />
+                    Deselect All
+                  </Button>
+                )}
+
+                {/* Queue for Export — send local queue to backend */}
+                {queuedKeys.size > 0 && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        disabled={isConfirmingQueue}
+                      >
+                        {isConfirmingQueue ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <SendHorizonal className="h-4 w-4 mr-2" />
+                        )}
+                        Queue for Export
+                        <Badge
+                          variant="secondary"
+                          className="ml-2 h-5 min-w-5 px-1.5"
+                        >
+                          {queuedKeys.size}
+                        </Badge>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Queue {queuedKeys.size} item
+                          {queuedKeys.size !== 1 ? "s" : ""} for export?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will add {queuedKeys.size} selected item
+                          {queuedKeys.size !== 1 ? "s" : ""} to the export
+                          queue. Queued items will be picked up by the nightly
+                          export run, or you can export manually using
+                          &quot;Export SIQ&quot;.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => void handleConfirmQueue()}
+                        >
+                          Confirm
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
+            )}
+
+            {/* Export SIQ — atomic: marks exported + returns data for CSV */}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={
+                isExportingSIQ || !queueSummary || queueSummary.siq === 0
+              }
+              onClick={() => void handleExportSIQ()}
+            >
+              {isExportingSIQ ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export SIQ
+              {queueSummary && queueSummary.siq > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1.5">
+                  {queueSummary.siq}
+                </Badge>
+              )}
+            </Button>
+          </>
+        )}
+
+        {/* Legacy SIQ export (non-queue, e.g. Back to School page) */}
+        {showSIQExport && !showQueueExport && (
           <Button
             variant="outline"
             size="sm"
@@ -1024,7 +1519,7 @@ export default function CustomerBids({
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <DataTable
           columns={tableColumns}
-          data={bids}
+          data={displayedBids}
           isLoading={isLoading}
           error={error}
           onRetry={() => fetchData(filters)}

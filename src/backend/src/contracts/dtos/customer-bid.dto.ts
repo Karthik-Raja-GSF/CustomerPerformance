@@ -69,6 +69,12 @@ export interface CustomerBidDto {
   /** Email of user who confirmed, or null if unconfirmed */
   confirmedBy: string | null;
 
+  // Export tracking
+  /** ISO8601 UTC timestamp when last exported, or null if never exported */
+  lastExportedAt: string | null;
+  /** Email of user who triggered the export, or null if never exported */
+  lastExportedBy: string | null;
+
   // User-editable fields
   /** Year-around item flag */
   yearAround: boolean;
@@ -125,6 +131,9 @@ export interface CustomerBidQueryDto {
   sourceDb?: string;
   isLost?: boolean;
   confirmed?: boolean;
+  exported?: boolean;
+  /** Filter by queue status - true=queued only, false=not-queued only */
+  queued?: boolean;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
 }

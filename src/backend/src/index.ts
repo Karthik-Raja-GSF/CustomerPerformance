@@ -23,6 +23,7 @@ import promptsRouter from "./routes/prompts";
 import assistantRouter from "./routes/assistant";
 import stockiqRouter from "./routes/stockiq";
 import customerBidsRouter from "./routes/customer-bids";
+import bidExportsRouter from "./routes/bid-exports";
 
 const serverLogger = createChildLogger("server");
 
@@ -96,6 +97,7 @@ class Server {
     this.app.use("/assistant", assistantRouter);
     this.app.use("/stockiq", stockiqRouter);
     this.app.use("/customer-bids", customerBidsRouter);
+    this.app.use("/bid-exports", bidExportsRouter);
   }
 
   private initializeErrorHandling(): void {

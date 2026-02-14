@@ -66,4 +66,10 @@ export const config = {
     // Production: "0 13 * * *" (5 AM PST / 1 PM UTC) - syncs Current + Next school years
     syncCronExpression: process.env.CUSTOMER_BID_SYNC_CRON || "",
   },
+  // Bid Export Processing Configuration
+  bidExport: {
+    // Cron expression for scheduled export processing (empty string disables scheduling)
+    // Push method (API/FTP) is TBD — leave disabled until decided
+    processCronExpression: process.env.BID_EXPORT_PROCESS_CRON || "",
+  },
 };

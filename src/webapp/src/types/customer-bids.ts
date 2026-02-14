@@ -69,6 +69,12 @@ export interface CustomerBidDto {
   /** Email of user who confirmed, or null if unconfirmed */
   confirmedBy: string | null;
 
+  // Export tracking fields
+  /** ISO8601 UTC timestamp when last exported, or null if never exported */
+  lastExportedAt: string | null;
+  /** Email of user who last exported, or null if never exported */
+  lastExportedBy: string | null;
+
   // User-editable fields
   /** Year-around item flag */
   yearAround: boolean;
@@ -150,6 +156,10 @@ export interface CustomerBidFilters {
   isLost?: boolean;
   /** Filter by confirmation status - defaults to false (show unconfirmed) */
   confirmed?: boolean;
+  /** Filter by export status - true=exported only, false=not-exported only */
+  exported?: boolean;
+  /** Filter by queue status - true=queued only, false=not-queued only */
+  queued?: boolean;
 }
 
 /**

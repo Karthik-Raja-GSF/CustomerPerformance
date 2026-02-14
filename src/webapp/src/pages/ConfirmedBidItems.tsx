@@ -6,11 +6,15 @@ export default function ConfirmedBidItems() {
       pageTitle="Confirmed Bid Items"
       pageDescription="View confirmed customer bid items"
       defaultConfirmed={true}
+      defaultExported={false}
+      defaultQueued={false}
       canUnconfirm={false}
       showSIQExport={true}
       showCSVExport={false}
       showCSVImport={false}
       showConfirmedFilter={false}
+      showExportedFilter={true}
+      showQueueExport={true}
       defaultColumnVisibility={{
         isLost: false,
         bidStartDate: false,

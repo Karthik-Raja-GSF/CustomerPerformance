@@ -35,6 +35,14 @@ const querySchema = z.object({
     .enum(["true", "false"])
     .transform((v) => v === "true")
     .optional(),
+  exported: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  queued: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
   coOpCode: z.string().optional(),
   sourceDb: z.string().optional(),
   schoolYear: z.enum(["current", "previous", "next"]).default("next"),

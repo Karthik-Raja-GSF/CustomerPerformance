@@ -59,6 +59,10 @@ const data = {
           title: "Customer Bids Sync",
           url: "/customer-bids-sync",
         },
+        {
+          title: "Bid Items Export History",
+          url: "/bid-export-history",
+        },
       ],
     },
   ],

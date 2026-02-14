@@ -1037,6 +1037,13 @@ enum PromptStatus {
   @@schema("ait")
 }
 
+enum BidExportType {
+  CSV
+  SIQ
+
+  @@schema("ait")
+}
+
 model Prompt {
   id        String       @id @default(uuid())
   name      String
@@ -1094,14 +1101,23 @@ model CustomerBidData {
   // Confirmation fields (confirmed_at IS NOT NULL = confirmed)
   confirmedBy String?   @map("confirmed_by")
   confirmedAt DateTime? @map("confirmed_at")
+
+  // Export tracking (last_exported_at IS NOT NULL = exported)
+  lastExportedAt DateTime? @map("last_exported_at")
+  lastExportedBy String?   @map("last_exported_by")
+
   syncedAt    DateTime? @map("synced_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  exportItems CustomerBidExportItem[]
 
   @@id([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
   @@index([schoolYear])
   @@index([confirmedAt])
   @@index([isLost])
+  @@index([lastExportedAt])
   @@index([schoolYear, siteCode, itemNo, customerBillTo])
   @@map("customer_bid_data")
   @@schema("ait")
@@ -1123,6 +1139,51 @@ model CustomerBidSyncLog {
   @@index([schoolYear])
   @@index([status])
   @@map("customer_bid_sync_log")
+  @@schema("ait")
+}
+
+model CustomerBidExportRun {
+  id           String        @id @default(uuid())
+  status       String        @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, FAILED
+  exportType   BidExportType @map("export_type")
+  triggeredBy  String        @map("triggered_by") // "manual" | "scheduled"
+  totalRecords Int?          @map("total_records")
+  startedAt    DateTime      @default(now()) @map("started_at")
+  completedAt  DateTime?     @map("completed_at")
+  durationMs   Int?          @map("duration_ms")
+  errorMessage String?       @map("error_message") @db.Text
+
+  // Relations
+  items CustomerBidExportItem[]
+
+  @@index([status])
+  @@index([startedAt])
+  @@map("customer_bid_export_run")
+  @@schema("ait")
+}
+
+model CustomerBidExportItem {
+  id             String        @id @default(uuid())
+  sourceDb       String        @map("source_db")
+  siteCode       String        @map("site_code")
+  customerBillTo String        @map("customer_bill_to")
+  itemNo         String        @map("item_no")
+  schoolYear     String        @map("school_year")
+  exportType     BidExportType @map("export_type")
+  status         String        @default("QUEUED") // QUEUED, EXPORTED, CANCELLED
+  queuedBy       String        @map("queued_by")
+  queuedAt       DateTime      @default(now()) @map("queued_at")
+  runId          String?       @map("run_id")
+
+  // Relations
+  customerBid CustomerBidData      @relation(fields: [sourceDb, siteCode, customerBillTo, itemNo, schoolYear], references: [sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
+  exportRun   CustomerBidExportRun? @relation(fields: [runId], references: [id])
+
+  @@index([status])
+  @@index([queuedAt])
+  @@index([runId])
+  @@index([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
+  @@map("customer_bid_export_item")
   @@schema("ait")
 }
 

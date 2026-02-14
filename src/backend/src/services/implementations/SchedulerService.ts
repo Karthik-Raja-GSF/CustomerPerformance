@@ -10,6 +10,10 @@ import {
   ICustomerBidService,
   CUSTOMER_BID_SERVICE_TOKEN,
 } from "@/services/ICustomerBidService";
+import {
+  IBidExportService,
+  BID_EXPORT_SERVICE_TOKEN,
+} from "@/services/IBidExportService";
 import { config } from "@/config/index";
 import { createChildLogger } from "@/telemetry/logger";
 
@@ -27,6 +31,11 @@ const STOCKIQ_SYNC_LOCK_ID = 7892341;
 const CUSTOMER_BID_SYNC_LOCK_ID = 7892342;
 
 /**
+ * Fixed lock ID for Bid Export processing
+ */
+const BID_EXPORT_PROCESS_LOCK_ID = 7892343;
+
+/**
  * Scheduler Service Implementation
  *
  * Manages scheduled tasks with distributed locking using PostgreSQL advisory locks.
@@ -36,13 +45,16 @@ const CUSTOMER_BID_SYNC_LOCK_ID = 7892342;
 export class SchedulerService implements ISchedulerService {
   private stockIqCronTask: ScheduledTask | null = null;
   private customerBidCronTask: ScheduledTask | null = null;
+  private bidExportCronTask: ScheduledTask | null = null;
 
   constructor(
     @inject("PrismaClient") private readonly prisma: PrismaClient,
     @inject(STOCKIQ_SERVICE_TOKEN)
     private readonly stockIqService: IStockIqService,
     @inject(CUSTOMER_BID_SERVICE_TOKEN)
-    private readonly customerBidService: ICustomerBidService
+    private readonly customerBidService: ICustomerBidService,
+    @inject(BID_EXPORT_SERVICE_TOKEN)
+    private readonly bidExportService: IBidExportService
   ) {}
 
   /**
@@ -52,6 +64,7 @@ export class SchedulerService implements ISchedulerService {
   start(): void {
     this.startStockIqScheduler();
     this.startCustomerBidScheduler();
+    this.startBidExportScheduler();
   }
 
   /**
@@ -137,6 +150,14 @@ export class SchedulerService implements ISchedulerService {
       logger.info(
         { event: "scheduler.customerbid.stopped" },
         "Customer Bid scheduler stopped"
+      );
+    }
+    if (this.bidExportCronTask) {
+      void this.bidExportCronTask.stop();
+      this.bidExportCronTask = null;
+      logger.info(
+        { event: "scheduler.bidexport.stopped" },
+        "Bid Export scheduler stopped"
       );
     }
   }
@@ -254,6 +275,82 @@ export class SchedulerService implements ISchedulerService {
       );
     } finally {
       await this.releaseLock(CUSTOMER_BID_SYNC_LOCK_ID);
+    }
+  }
+
+  /**
+   * Start the Bid Export processing scheduler
+   */
+  private startBidExportScheduler(): void {
+    const cronExpression = config.bidExport.processCronExpression;
+
+    if (!cronExpression) {
+      logger.info(
+        { event: "scheduler.bidexport.disabled" },
+        "Bid Export scheduler disabled (no cron expression configured)"
+      );
+      return;
+    }
+
+    if (!cron.validate(cronExpression)) {
+      logger.error(
+        { event: "scheduler.bidexport.invalid_cron", cronExpression },
+        `Invalid Bid Export cron expression: ${cronExpression}`
+      );
+      return;
+    }
+
+    this.bidExportCronTask = cron.schedule(cronExpression, () => {
+      void this.runBidExportProcess();
+    });
+
+    logger.info(
+      { event: "scheduler.bidexport.started", cronExpression },
+      `Bid Export scheduler started with cron: ${cronExpression}`
+    );
+  }
+
+  /**
+   * Run the scheduled Bid Export processing with distributed locking
+   */
+  private async runBidExportProcess(): Promise<void> {
+    const lockAcquired = await this.tryAcquireLock(BID_EXPORT_PROCESS_LOCK_ID);
+
+    if (!lockAcquired) {
+      logger.info(
+        { event: "scheduler.bidexport.skipped" },
+        "Skipping Bid Export processing - another instance is running"
+      );
+      return;
+    }
+
+    try {
+      logger.info(
+        { event: "scheduler.bidexport.start" },
+        "Starting scheduled Bid Export processing"
+      );
+
+      const result = await this.bidExportService.processPendingExports();
+
+      logger.info(
+        {
+          event: "scheduler.bidexport.complete",
+          runsCreated: result.runsCreated,
+          totalProcessed: result.totalProcessed,
+          failed: result.failed,
+        },
+        "Scheduled Bid Export processing completed"
+      );
+    } catch (error) {
+      logger.error(
+        {
+          event: "scheduler.bidexport.error",
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Scheduled Bid Export processing failed"
+      );
+    } finally {
+      await this.releaseLock(BID_EXPORT_PROCESS_LOCK_ID);
     }
   }
 

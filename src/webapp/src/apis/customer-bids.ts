@@ -46,6 +46,10 @@ export async function getCustomerBids(
     params.set("isLost", filters.isLost.toString());
   if (filters?.confirmed !== undefined)
     params.set("confirmed", filters.confirmed.toString());
+  if (filters?.exported !== undefined)
+    params.set("exported", filters.exported.toString());
+  if (filters?.queued !== undefined)
+    params.set("queued", filters.queued.toString());
 
   const queryString = params.toString();
   const url = `/customer-bids${queryString ? `?${queryString}` : ""}`;

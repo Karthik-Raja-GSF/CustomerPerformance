@@ -1,6 +1,14 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { type Column, type ColumnDef } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ListMinus,
+  ListPlus,
+  Loader2,
+  X,
+} from "lucide-react";
 import { Button } from "@/shadcn/components/button";
 import { Badge } from "@/shadcn/components/badge";
 import { cn } from "@/shadcn/lib/utils";
@@ -249,6 +257,72 @@ function ConfirmCell({
   );
 }
 
+function QueueCell({
+  bid,
+  isQueued,
+  onToggleQueue,
+}: {
+  bid: CustomerBidDto;
+  isQueued: (bid: CustomerBidDto) => boolean;
+  onToggleQueue: (bid: CustomerBidDto) => void;
+}): ReactNode {
+  const queued = isQueued(bid);
+
+  return (
+    <div className="flex justify-center">
+      <Button
+        variant={queued ? "destructive" : "outline"}
+        size="sm"
+        className="h-7 px-2"
+        onClick={() => onToggleQueue(bid)}
+      >
+        {queued ? (
+          <ListMinus className="h-3.5 w-3.5" />
+        ) : (
+          <ListPlus className="h-3.5 w-3.5" />
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function DequeueCell({
+  bid,
+  onDequeue,
+}: {
+  bid: CustomerBidDto;
+  onDequeue: (bid: CustomerBidDto) => Promise<void>;
+}): ReactNode {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleDequeue = async () => {
+    setIsLoading(true);
+    try {
+      await onDequeue(bid);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex justify-center">
+      <Button
+        variant="destructive"
+        size="sm"
+        className="h-7 px-2"
+        disabled={isLoading}
+        onClick={() => void handleDequeue()}
+      >
+        {isLoading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <X className="h-3.5 w-3.5" />
+        )}
+      </Button>
+    </div>
+  );
+}
+
 export type OnCellUpdateFn = (
   bid: CustomerBidDto,
   updates: UpdateCustomerBidDto
@@ -266,6 +340,14 @@ export interface ColumnsConfig {
     bid: CustomerBidDto,
     months: Record<MonthKey, boolean>
   ) => void;
+  /** Check whether a bid is in the local queue */
+  isQueued?: (bid: CustomerBidDto) => boolean;
+  /** Toggle a bid in/out of the local queue (no API call) */
+  onToggleQueue?: (bid: CustomerBidDto) => void;
+  /** Cancel a QUEUED item or clear export status — renders X button */
+  onDequeue?: (bid: CustomerBidDto) => Promise<void>;
+  /** Column header label when onDequeue is provided (defaults to "Dequeue") */
+  dequeueLabel?: string;
 }
 
 export function createColumns(
@@ -278,9 +360,13 @@ export function createColumns(
     canUnconfirm = true,
     getMenuMonths,
     onMenuMonthsChange,
+    isQueued,
+    onToggleQueue,
+    onDequeue,
+    dequeueLabel = "Dequeue",
   } = config;
 
-  return [
+  const cols: ColumnDef<CustomerBidDto>[] = [
     // Source DB - hidden by default
     {
       accessorKey: "sourceDb",
@@ -693,6 +779,39 @@ export function createColumns(
       },
     },
   ];
+
+  // Conditionally add per-row queue toggle or dequeue column
+  if (onDequeue) {
+    cols.push({
+      id: "queueExport",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          {dequeueLabel}
+        </div>
+      ),
+      cell: ({ row }) => (
+        <DequeueCell bid={row.original} onDequeue={onDequeue} />
+      ),
+    });
+  } else if (isQueued && onToggleQueue) {
+    cols.push({
+      id: "queueExport",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          Queue
+        </div>
+      ),
+      cell: ({ row }) => (
+        <QueueCell
+          bid={row.original}
+          isQueued={isQueued}
+          onToggleQueue={onToggleQueue}
+        />
+      ),
+    });
+  }
+
+  return cols;
 }
 
 // Legacy export for backwards compatibility (non-editable)
