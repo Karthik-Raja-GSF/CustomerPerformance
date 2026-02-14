@@ -50,6 +50,8 @@ export async function getCustomerBids(
     params.set("exported", filters.exported.toString());
   if (filters?.queued !== undefined)
     params.set("queued", filters.queued.toString());
+  if (filters?.excludeItemPrefixes)
+    params.set("excludeItemPrefixes", filters.excludeItemPrefixes);
 
   const queryString = params.toString();
   const url = `/customer-bids${queryString ? `?${queryString}` : ""}`;

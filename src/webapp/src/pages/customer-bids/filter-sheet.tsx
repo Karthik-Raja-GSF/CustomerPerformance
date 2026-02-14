@@ -34,6 +34,7 @@ export interface FilterInputs {
   itemCode: string;
   erpStatus: string;
   coOpCode: string;
+  excludeItemPrefixes: string;
 }
 
 export const EMPTY_FILTER_INPUTS: FilterInputs = {
@@ -44,6 +45,7 @@ export const EMPTY_FILTER_INPUTS: FilterInputs = {
   itemCode: "",
   erpStatus: "",
   coOpCode: "",
+  excludeItemPrefixes: "",
 };
 
 interface FilterSheetProps {
@@ -251,6 +253,27 @@ export function FilterSheet({
               onKeyDown={handleKeyDown}
               className="h-11"
             />
+          </div>
+          <div className="space-y-3">
+            <Label
+              htmlFor="excludeItemPrefixes"
+              className="text-sm font-medium text-foreground"
+            >
+              Exclude Item Prefixes
+            </Label>
+            <Input
+              id="excludeItemPrefixes"
+              placeholder="e.g. 6, 8"
+              value={filterInputs.excludeItemPrefixes}
+              onChange={(e) =>
+                updateField("excludeItemPrefixes")(e.target.value)
+              }
+              onKeyDown={handleKeyDown}
+              className="h-11"
+            />
+            <p className="text-xs text-muted-foreground">
+              Comma-separated prefixes to exclude
+            </p>
           </div>
           <div className="space-y-3">
             <Label className="text-sm font-medium text-foreground">

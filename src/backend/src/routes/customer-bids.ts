@@ -45,6 +45,17 @@ const querySchema = z.object({
     .optional(),
   coOpCode: z.string().optional(),
   sourceDb: z.string().optional(),
+  excludeItemPrefixes: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined
+    ),
   schoolYear: z.enum(["current", "previous", "next"]).default("next"),
 });
 

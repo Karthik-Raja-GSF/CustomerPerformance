@@ -160,6 +160,8 @@ export interface CustomerBidFilters {
   exported?: boolean;
   /** Filter by queue status - true=queued only, false=not-queued only */
   queued?: boolean;
+  /** Comma-separated item code prefixes to exclude (e.g., "6,8") */
+  excludeItemPrefixes?: string;
 }
 
 /**

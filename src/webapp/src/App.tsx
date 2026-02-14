@@ -45,7 +45,10 @@ function App() {
           <Route path="/" element={<AIAgent />} />
           <Route path="/stockiq-sync" element={<StockiqSync />} />
           <Route path="/customer-bids-sync" element={<CustomerBidsSync />} />
-          <Route path="/back-to-school" element={<CustomerBids />} />
+          <Route
+            path="/back-to-school"
+            element={<CustomerBids defaultExcludeItemPrefixes="6,8" />}
+          />
           <Route
             path="/demand-planning/monthly-forecast"
             element={<MonthlyForecast />}

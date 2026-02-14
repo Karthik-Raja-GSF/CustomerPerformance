@@ -659,6 +659,9 @@ export class BidExportService implements IBidExportService {
           : undefined,
       exported:
         filters.exported !== undefined ? Boolean(filters.exported) : undefined,
+      excludeItemPrefixes: Array.isArray(filters.excludeItemPrefixes)
+        ? (filters.excludeItemPrefixes as string[])
+        : undefined,
     });
 
     const additionalWhere =

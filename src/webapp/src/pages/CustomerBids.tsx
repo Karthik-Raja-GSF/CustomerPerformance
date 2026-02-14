@@ -112,7 +112,8 @@ function parseFiltersFromURL(
   searchParams: URLSearchParams,
   defaultConfirmed = false,
   defaultExported?: boolean,
-  defaultQueued?: boolean
+  defaultQueued?: boolean,
+  defaultExcludeItemPrefixes?: string
 ): CustomerBidFilters {
   // Parse confirmed param: "true" -> true, "false" -> false, missing -> use default
   const confirmedParam = searchParams.get("confirmed");
@@ -159,6 +160,10 @@ function parseFiltersFromURL(
     confirmed: confirmed ?? defaultConfirmed,
     exported: exported ?? defaultExported,
     queued: queued ?? defaultQueued,
+    excludeItemPrefixes:
+      searchParams.get("excludeItemPrefixes") ||
+      defaultExcludeItemPrefixes ||
+      undefined,
   };
 }
 
@@ -195,6 +200,9 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.queued !== undefined) {
     params.set("queued", filters.queued.toString());
   }
+  if (filters.excludeItemPrefixes) {
+    params.set("excludeItemPrefixes", filters.excludeItemPrefixes);
+  }
 
   return params;
 }
@@ -213,6 +221,7 @@ interface CustomerBidsProps {
   showConfirmedFilter?: boolean;
   showExportedFilter?: boolean;
   showQueueExport?: boolean;
+  defaultExcludeItemPrefixes?: string;
 }
 
 export default function CustomerBids({
@@ -221,6 +230,7 @@ export default function CustomerBids({
   defaultConfirmed = false,
   defaultExported,
   defaultQueued,
+  defaultExcludeItemPrefixes,
   defaultColumnVisibility,
   canUnconfirm = true,
   showSIQExport = false,
@@ -246,7 +256,8 @@ export default function CustomerBids({
       searchParams,
       defaultConfirmed,
       defaultExported,
-      defaultQueued
+      defaultQueued,
+      defaultExcludeItemPrefixes
     )
   );
 
@@ -259,6 +270,10 @@ export default function CustomerBids({
     itemCode: searchParams.get("itemCode") || "",
     erpStatus: searchParams.get("erpStatus") || "",
     coOpCode: searchParams.get("coOpCode") || "",
+    excludeItemPrefixes:
+      searchParams.get("excludeItemPrefixes") ||
+      defaultExcludeItemPrefixes ||
+      "",
   }));
   const [confirmedFilter, setConfirmedFilter] = useState<boolean>(() => {
     const param = searchParams.get("confirmed");
@@ -416,6 +431,7 @@ export default function CustomerBids({
       itemCode: filters.itemCode || undefined,
       erpStatus: filters.erpStatus || undefined,
       coOpCode: filters.coOpCode || undefined,
+      excludeItemPrefixes: filters.excludeItemPrefixes || undefined,
     });
     const urlFiltersStr = JSON.stringify(urlFilters);
 
@@ -430,6 +446,7 @@ export default function CustomerBids({
         itemCode: urlFilters.itemCode || "",
         erpStatus: urlFilters.erpStatus || "",
         coOpCode: urlFilters.coOpCode || "",
+        excludeItemPrefixes: urlFilters.excludeItemPrefixes || "",
       });
       setExportedFilter(urlFilters.exported);
       setQueuedFilter(urlFilters.queued);
@@ -458,13 +475,17 @@ export default function CustomerBids({
       confirmed: confirmedFilter,
       exported: exportedFilter,
       queued: queuedFilter,
+      excludeItemPrefixes: filterInputs.excludeItemPrefixes || undefined,
     };
     setFilters(newFilters);
     setFilterSheetOpen(false);
   };
 
   const handleClearFilters = () => {
-    setFilterInputs(EMPTY_FILTER_INPUTS);
+    setFilterInputs({
+      ...EMPTY_FILTER_INPUTS,
+      excludeItemPrefixes: defaultExcludeItemPrefixes || "",
+    });
     setConfirmedFilter(defaultConfirmed);
     setExportedFilter(defaultExported);
     setQueuedFilter(defaultQueued);
@@ -477,6 +498,7 @@ export default function CustomerBids({
       confirmed: defaultConfirmed,
       exported: defaultExported,
       queued: defaultQueued,
+      excludeItemPrefixes: defaultExcludeItemPrefixes || undefined,
     }));
   };
 
@@ -488,6 +510,9 @@ export default function CustomerBids({
     setFilters((prev) => ({ ...prev, page: 1, limit: newSize }));
   };
 
+  const excludePrefixesChanged =
+    filterInputs.excludeItemPrefixes !== (defaultExcludeItemPrefixes || "");
+
   const hasActiveFilters = Boolean(
     filterInputs.siteCode ||
       filterInputs.customerBillTo ||
@@ -496,6 +521,7 @@ export default function CustomerBids({
       filterInputs.itemCode ||
       filterInputs.erpStatus ||
       filterInputs.coOpCode ||
+      excludePrefixesChanged ||
       isLostFilter !== "all" ||
       (showConfirmedFilter && confirmedFilter)
   );
@@ -508,6 +534,7 @@ export default function CustomerBids({
     filterInputs.itemCode,
     filterInputs.erpStatus,
     filterInputs.coOpCode,
+    excludePrefixesChanged,
     isLostFilter !== "all",
     showConfirmedFilter && confirmedFilter,
   ].filter(Boolean).length;

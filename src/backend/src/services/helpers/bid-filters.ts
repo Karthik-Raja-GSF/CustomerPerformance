@@ -16,6 +16,7 @@ export interface BidFilterParams {
   isLost?: boolean;
   confirmed?: boolean;
   exported?: boolean;
+  excludeItemPrefixes?: string[];
 }
 
 /**
@@ -47,6 +48,12 @@ export function buildBidFilterConditions(
   }
   if (filters.itemCode) {
     conditions.push(Prisma.sql`cbd.item_no = ${filters.itemCode}`);
+  }
+  if (filters.excludeItemPrefixes && filters.excludeItemPrefixes.length > 0) {
+    const exclusions = filters.excludeItemPrefixes.map(
+      (prefix) => Prisma.sql`cbd.item_no NOT LIKE ${prefix + "%"}`
+    );
+    conditions.push(Prisma.sql`(${Prisma.join(exclusions, " AND ")})`);
   }
   if (filters.erpStatus) {
     conditions.push(
