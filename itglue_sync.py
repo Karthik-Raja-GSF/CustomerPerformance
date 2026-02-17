@@ -23,9 +23,8 @@ ORG_ID = int(os.environ["ITGLUE_ORG_ID"])
 FOLDER_ID = int(os.environ["ITGLUE_DOC_FOLDER_ID"])
 SYNC_ROOT = os.environ.get("SYNC_ROOT", ".docs")
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "repo") 
+REPO = os.environ.get("GITHUB_REPOSITORY", "repo")  # "owner/name"
 
-# Update/extend as needed
 ALLOWED_EXT = {
     ".md",
     ".pdf",
@@ -52,7 +51,7 @@ def json_headers() -> Dict[str, str]:
     }
 
 
-def key_header_only() -> Dict[str, str]:
+def key_headers() -> Dict[str, str]:
     return {
         "x-api-key": ITGLUE_API_KEY,
         "Accept": "application/vnd.api+json",
@@ -60,7 +59,7 @@ def key_header_only() -> Dict[str, str]:
 
 
 def doc_name_for_file(rel_path: pathlib.Path) -> str:
-    # One doc per file, stable, unique, readable
+    # One doc per file, stable and unique (repo + path)
     return f"{REPO}: {rel_path.as_posix()}"
 
 
@@ -80,7 +79,7 @@ def list_documents_in_folder() -> Dict[str, int]:
             "page[size]": page_size,
         }
 
-        r = requests.get(url, headers=key_header_only(), params=params, timeout=60)
+        r = requests.get(url, headers=key_headers(), params=params, timeout=60)
         if r.status_code != 200:
             die(f"List documents failed ({r.status_code}): {r.text}")
 
@@ -105,9 +104,11 @@ def list_documents_in_folder() -> Dict[str, int]:
 
 def create_document(doc_name: str) -> int:
     """
-    Creates a document in the org, targeting document_folder_id.
+    Create a normal (non-uploaded) IT Glue Document in the folder.
+    Then we attach the file via the attachments endpoint.
     """
     url = f"{API_BASE}/organizations/{ORG_ID}/relationships/documents"
+
     body = {
         "data": {
             "type": "documents",
@@ -116,9 +117,9 @@ def create_document(doc_name: str) -> int:
                 "name": doc_name,
                 "public": False,
                 "restricted": False,
-                "is_uploaded": True,
                 "document_folder_id": FOLDER_ID,
-            },
+                # NOTE: do NOT set is_uploaded here
+            }
         }
     }
 
@@ -132,13 +133,16 @@ def create_document(doc_name: str) -> int:
 
 def list_attachments(document_id: int) -> List[dict]:
     url = f"{API_BASE}/documents/{document_id}/relationships/attachments"
-    r = requests.get(url, headers=key_header_only(), timeout=60)
+    r = requests.get(url, headers=key_headers(), timeout=60)
     if r.status_code != 200:
         die(f"List attachments failed ({r.status_code}): {r.text}")
     return r.json().get("data", []) or []
 
 
 def delete_attachments(document_id: int, attachment_ids: List[int]) -> None:
+    """
+    Bulk delete attachments from a document.
+    """
     if not attachment_ids:
         return
 
@@ -156,21 +160,22 @@ def upload_attachment(document_id: int, file_path: pathlib.Path) -> None:
     """
     Multipart upload:
       POST /documents/:id/relationships/attachments
+
+    Keys per IT Glue docs:
+      -F "data[type]=attachments"
+      -F "data[attributes][attachment]=@file.ext"
     """
     url = f"{API_BASE}/documents/{document_id}/relationships/attachments"
 
     with file_path.open("rb") as f:
-        # IT Glue expects this multipart field name for the file:
         files = {
             "data[attributes][attachment]": (file_path.name, f),
         }
         data = {
             "data[type]": "attachments",
-            # Optional, but can be helpful in UI:
-            "data[attributes][name]": file_path.name,
         }
 
-        # NOTE: do not set JSON:API headers for multipart
+        # Do NOT set Content-Type manually (requests will set multipart boundary)
         r = requests.post(
             url,
             headers={"x-api-key": ITGLUE_API_KEY, "Accept": "application/vnd.api+json"},
@@ -188,7 +193,6 @@ def main() -> None:
     if not root.exists() or not root.is_dir():
         die(f"SYNC_ROOT does not exist or is not a directory: {root.resolve()}")
 
-    # Collect files
     files_to_sync: List[pathlib.Path] = []
     for p in root.rglob("*"):
         if p.is_file() and p.suffix.lower() in ALLOWED_EXT:
@@ -201,8 +205,7 @@ def main() -> None:
     existing_docs = list_documents_in_folder()
 
     for abs_path in sorted(files_to_sync, key=lambda x: x.as_posix()):
-        # IMPORTANT: names are relative to .docs (not repo root)
-        rel_path = abs_path.relative_to(root)
+        rel_path = abs_path.relative_to(root)  # names are relative to .docs
         doc_name = doc_name_for_file(rel_path)
 
         doc_id = existing_docs.get(doc_name)
@@ -213,7 +216,7 @@ def main() -> None:
         else:
             print(f"Found document:   {doc_name} (id={doc_id})")
 
-        # Keep only one attachment (latest)
+        # Replace attachment(s) with the latest file
         atts = list_attachments(doc_id)
         old_ids = [int(a["id"]) for a in atts if a.get("id")]
         if old_ids:
