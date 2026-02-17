@@ -13,8 +13,9 @@ import os
 import sys
 import json
 import pathlib
+import hashlib
 import requests
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 API_BASE = os.environ.get("ITGLUE_API_BASE", "https://api.itglue.com/api")
 
@@ -24,6 +25,7 @@ FOLDER_ID = int(os.environ["ITGLUE_DOC_FOLDER_ID"])
 SYNC_ROOT = os.environ.get("SYNC_ROOT", ".docs")
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "repo")  # "owner/name"
+FAIL_ON_ERROR = os.environ.get("FAIL_ON_ERROR", "true").lower() == "true"
 
 ALLOWED_EXT = {
     ".md",
@@ -37,9 +39,15 @@ ALLOWED_EXT = {
     ".webp",
 }
 
+MAX_NAME_LEN = 100
+
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
 
 def die(msg: str) -> None:
-    print(f"ERROR: {msg}", file=sys.stderr)
+    print(f"ERROR: {msg}", file=sys.stderr, flush=True)
     sys.exit(1)
 
 
@@ -58,9 +66,47 @@ def key_headers() -> Dict[str, str]:
     }
 
 
-def doc_name_for_file(rel_path: pathlib.Path) -> str:
-    # One doc per file, stable and unique (repo + path)
-    return f"{REPO}: {rel_path.as_posix()}"
+def short_hash(s: str, n: int = 8) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:n]
+
+
+def safe_document_name(repo: str, rel_path: pathlib.Path) -> str:
+    """
+    Build a stable, unique, <=100 char document name.
+
+    Format:
+      "<repo>: <filename> [<hash>]"
+    If needed, truncates the middle part to fit MAX_NAME_LEN.
+
+    Uniqueness:
+      hash is derived from "<repo>|<full rel path>" so different paths won't collide.
+    """
+    rel_str = rel_path.as_posix()
+    filename = rel_path.name
+    h = short_hash(f"{repo}|{rel_str}", 8)
+
+    base = f"{repo}: {filename} [{h}]"
+
+    if len(base) <= MAX_NAME_LEN:
+        return base
+
+    # If filename itself is huge, truncate filename portion
+    # Keep suffix (extension) when possible.
+    ext = rel_path.suffix
+    stem = filename[:-len(ext)] if ext and filename.endswith(ext) else filename
+
+    # Reserve space for "repo: " + " [hash]" + ext
+    prefix = f"{repo}: "
+    suffix = f" [{h}]"
+    reserve = len(prefix) + len(suffix) + len(ext)
+
+    allowed_stem_len = MAX_NAME_LEN - reserve
+    if allowed_stem_len < 5:
+        # ultra defensive fallback
+        return (base[:MAX_NAME_LEN]).rstrip()
+
+    truncated_stem = stem[: allowed_stem_len - 1].rstrip() + "…"
+    return f"{prefix}{truncated_stem}{ext}{suffix}"
 
 
 def list_documents_in_folder() -> Dict[str, int]:
@@ -104,8 +150,7 @@ def list_documents_in_folder() -> Dict[str, int]:
 
 def create_document(doc_name: str) -> int:
     """
-    Create a normal (non-uploaded) IT Glue Document in the folder.
-    Then we attach the file via the attachments endpoint.
+    Create a normal IT Glue Document in the folder.
     """
     url = f"{API_BASE}/organizations/{ORG_ID}/relationships/documents"
 
@@ -118,14 +163,13 @@ def create_document(doc_name: str) -> int:
                 "public": False,
                 "restricted": False,
                 "document_folder_id": FOLDER_ID,
-                # NOTE: do NOT set is_uploaded here
             }
         }
     }
 
     r = requests.post(url, headers=json_headers(), data=json.dumps(body), timeout=60)
     if r.status_code not in (200, 201):
-        die(f"Create document failed ({r.status_code}): {r.text}")
+        raise RuntimeError(f"Create document failed ({r.status_code}): {r.text}")
 
     payload = r.json()
     return int(payload["data"]["id"])
@@ -135,47 +179,29 @@ def list_attachments(document_id: int) -> List[dict]:
     url = f"{API_BASE}/documents/{document_id}/relationships/attachments"
     r = requests.get(url, headers=key_headers(), timeout=60)
     if r.status_code != 200:
-        die(f"List attachments failed ({r.status_code}): {r.text}")
+        raise RuntimeError(f"List attachments failed ({r.status_code}): {r.text}")
     return r.json().get("data", []) or []
 
 
 def delete_attachments(document_id: int, attachment_ids: List[int]) -> None:
-    """
-    Bulk delete attachments from a document.
-    """
     if not attachment_ids:
         return
 
     url = f"{API_BASE}/documents/{document_id}/relationships/attachments"
-    body = {
-        "data": [{"type": "attachments", "id": str(aid)} for aid in attachment_ids]
-    }
+    body = {"data": [{"type": "attachments", "id": str(aid)} for aid in attachment_ids]}
 
     r = requests.delete(url, headers=json_headers(), data=json.dumps(body), timeout=60)
     if r.status_code != 200:
-        die(f"Delete attachments failed ({r.status_code}): {r.text}")
+        raise RuntimeError(f"Delete attachments failed ({r.status_code}): {r.text}")
 
 
 def upload_attachment(document_id: int, file_path: pathlib.Path) -> None:
-    """
-    Multipart upload:
-      POST /documents/:id/relationships/attachments
-
-    Keys per IT Glue docs:
-      -F "data[type]=attachments"
-      -F "data[attributes][attachment]=@file.ext"
-    """
     url = f"{API_BASE}/documents/{document_id}/relationships/attachments"
 
     with file_path.open("rb") as f:
-        files = {
-            "data[attributes][attachment]": (file_path.name, f),
-        }
-        data = {
-            "data[type]": "attachments",
-        }
+        files = {"data[attributes][attachment]": (file_path.name, f)}
+        data = {"data[type]": "attachments"}
 
-        # Do NOT set Content-Type manually (requests will set multipart boundary)
         r = requests.post(
             url,
             headers={"x-api-key": ITGLUE_API_KEY, "Accept": "application/vnd.api+json"},
@@ -185,7 +211,7 @@ def upload_attachment(document_id: int, file_path: pathlib.Path) -> None:
         )
 
         if r.status_code not in (200, 201):
-            die(f"Upload attachment failed ({r.status_code}): {r.text}")
+            raise RuntimeError(f"Upload attachment failed ({r.status_code}): {r.text}")
 
 
 def main() -> None:
@@ -199,33 +225,50 @@ def main() -> None:
             files_to_sync.append(p)
 
     if not files_to_sync:
-        print(f"No matching files found under {root}.")
+        log(f"No matching files found under {root}.")
         return
 
     existing_docs = list_documents_in_folder()
 
+    errors: List[Tuple[str, str]] = []
+
     for abs_path in sorted(files_to_sync, key=lambda x: x.as_posix()):
-        rel_path = abs_path.relative_to(root)  # names are relative to .docs
-        doc_name = doc_name_for_file(rel_path)
+        try:
+            rel_path = abs_path.relative_to(root)
+            doc_name = safe_document_name(REPO, rel_path)
 
-        doc_id = existing_docs.get(doc_name)
-        if not doc_id:
-            doc_id = create_document(doc_name)
-            existing_docs[doc_name] = doc_id
-            print(f"Created document: {doc_name} (id={doc_id})")
-        else:
-            print(f"Found document:   {doc_name} (id={doc_id})")
+            doc_id = existing_docs.get(doc_name)
+            if not doc_id:
+                doc_id = create_document(doc_name)
+                existing_docs[doc_name] = doc_id
+                log(f"Created document: {doc_name} (id={doc_id})")
+            else:
+                log(f"Found document:   {doc_name} (id={doc_id})")
 
-        # Replace attachment(s) with the latest file
-        atts = list_attachments(doc_id)
-        old_ids = [int(a["id"]) for a in atts if a.get("id")]
-        if old_ids:
-            delete_attachments(doc_id, old_ids)
+            # Replace attachments with the latest file
+            atts = list_attachments(doc_id)
+            old_ids = [int(a["id"]) for a in atts if a.get("id")]
+            if old_ids:
+                delete_attachments(doc_id, old_ids)
 
-        upload_attachment(doc_id, abs_path)
-        print(f"Uploaded: {abs_path.resolve()}")
+            upload_attachment(doc_id, abs_path)
+            log(f"Uploaded: {abs_path.resolve()}")
 
-    print("Sync complete.")
+        except Exception as e:
+            msg = f"{abs_path.as_posix()} -> {str(e)}"
+            log(f"ERROR (file): {msg}")
+            errors.append((abs_path.as_posix(), str(e)))
+            continue
+
+    if errors:
+        log("\n--- Sync completed with errors ---")
+        for fp, err in errors:
+            log(f"- {fp}: {err}")
+
+        if FAIL_ON_ERROR:
+            die(f"{len(errors)} file(s) failed. Set FAIL_ON_ERROR=false to not fail the job.")
+
+    log("Sync complete.")
 
 
 if __name__ == "__main__":
