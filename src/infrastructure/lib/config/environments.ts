@@ -165,7 +165,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     frontendEcs: {
       cpu: 256, // 0.25 vCPU (nginx is lightweight)
       memory: 512, // 512 MB
-      desiredCount: 0, // Start at 0 — no image in ECR yet. CI/CD will push image and update.
+      desiredCount: 1, // Start at 0 — no image in ECR yet. CI/CD will push image and update.
     },
   },
 
