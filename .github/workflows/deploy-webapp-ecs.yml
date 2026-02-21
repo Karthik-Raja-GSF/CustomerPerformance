@@ -1,0 +1,326 @@
+name: Deploy Frontend (ECS)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/webapp/**"
+      - ".github/workflows/deploy-webapp-ecs.yml"
+
+concurrency:
+  group: webapp-ecs-deploy-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+  AWS_REGION: us-east-1
+
+jobs:
+  setup:
+    name: Setup Resource Names
+    runs-on: ubuntu-latest
+    outputs:
+      dev_ecr_repository: ${{ steps.set-resources.outputs.dev_ecr_repository }}
+      dev_ecs_cluster: ${{ steps.set-resources.outputs.dev_ecs_cluster }}
+      dev_ecs_service: ${{ steps.set-resources.outputs.dev_ecs_service }}
+      prod_ecr_repository: ${{ steps.set-resources.outputs.prod_ecr_repository }}
+      prod_ecs_cluster: ${{ steps.set-resources.outputs.prod_ecs_cluster }}
+      prod_ecs_service: ${{ steps.set-resources.outputs.prod_ecs_service }}
+
+    steps:
+      - name: Set resource names
+        id: set-resources
+        run: |
+          # Dev resources
+          echo "dev_ecr_repository=ait-dev-gbl-ecr-webapp-01" >> $GITHUB_OUTPUT
+          echo "dev_ecs_cluster=ait-dev-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
+          echo "dev_ecs_service=ait-dev-ue1-ecs-webapp-01" >> $GITHUB_OUTPUT
+
+          # Prod resources
+          echo "prod_ecr_repository=ait-prd-gbl-ecr-webapp-01" >> $GITHUB_OUTPUT
+          echo "prod_ecs_cluster=ait-prd-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
+          echo "prod_ecs_service=ait-prd-ue1-ecs-webapp-01" >> $GITHUB_OUTPUT
+
+          echo "Resource names configured"
+
+  build-and-push-dev:
+    name: Build & Push to Dev ECR
+    needs: setup
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image (Dev)
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building webapp Docker image for dev..."
+
+          docker build --platform linux/amd64 \
+            -f src/webapp/Dockerfile \
+            --build-arg VITE_COGNITO_USER_POOL_ID="${{ vars.VITE_COGNITO_USER_POOL_ID }}" \
+            --build-arg VITE_COGNITO_CLIENT_ID="${{ vars.VITE_COGNITO_CLIENT_ID }}" \
+            --build-arg VITE_COGNITO_REGION="${{ vars.VITE_COGNITO_REGION }}" \
+            --build-arg VITE_COGNITO_DOMAIN="${{ vars.VITE_COGNITO_DOMAIN }}" \
+            --build-arg VITE_COGNITO_AZURE_AD_IDP_NAME="${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME }}" \
+            --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL }}" \
+            -t webapp-image:$IMAGE_TAG \
+            .
+
+          echo "Image built: webapp-image:$IMAGE_TAG"
+
+      - name: Save Docker image to artifact
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker save webapp-image:$IMAGE_TAG | gzip > webapp-image.tar.gz
+
+          SIZE=$(ls -lh webapp-image.tar.gz | awk '{print $5}')
+          echo "Image saved: webapp-image.tar.gz (size: $SIZE)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-image-${{ github.sha }}
+          path: webapp-image.tar.gz
+          retention-days: 7
+          compression-level: 0
+
+      - name: Configure AWS credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag and push to dev ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.dev_ecr_repository }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag webapp-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag webapp-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          echo "Image pushed to dev ECR"
+
+  deploy-dev:
+    name: Deploy to Dev ECS
+    needs: [setup, build-and-push-dev]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
+          IMAGE_TAG: ${{ needs.build-and-push-dev.outputs.image_tag }}
+        run: |
+          echo "Deploying webapp to dev ECS with image tag: $IMAGE_TAG"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Wait for deployment
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --cli-read-timeout 300
+
+      - name: Deployment summary
+        if: success()
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push-dev.outputs.image_tag }}
+        run: |
+          echo "## Dev Frontend ECS Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** dev" >> $GITHUB_STEP_SUMMARY
+          echo "**Private URL:** https://stg-ait.goldstarfoods.com" >> $GITHUB_STEP_SUMMARY
+          echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+
+  load-artifact-and-push-prod:
+    name: Load Artifact & Push to Prod ECR
+    needs: [setup, build-and-push-dev, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: production-ecr
+
+    outputs:
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download dev artifact (for reference only)
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp-image-${{ github.sha }}
+
+      - name: Build Docker image (Prod)
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building webapp Docker image for prod..."
+
+          docker build --platform linux/amd64 \
+            -f src/webapp/Dockerfile \
+            --build-arg VITE_COGNITO_USER_POOL_ID="${{ vars.VITE_COGNITO_USER_POOL_ID_PROD }}" \
+            --build-arg VITE_COGNITO_CLIENT_ID="${{ vars.VITE_COGNITO_CLIENT_ID_PROD }}" \
+            --build-arg VITE_COGNITO_REGION="${{ vars.VITE_COGNITO_REGION_PROD }}" \
+            --build-arg VITE_COGNITO_DOMAIN="${{ vars.VITE_COGNITO_DOMAIN_PROD }}" \
+            --build-arg VITE_COGNITO_AZURE_AD_IDP_NAME="${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME_PROD }}" \
+            --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL_PROD }}" \
+            -t webapp-image:$IMAGE_TAG \
+            .
+
+          echo "Image built: webapp-image:$IMAGE_TAG"
+
+      - name: Configure AWS credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to prod ECR
+        id: login-prod-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag and push to prod ECR
+        env:
+          PROD_ECR: ${{ steps.login-prod-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.prod_ecr_repository }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag webapp-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag webapp-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:latest
+
+          docker push $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $PROD_ECR/$ECR_REPOSITORY:latest
+
+          echo "Image pushed to prod ECR"
+
+  deploy-prod:
+    name: Deploy to Prod ECS
+    needs: [setup, load-artifact-and-push-prod]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Configure AWS credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
+          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
+        run: |
+          echo "Deploying webapp to prod ECS with image tag: $IMAGE_TAG"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Wait for deployment
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --cli-read-timeout 600
+
+      - name: Deployment summary
+        if: success()
+        env:
+          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
+        run: |
+          echo "## Prod Frontend ECS Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** prod" >> $GITHUB_STEP_SUMMARY
+          echo "**Private URL:** https://ait.goldstarfoods.com" >> $GITHUB_STEP_SUMMARY
+          echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+
+  rollback:
+    name: Rollback on Failure
+    needs: [setup, deploy-prod]
+    if: failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback to previous task definition
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
+        run: |
+          echo "Deployment failed, initiating rollback..."
+
+          PREVIOUS_TASK_DEF=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --query 'services[0].deployments[1].taskDefinition' \
+            --output text || echo "none")
+
+          if [ "$PREVIOUS_TASK_DEF" = "none" ] || [ -z "$PREVIOUS_TASK_DEF" ]; then
+            echo "No previous task definition found for rollback"
+            exit 1
+          fi
+
+          echo "Rolling back to: $PREVIOUS_TASK_DEF"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition $PREVIOUS_TASK_DEF \
+            --force-new-deployment \
+            --no-cli-pager
+
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE
+
+          echo "Rollback complete"

@@ -34,16 +34,18 @@ services:
       timeout: 5s
       retries: 5
 
-  # DISABLED - Use otel_collector for local OTEL testing
-  # aspire_dashboard:
-  #   image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
-  #   restart: always
-  #   ports:
-  #     - 18888:18888
-  #     - 4317:18889
-  #   environment:
-  #     - Dashboard:ApplicationName=GSF
-  #     - Dashboard:Frontend:BrowserToken=password
+  # Aspire Dashboard - alternative OTEL viewer (enable via profile)
+  # UI: http://localhost:20000 | OTLP endpoint: localhost:20001
+  aspire_dashboard:
+    profiles: [aspire]
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
+    restart: unless-stopped
+    ports:
+      - "20000:18888" # Dashboard UI
+      - "20001:18889" # OTLP receiver (avoids conflict with otel_collector's 4317)
+    environment:
+      - Dashboard__ApplicationName=GSF
+      - Dashboard__Frontend__BrowserToken=password
 
   # OTEL Collector Contrib for local telemetry testing
   # Uses Contrib for transform processor support (flattens logs for CloudWatch queries)
@@ -58,6 +60,38 @@ services:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
       - "13133:13133" # Health check
+
+  # Frontend (nginx serving built React SPA)
+  # Only starts with: docker compose --profile frontend up
+  frontend:
+    profiles: [frontend]
+    build:
+      context: .
+      dockerfile: src/webapp/Dockerfile
+      args:
+        VITE_COGNITO_USER_POOL_ID: ${VITE_COGNITO_USER_POOL_ID:-us-east-1_hO4sbrlVw}
+        VITE_COGNITO_CLIENT_ID: ${VITE_COGNITO_CLIENT_ID:-6divm16kgf3lljacicn0cjl0pn}
+        VITE_COGNITO_REGION: ${VITE_COGNITO_REGION:-us-east-1}
+        VITE_COGNITO_DOMAIN: ${VITE_COGNITO_DOMAIN:-ait-dev.auth.us-east-1.amazoncognito.com}
+        VITE_COGNITO_AZURE_AD_IDP_NAME: ${VITE_COGNITO_AZURE_AD_IDP_NAME:-ait-dev-gbl-cog-idp-ad-01}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://ait-dev-be.tratin.com}
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80/health",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   postgres_data:

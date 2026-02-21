@@ -14,6 +14,8 @@ export interface AuthConstructProps {
   naming: NamingConfig;
   /** Azure AD federation metadata URL for SAML IdP */
   azureAdMetadataUrl?: string;
+  /** Set to true only for new User Pools. Existing pools have custom attributes added via CLI. */
+  createCustomAttributes?: boolean;
 }
 
 export class AuthConstruct extends Construct {
@@ -56,21 +58,28 @@ export class AuthConstruct extends Construct {
           mutable: true,
         },
       },
-      customAttributes: {
-        mail: new cognito.StringAttribute({ mutable: true }),
-        idp: new cognito.StringAttribute({ mutable: true }),
-        token_exp: new cognito.StringAttribute({ mutable: true }),
-        object_id: new cognito.StringAttribute({ mutable: true }),
-        groups: new cognito.StringAttribute({ mutable: true }),
-        wids: new cognito.StringAttribute({ mutable: true }),
-        auth_method: new cognito.StringAttribute({ mutable: true }),
-        name_id: new cognito.StringAttribute({ mutable: true }),
-        auth_instant: new cognito.StringAttribute({ mutable: true }),
-        idp_email: new cognito.StringAttribute({ mutable: true }),
-        openid2_id: new cognito.StringAttribute({ mutable: true }),
-        groups_link: new cognito.StringAttribute({ mutable: true }),
-        role: new cognito.StringAttribute({ mutable: true }),
-      },
+      // Custom attributes are only declared for new User Pools.
+      // Existing pools (dev/prod) have these added via CLI — re-declaring them
+      // causes "attribute already exists with different properties" errors.
+      ...(props.createCustomAttributes
+        ? {
+            customAttributes: {
+              mail: new cognito.StringAttribute({ mutable: true }),
+              idp: new cognito.StringAttribute({ mutable: true }),
+              token_exp: new cognito.StringAttribute({ mutable: true }),
+              object_id: new cognito.StringAttribute({ mutable: true }),
+              groups: new cognito.StringAttribute({ mutable: true }),
+              wids: new cognito.StringAttribute({ mutable: true }),
+              auth_method: new cognito.StringAttribute({ mutable: true }),
+              name_id: new cognito.StringAttribute({ mutable: true }),
+              auth_instant: new cognito.StringAttribute({ mutable: true }),
+              idp_email: new cognito.StringAttribute({ mutable: true }),
+              openid2_id: new cognito.StringAttribute({ mutable: true }),
+              groups_link: new cognito.StringAttribute({ mutable: true }),
+              role: new cognito.StringAttribute({ mutable: true }),
+            },
+          }
+        : {}),
       passwordPolicy: {
         minLength: 8,
         requireLowercase: true,

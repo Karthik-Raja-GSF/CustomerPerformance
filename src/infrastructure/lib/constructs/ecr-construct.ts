@@ -17,6 +17,7 @@ export interface EcrConstructProps {
 
 export class EcrConstruct extends Construct {
   public readonly repository: ecr.IRepository;
+  public readonly webappRepository: ecr.IRepository;
 
   constructor(scope: Construct, id: string, props: EcrConstructProps) {
     super(scope, id);
@@ -26,18 +27,24 @@ export class EcrConstruct extends Construct {
     // Generate resource names (ECR is global resource)
     const n = createNamingHelper(naming);
     const repoName = n.globalName(ResourceTypes.ECR, "backend", "01");
+    const webappRepoName = n.globalName(ResourceTypes.ECR, "webapp", "01");
 
     const isProd = envName === "prod" || envName === "prd";
 
     if (importExisting) {
-      // Import existing repository (useful when repo was created outside CDK)
+      // Import existing repositories (useful when repos were created outside CDK)
       this.repository = ecr.Repository.fromRepositoryName(
         this,
         "Repository",
         repoName
       );
+      this.webappRepository = ecr.Repository.fromRepositoryName(
+        this,
+        "WebappRepository",
+        webappRepoName
+      );
     } else {
-      // Create new repository
+      // Create backend repository
       const newRepo = new ecr.Repository(this, "Repository", {
         repositoryName: repoName,
         imageScanOnPush: true,
@@ -60,6 +67,29 @@ export class EcrConstruct extends Construct {
       addStandardTags(newRepo, naming.env, repoName);
 
       this.repository = newRepo;
+
+      // Create webapp repository
+      const newWebappRepo = new ecr.Repository(this, "WebappRepository", {
+        repositoryName: webappRepoName,
+        imageScanOnPush: true,
+        imageTagMutability: ecr.TagMutability.MUTABLE,
+        removalPolicy: isProd
+          ? cdk.RemovalPolicy.RETAIN
+          : cdk.RemovalPolicy.DESTROY,
+        emptyOnDelete: !isProd,
+        lifecycleRules: [
+          {
+            description: "Keep last 10 images",
+            maxImageCount: 10,
+            rulePriority: 1,
+            tagStatus: ecr.TagStatus.ANY,
+          },
+        ],
+      });
+
+      addStandardTags(newWebappRepo, naming.env, webappRepoName);
+
+      this.webappRepository = newWebappRepo;
     }
   }
 }

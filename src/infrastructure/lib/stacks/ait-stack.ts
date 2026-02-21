@@ -19,6 +19,7 @@ import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
 import { WafConstruct } from "../constructs/waf-construct";
 import { PrivateHostedZoneConstruct } from "../constructs/private-hosted-zone-construct";
+import { FrontendEcsConstruct } from "../constructs/frontend-ecs-construct";
 import { defaultWafConfigs } from "../config/waf-config";
 
 export interface CrossAccountRoute53Config {
@@ -273,6 +274,28 @@ export class AitStack extends cdk.Stack {
     }
 
     // ===================
+    // Frontend ECS (Private deployment via nginx + internal ALB)
+    // ===================
+    let frontendEcsConstruct: FrontendEcsConstruct | undefined;
+    if (
+      config.frontendEcs &&
+      privateHostedZoneConstruct &&
+      config.privateDomain
+    ) {
+      frontendEcsConstruct = new FrontendEcsConstruct(this, "FrontendEcs", {
+        envName: config.envName,
+        vpc: vpcConstruct.vpc,
+        cluster: backendConstruct.cluster,
+        ecrRepository: ecrConstruct.webappRepository,
+        privateHostedZone: privateHostedZoneConstruct.hostedZone,
+        domainName: config.privateDomain,
+        config: config.frontendEcs,
+        naming,
+        peerVpcCidr: config.vpcPeering?.peerVpcCidr,
+      });
+    }
+
+    // ===================
     // Bastion Host (for database SSH tunnel access)
     // ===================
     const bastionConstruct = new BastionConstruct(this, "Bastion", {
@@ -480,6 +503,29 @@ export class AitStack extends cdk.Stack {
       new cdk.CfnOutput(this, "PrivateHostedZoneId", {
         value: privateHostedZoneConstruct.hostedZone.hostedZoneId,
         description: `Private Hosted Zone ID (${config.privateDomain})`,
+      });
+    }
+
+    // Frontend ECS Outputs
+    if (frontendEcsConstruct) {
+      new cdk.CfnOutput(this, "FrontendEcsServiceName", {
+        value: frontendEcsConstruct.service.serviceName,
+        description: "Frontend ECS Service Name",
+      });
+
+      new cdk.CfnOutput(this, "FrontendInternalAlbDns", {
+        value: frontendEcsConstruct.loadBalancer.loadBalancerDnsName,
+        description: "Frontend Internal ALB DNS Name",
+      });
+
+      new cdk.CfnOutput(this, "FrontendPrivateUrl", {
+        value: `https://${config.privateDomain}`,
+        description: "Frontend Private URL",
+      });
+
+      new cdk.CfnOutput(this, "WebappEcrRepositoryUri", {
+        value: ecrConstruct.webappRepository.repositoryUri,
+        description: "Webapp ECR Repository URI",
       });
     }
   }

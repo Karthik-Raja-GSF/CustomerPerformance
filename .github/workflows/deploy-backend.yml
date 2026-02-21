@@ -41,7 +41,7 @@ jobs:
           echo "prod_ecs_cluster=ait-prd-ue1-ecs-cluster-01" >> $GITHUB_OUTPUT
           echo "prod_ecs_service=ait-prd-ue1-ecs-backend-01" >> $GITHUB_OUTPUT
 
-          echo "✅ Resource names configured"
+          echo "Resource names configured"
 
   validate:
     name: Validate & Typecheck
@@ -93,7 +93,7 @@ jobs:
             -t backend-image:$IMAGE_TAG \
             .
 
-          echo "✅ Image built: backend-image:$IMAGE_TAG"
+          echo "Image built: backend-image:$IMAGE_TAG"
 
       - name: Save Docker image to artifact
         env:
@@ -103,7 +103,7 @@ jobs:
           docker save backend-image:$IMAGE_TAG | gzip > backend-image.tar.gz
 
           SIZE=$(ls -lh backend-image.tar.gz | awk '{print $5}')
-          echo "✅ Image saved: backend-image.tar.gz (size: $SIZE)"
+          echo "Image saved: backend-image.tar.gz (size: $SIZE)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -146,7 +146,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-          echo "✅ Image pushed to dev ECR"
+          echo "Image pushed to dev ECR"
 
   load-artifact-and-push-prod:
     name: Load Artifact & Push to Prod ECR
@@ -178,7 +178,7 @@ jobs:
           fi
 
           SIZE=$(ls -lh backend-image.tar.gz | awk '{print $5}')
-          echo "✅ Artifact validated (size: $SIZE)"
+          echo "Artifact validated (size: $SIZE)"
 
       - name: Load Docker image
         env:
@@ -187,7 +187,7 @@ jobs:
           echo "Loading image from artifact..."
           gunzip < backend-image.tar.gz | docker load
           docker image inspect backend-image:$IMAGE_TAG
-          echo "✅ Image loaded: backend-image:$IMAGE_TAG"
+          echo "Image loaded: backend-image:$IMAGE_TAG"
 
       - name: Configure AWS credentials (prod)
         uses: aws-actions/configure-aws-credentials@v4
@@ -213,7 +213,7 @@ jobs:
           docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
           docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
 
-          echo "✅ Image pushed to prod ECR"
+          echo "Image pushed to prod ECR"
 
   deploy-dev:
     name: Deploy to Dev
@@ -350,7 +350,7 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Migrations completed successfully"
+          echo "Migrations completed successfully"
 
       - name: Deploy to ECS
         env:
@@ -386,7 +386,7 @@ jobs:
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://ait-be.tratin.com/health || echo "000")
 
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Health check passed (HTTP $HTTP_CODE)"
+              echo "Health check passed (HTTP $HTTP_CODE)"
               exit 0
             fi
 
@@ -407,7 +407,7 @@ jobs:
             --output text)
 
           if [ -z "$ALARM_NAMES" ]; then
-            echo "⚠️ No CloudWatch alarms found"
+            echo "No CloudWatch alarms found"
             exit 0
           fi
 
@@ -424,11 +424,11 @@ jobs:
               exit 1
             fi
 
-            echo "✅ All alarms OK (check $i/10)"
+            echo "All alarms OK (check $i/10)"
             sleep 30
           done
 
-          echo "✅ CloudWatch monitoring complete - no alarms triggered"
+          echo "CloudWatch monitoring complete - no alarms triggered"
 
       - name: Deployment summary
         if: success()
@@ -487,7 +487,7 @@ jobs:
             --cluster $ECS_CLUSTER \
             --services $ECS_SERVICE
 
-          echo "✅ Rollback complete"
+          echo "Rollback complete"
 
       - name: Create rollback incident issue
         if: always()
@@ -497,7 +497,7 @@ jobs:
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🚨 Production Deployment Failed - Rollback Initiated`,
+              title: `Production Deployment Failed - Rollback Initiated`,
               body: `## Deployment Failure\n\n**Workflow:** [${context.workflow}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n**Time:** ${new Date().toISOString()}\n\n### Action Required\n- Investigate deployment logs\n- Fix underlying issue\n- Re-run deployment when ready\n\n### Rollback Status\nAutomatic rollback to previous task definition has been initiated.`,
               labels: ['deployment', 'production', 'incident']
             });

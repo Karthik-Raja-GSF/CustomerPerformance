@@ -99,6 +99,7 @@ export interface EnvironmentConfig {
   vpcPeering?: VpcPeeringConfig;
   dms?: DmsConfig;
   waf?: WafConfig;
+  frontendEcs?: EcsConfig; // Private frontend deployment via nginx + ECS
 }
 
 export const environments: Record<string, EnvironmentConfig> = {
@@ -161,6 +162,11 @@ export const environments: Record<string, EnvironmentConfig> = {
       },
     },
     waf: defaultWafConfigs.dev,
+    frontendEcs: {
+      cpu: 256, // 0.25 vCPU (nginx is lightweight)
+      memory: 512, // 512 MB
+      desiredCount: 0, // Start at 0 — no image in ECR yet. CI/CD will push image and update.
+    },
   },
 
   prd: {
@@ -229,6 +235,18 @@ export const environments: Record<string, EnvironmentConfig> = {
       },
     },
     waf: defaultWafConfigs.prd,
+    frontendEcs: {
+      cpu: 256,
+      memory: 512,
+      desiredCount: 2, // 2 for HA
+      autoScaling: {
+        minCount: 2,
+        maxCount: 4,
+        cpuTargetPercent: 70,
+        scaleInCooldown: 300, // 5 minutes
+        scaleOutCooldown: 60, // 1 minute
+      },
+    },
   },
 };
 
