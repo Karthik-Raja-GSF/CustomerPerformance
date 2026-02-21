@@ -315,6 +315,7 @@ export default function CustomerBids({
     sourceDb: false,
     customerBillTo: false,
     coOpCode: false,
+    packSize: false,
     contactName: false,
     contactEmail: false,
     contactPhone: false,

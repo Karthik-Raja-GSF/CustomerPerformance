@@ -42,6 +42,7 @@ interface QueuedBidRow {
   itemNo: string;
   itemDescription: string | null;
   brandName: string | null;
+  packSize: string | null;
   bidQty: Prisma.Decimal | null;
   bidStart: Date;
   bidEnd: Date | null;
@@ -555,6 +556,7 @@ export class BidExportService implements IBidExportService {
           cbd.item_no AS "itemNo",
           i.description AS "itemDescription",
           i.description_2 AS "brandName",
+          i.pack_size AS "packSize",
           cbd.bid_qty AS "bidQty",
           cbd.bid_start AS "bidStart",
           cbd.bid_end AS "bidEnd",
@@ -704,6 +706,7 @@ export class BidExportService implements IBidExportService {
       itemCode: row.itemNo,
       itemDescription: row.itemDescription,
       brandName: row.brandName,
+      packSize: row.packSize,
       erpStatus: row.erpStatus,
       bidQuantity: decimalToNumber(row.bidQty),
       lastYearBidQty: decimalToNumber(row.lastYearBidQty),

@@ -499,6 +499,13 @@ export function createColumns(
       },
     },
     {
+      accessorKey: "packSize",
+      header: () => (
+        <span className="text-muted-foreground font-medium">Pack Size</span>
+      ),
+      cell: ({ row }) => row.getValue<string | null>("packSize") ?? "-",
+    },
+    {
       accessorKey: "itemDescription",
       header: () => (
         <span className="text-muted-foreground font-medium">

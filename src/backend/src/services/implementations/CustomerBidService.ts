@@ -50,6 +50,7 @@ interface BaseBidRow {
   itemNo: string;
   itemDescription: string | null;
   brandName: string | null;
+  packSize: string | null;
   bidQty: Prisma.Decimal | null;
   bidStart: Date;
   bidEnd: Date | null;
@@ -170,6 +171,7 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.item_no AS "itemNo",
             i.description AS "itemDescription",
             i.description_2 AS "brandName",
+            i.pack_size AS "packSize",
             cbd.bid_qty AS "bidQty",
             cbd.bid_start AS "bidStart",
             cbd.bid_end AS "bidEnd",
@@ -234,6 +236,7 @@ export class CustomerBidService implements ICustomerBidService {
         itemCode: row.itemNo,
         itemDescription: row.itemDescription,
         brandName: row.brandName,
+        packSize: row.packSize,
         erpStatus: row.erpStatus,
         bidQuantity: row.bidQty ? Number(row.bidQty) : null,
         lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
@@ -729,6 +732,7 @@ export class CustomerBidService implements ICustomerBidService {
       itemCode: record.itemNo,
       itemDescription: null,
       brandName: null,
+      packSize: null,
       erpStatus: null,
       bidQuantity: null,
       lastYearBidQty: decimalToNumber(record.lastYearBidQty),

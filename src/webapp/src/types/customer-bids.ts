@@ -40,6 +40,8 @@ export interface CustomerBidDto {
   itemDescription: string | null;
   /** Brand name from Item.description_2 */
   brandName: string | null;
+  /** Pack size from Item table */
+  packSize: string | null;
   erpStatus: string | null;
   bidQuantity: number | null;
 
