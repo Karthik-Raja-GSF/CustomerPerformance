@@ -155,6 +155,17 @@
       "rule-action": "include"
     },
     {
+      "rule-type": "selection",
+      "rule-id": "15",
+      "rule-name": "include_completed_bid",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "table-type": "view"
+      },
+      "rule-action": "include"
+    },
+    {
       "rule-type": "transformation",
       "rule-id": "1001",
       "rule-name": "rename_customer",
@@ -321,6 +332,18 @@
       },
       "rule-action": "rename",
       "value": "vendor"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1015",
+      "rule-name": "rename_completed_bid",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid"
+      },
+      "rule-action": "rename",
+      "value": "completed_bid"
     },
     {
       "rule-type": "transformation",

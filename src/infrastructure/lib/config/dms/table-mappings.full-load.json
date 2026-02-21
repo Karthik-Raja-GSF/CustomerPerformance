@@ -4,21 +4,30 @@
       "rule-type": "selection",
       "rule-id": "1",
       "rule-name": "include_acc_schedule_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Acc[_] Schedule Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Acc[_] Schedule Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "2",
       "rule-name": "include_accounting_period",
-      "object-locator": { "schema-name": "nav", "table-name": "Accounting Period" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Accounting Period"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "3",
       "rule-name": "include_appointment_schedule",
-      "object-locator": { "schema-name": "nav", "table-name": "Appointment Schedule" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Appointment Schedule"
+      },
       "rule-action": "include"
     },
     {
@@ -74,63 +83,90 @@
       "rule-type": "selection",
       "rule-id": "11",
       "rule-name": "include_campaign_target_group",
-      "object-locator": { "schema-name": "nav", "table-name": "Campaign Target Group" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Campaign Target Group"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "12",
       "rule-name": "include_change_log_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Change Log Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Change Log Entry"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "13",
       "rule-name": "include_change_log_entry_full_history",
-      "object-locator": { "schema-name": "nav", "table-name": "Change Log Entry (Full History)" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Change Log Entry (Full History)"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "14",
       "rule-name": "include_commodity_amt_limit",
-      "object-locator": { "schema-name": "nav", "table-name": "Commodity AMT Limit" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity AMT Limit"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "15",
       "rule-name": "include_commodity_component",
-      "object-locator": { "schema-name": "nav", "table-name": "Commodity Component" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Component"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "16",
       "rule-name": "include_commodity_lb_limit",
-      "object-locator": { "schema-name": "nav", "table-name": "Commodity LB Limit" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity LB Limit"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "17",
       "rule-name": "include_commodity_ledger_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Commodity Ledger Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Ledger Entry"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "18",
       "rule-name": "include_commodity_manufacturer",
-      "object-locator": { "schema-name": "nav", "table-name": "Commodity Manufacturer" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Manufacturer"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "19",
       "rule-name": "include_commodity_opt_out",
-      "object-locator": { "schema-name": "nav", "table-name": "Commodity Opt Out" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Opt Out"
+      },
       "rule-action": "include"
     },
     {
@@ -144,21 +180,30 @@
       "rule-type": "selection",
       "rule-id": "21",
       "rule-name": "include_contact_business_relation",
-      "object-locator": { "schema-name": "nav", "table-name": "Contact Business Relation" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Contact Business Relation"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "22",
       "rule-name": "include_co_op_distributor_transaction",
-      "object-locator": { "schema-name": "nav", "table-name": "Co-op Distributor Transaction" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Co-op Distributor Transaction"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "23",
       "rule-name": "include_cust_ledger_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Cust[_] Ledger Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Cust[_] Ledger Entry"
+      },
       "rule-action": "include"
     },
     {
@@ -172,49 +217,70 @@
       "rule-type": "selection",
       "rule-id": "25",
       "rule-name": "include_customer_grouping",
-      "object-locator": { "schema-name": "nav", "table-name": "Customer Grouping" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Customer Grouping"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "26",
       "rule-name": "include_default_dimension",
-      "object-locator": { "schema-name": "nav", "table-name": "Default Dimension" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Default Dimension"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "27",
       "rule-name": "include_delivery_schedule",
-      "object-locator": { "schema-name": "nav", "table-name": "Delivery Schedule" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Delivery Schedule"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "28",
       "rule-name": "include_detailed_cust_ledg_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Detailed Cust[_] Ledg[_] Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Detailed Cust[_] Ledg[_] Entry"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "29",
       "rule-name": "include_detailed_vendor_ledg_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Detailed Vendor Ledg[_] Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Detailed Vendor Ledg[_] Entry"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "30",
       "rule-name": "include_dimension_set_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Dimension Set Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Dimension Set Entry"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "31",
       "rule-name": "include_dimension_value",
-      "object-locator": { "schema-name": "nav", "table-name": "Dimension Value" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Dimension Value"
+      },
       "rule-action": "include"
     },
     {
@@ -256,21 +322,30 @@
       "rule-type": "selection",
       "rule-id": "37",
       "rule-name": "include_gsf_item_cost_history",
-      "object-locator": { "schema-name": "nav", "table-name": "GSF Item Cost History" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "GSF Item Cost History"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "38",
       "rule-name": "include_gsf_item_usage",
-      "object-locator": { "schema-name": "nav", "table-name": "GSF Item Usage" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "GSF Item Usage"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "39",
       "rule-name": "include_gsf_sales_price",
-      "object-locator": { "schema-name": "nav", "table-name": "GSF Sales Price" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "GSF Sales Price"
+      },
       "rule-action": "include"
     },
     {
@@ -284,7 +359,10 @@
       "rule-type": "selection",
       "rule-id": "41",
       "rule-name": "include_item_application_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Item Application Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Application Entry"
+      },
       "rule-action": "include"
     },
     {
@@ -298,14 +376,20 @@
       "rule-type": "selection",
       "rule-id": "43",
       "rule-name": "include_item_cross_reference",
-      "object-locator": { "schema-name": "nav", "table-name": "Item Cross Reference" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Cross Reference"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "44",
       "rule-name": "include_item_date_range",
-      "object-locator": { "schema-name": "nav", "table-name": "Item Date Range" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Date Range"
+      },
       "rule-action": "include"
     },
     {
@@ -326,7 +410,10 @@
       "rule-type": "selection",
       "rule-id": "47",
       "rule-name": "include_item_ledger_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Item Ledger Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Ledger Entry"
+      },
       "rule-action": "include"
     },
     {
@@ -340,7 +427,10 @@
       "rule-type": "selection",
       "rule-id": "49",
       "rule-name": "include_item_unit_of_measure",
-      "object-locator": { "schema-name": "nav", "table-name": "Item Unit of Measure" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Unit of Measure"
+      },
       "rule-action": "include"
     },
     {
@@ -354,70 +444,100 @@
       "rule-type": "selection",
       "rule-id": "51",
       "rule-name": "include_lot_no_information",
-      "object-locator": { "schema-name": "nav", "table-name": "Lot No[_] Information" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Lot No[_] Information"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "52",
       "rule-name": "include_pallet_bin_content",
-      "object-locator": { "schema-name": "nav", "table-name": "Pallet Bin Content" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Pallet Bin Content"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "53",
       "rule-name": "include_pallet_movement",
-      "object-locator": { "schema-name": "nav", "table-name": "Pallet Movement" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Pallet Movement"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "54",
       "rule-name": "include_purch_cr_memo_hdr",
-      "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Cr[_] Memo Hdr[_]" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Cr[_] Memo Hdr[_]"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "55",
       "rule-name": "include_purch_cr_memo_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Cr[_] Memo Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Cr[_] Memo Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "56",
       "rule-name": "include_purch_inv_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Inv[_] Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Inv[_] Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "57",
       "rule-name": "include_purch_inv_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Inv[_] Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Inv[_] Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "58",
       "rule-name": "include_purch_rcpt_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Rcpt[_] Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Rcpt[_] Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "59",
       "rule-name": "include_purch_rcpt_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Rcpt[_] Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Rcpt[_] Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "60",
       "rule-name": "include_purchase_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Purchase Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purchase Header"
+      },
       "rule-action": "include"
     },
     {
@@ -438,21 +558,30 @@
       "rule-type": "selection",
       "rule-id": "63",
       "rule-name": "include_receive_pallet_candidate",
-      "object-locator": { "schema-name": "nav", "table-name": "Receive Pallet Candidate" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Receive Pallet Candidate"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "64",
       "rule-name": "include_registered_whse_activity_hdr",
-      "object-locator": { "schema-name": "nav", "table-name": "Registered Whse[_] Activity Hdr[_]" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Registered Whse[_] Activity Hdr[_]"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "65",
       "rule-name": "include_registered_whse_activity_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Registered Whse[_] Activity Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Registered Whse[_] Activity Line"
+      },
       "rule-action": "include"
     },
     {
@@ -466,35 +595,50 @@
       "rule-type": "selection",
       "rule-id": "67",
       "rule-name": "include_return_receipt_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Return Receipt Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Return Receipt Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "68",
       "rule-name": "include_return_receipt_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Return Receipt Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Return Receipt Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "69",
       "rule-name": "include_return_shipment_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Return Shipment Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Return Shipment Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "70",
       "rule-name": "include_sales_cr_memo_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Cr[_]Memo Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Cr[_]Memo Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "71",
       "rule-name": "include_sales_cr_memo_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Cr[_]Memo Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Cr[_]Memo Line"
+      },
       "rule-action": "include"
     },
     {
@@ -508,14 +652,20 @@
       "rule-type": "selection",
       "rule-id": "73",
       "rule-name": "include_sales_invoice_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Invoice Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Invoice Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "74",
       "rule-name": "include_sales_invoice_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Invoice Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Invoice Line"
+      },
       "rule-action": "include"
     },
     {
@@ -536,35 +686,50 @@
       "rule-type": "selection",
       "rule-id": "77",
       "rule-name": "include_sales_rebate_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Rebate Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Rebate Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "78",
       "rule-name": "include_sales_rebate_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Rebate Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Rebate Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "79",
       "rule-name": "include_sales_shipment_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Shipment Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Shipment Header"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "80",
       "rule-name": "include_sales_shipment_line",
-      "object-locator": { "schema-name": "nav", "table-name": "Sales Shipment Line" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Shipment Line"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "81",
       "rule-name": "include_salesperson_purchaser",
-      "object-locator": { "schema-name": "nav", "table-name": "Salesperson[_]Purchaser" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Salesperson[_]Purchaser"
+      },
       "rule-action": "include"
     },
     {
@@ -585,14 +750,20 @@
       "rule-type": "selection",
       "rule-id": "84",
       "rule-name": "include_stockkeeping_unit",
-      "object-locator": { "schema-name": "nav", "table-name": "Stockkeeping Unit" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Stockkeeping Unit"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "85",
       "rule-name": "include_storage_fee_ledger_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Storage Fee Ledger Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Storage Fee Ledger Entry"
+      },
       "rule-action": "include"
     },
     {
@@ -606,7 +777,10 @@
       "rule-type": "selection",
       "rule-id": "87",
       "rule-name": "include_transfer_header",
-      "object-locator": { "schema-name": "nav", "table-name": "Transfer Header" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Transfer Header"
+      },
       "rule-action": "include"
     },
     {
@@ -641,110 +815,1064 @@
       "rule-type": "selection",
       "rule-id": "92",
       "rule-name": "include_vendor_ledger_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Vendor Ledger Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Vendor Ledger Entry"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "93",
       "rule-name": "include_warehouse_entry",
-      "object-locator": { "schema-name": "nav", "table-name": "Warehouse Entry" },
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Warehouse Entry"
+      },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "94",
+      "rule-name": "include_completed_bid",
+      "object-locator": { "schema-name": "nav", "table-name": "Completed Bid" },
       "rule-action": "include"
     },
 
-    { "rule-type": "transformation", "rule-id": "1001", "rule-name": "rename_acc_schedule_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Acc[_] Schedule Line" }, "rule-action": "rename", "value": "acc_schedule_line" },
-    { "rule-type": "transformation", "rule-id": "1002", "rule-name": "rename_accounting_period", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Accounting Period" }, "rule-action": "rename", "value": "accounting_period" },
-    { "rule-type": "transformation", "rule-id": "1003", "rule-name": "rename_appointment_schedule", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Appointment Schedule" }, "rule-action": "rename", "value": "appointment_schedule" },
-    { "rule-type": "transformation", "rule-id": "1004", "rule-name": "rename_bank_account", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Bank Account" }, "rule-action": "rename", "value": "bank_account" },
-    { "rule-type": "transformation", "rule-id": "1005", "rule-name": "rename_bid_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Bid Header" }, "rule-action": "rename", "value": "bid_header" },
-    { "rule-type": "transformation", "rule-id": "1006", "rule-name": "rename_bid_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Bid Line" }, "rule-action": "rename", "value": "bid_line" },
-    { "rule-type": "transformation", "rule-id": "1007", "rule-name": "rename_bin", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Bin" }, "rule-action": "rename", "value": "bin" },
-    { "rule-type": "transformation", "rule-id": "1008", "rule-name": "rename_bin_content", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Bin Content" }, "rule-action": "rename", "value": "bin_content" },
-    { "rule-type": "transformation", "rule-id": "1009", "rule-name": "rename_bin_type", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Bin Type" }, "rule-action": "rename", "value": "bin_type" },
-    { "rule-type": "transformation", "rule-id": "1010", "rule-name": "rename_campaign", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Campaign" }, "rule-action": "rename", "value": "campaign" },
-    { "rule-type": "transformation", "rule-id": "1011", "rule-name": "rename_campaign_target_group", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Campaign Target Group" }, "rule-action": "rename", "value": "campaign_target_group" },
-    { "rule-type": "transformation", "rule-id": "1012", "rule-name": "rename_change_log_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Change Log Entry" }, "rule-action": "rename", "value": "change_log_entry" },
-    { "rule-type": "transformation", "rule-id": "1013", "rule-name": "rename_change_log_entry_full_history", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Change Log Entry (Full History)" }, "rule-action": "rename", "value": "change_log_entry_full_history" },
-    { "rule-type": "transformation", "rule-id": "1014", "rule-name": "rename_commodity_amt_limit", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Commodity AMT Limit" }, "rule-action": "rename", "value": "commodity_amt_limit" },
-    { "rule-type": "transformation", "rule-id": "1015", "rule-name": "rename_commodity_component", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Commodity Component" }, "rule-action": "rename", "value": "commodity_component" },
-    { "rule-type": "transformation", "rule-id": "1016", "rule-name": "rename_commodity_lb_limit", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Commodity LB Limit" }, "rule-action": "rename", "value": "commodity_lb_limit" },
-    { "rule-type": "transformation", "rule-id": "1017", "rule-name": "rename_commodity_ledger_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Commodity Ledger Entry" }, "rule-action": "rename", "value": "commodity_ledger_entry" },
-    { "rule-type": "transformation", "rule-id": "1018", "rule-name": "rename_commodity_manufacturer", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Commodity Manufacturer" }, "rule-action": "rename", "value": "commodity_manufacturer" },
-    { "rule-type": "transformation", "rule-id": "1019", "rule-name": "rename_commodity_opt_out", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Commodity Opt Out" }, "rule-action": "rename", "value": "commodity_opt_out" },
-    { "rule-type": "transformation", "rule-id": "1020", "rule-name": "rename_contact", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Contact" }, "rule-action": "rename", "value": "contact" },
-    { "rule-type": "transformation", "rule-id": "1021", "rule-name": "rename_contact_business_relation", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Contact Business Relation" }, "rule-action": "rename", "value": "contact_business_relation" },
-    { "rule-type": "transformation", "rule-id": "1022", "rule-name": "rename_co_op_distributor_transaction", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Co-op Distributor Transaction" }, "rule-action": "rename", "value": "co_op_distributor_transaction" },
-    { "rule-type": "transformation", "rule-id": "1023", "rule-name": "rename_cust_ledger_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Cust[_] Ledger Entry" }, "rule-action": "rename", "value": "cust_ledger_entry" },
-    { "rule-type": "transformation", "rule-id": "1024", "rule-name": "rename_customer", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Customer" }, "rule-action": "rename", "value": "customer" },
-    { "rule-type": "transformation", "rule-id": "1025", "rule-name": "rename_customer_grouping", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Customer Grouping" }, "rule-action": "rename", "value": "customer_grouping" },
-    { "rule-type": "transformation", "rule-id": "1026", "rule-name": "rename_default_dimension", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Default Dimension" }, "rule-action": "rename", "value": "default_dimension" },
-    { "rule-type": "transformation", "rule-id": "1027", "rule-name": "rename_delivery_schedule", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Delivery Schedule" }, "rule-action": "rename", "value": "delivery_schedule" },
-    { "rule-type": "transformation", "rule-id": "1028", "rule-name": "rename_detailed_cust_ledg_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Detailed Cust[_] Ledg[_] Entry" }, "rule-action": "rename", "value": "detailed_cust_ledg_entry" },
-    { "rule-type": "transformation", "rule-id": "1029", "rule-name": "rename_detailed_vendor_ledg_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Detailed Vendor Ledg[_] Entry" }, "rule-action": "rename", "value": "detailed_vendor_ledg_entry" },
-    { "rule-type": "transformation", "rule-id": "1030", "rule-name": "rename_dimension_set_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Dimension Set Entry" }, "rule-action": "rename", "value": "dimension_set_entry" },
-    { "rule-type": "transformation", "rule-id": "1031", "rule-name": "rename_dimension_value", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Dimension Value" }, "rule-action": "rename", "value": "dimension_value" },
-    { "rule-type": "transformation", "rule-id": "1032", "rule-name": "rename_employee", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Employee" }, "rule-action": "rename", "value": "employee" },
-    { "rule-type": "transformation", "rule-id": "1033", "rule-name": "rename_fixed_asset", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Fixed Asset" }, "rule-action": "rename", "value": "fixed_asset" },
-    { "rule-type": "transformation", "rule-id": "1034", "rule-name": "rename_g_l_account", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "G[_]L Account" }, "rule-action": "rename", "value": "g_l_account" },
-    { "rule-type": "transformation", "rule-id": "1035", "rule-name": "rename_g_l_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "G[_]L Entry" }, "rule-action": "rename", "value": "g_l_entry" },
-    { "rule-type": "transformation", "rule-id": "1036", "rule-name": "rename_gsf_item_cost", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "GSF Item Cost" }, "rule-action": "rename", "value": "gsf_item_cost" },
-    { "rule-type": "transformation", "rule-id": "1037", "rule-name": "rename_gsf_item_cost_history", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "GSF Item Cost History" }, "rule-action": "rename", "value": "gsf_item_cost_history" },
-    { "rule-type": "transformation", "rule-id": "1038", "rule-name": "rename_gsf_item_usage", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "GSF Item Usage" }, "rule-action": "rename", "value": "gsf_item_usage" },
-    { "rule-type": "transformation", "rule-id": "1039", "rule-name": "rename_gsf_sales_price", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "GSF Sales Price" }, "rule-action": "rename", "value": "gsf_sales_price" },
-    { "rule-type": "transformation", "rule-id": "1040", "rule-name": "rename_item", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item" }, "rule-action": "rename", "value": "item" },
-    { "rule-type": "transformation", "rule-id": "1041", "rule-name": "rename_item_application_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Application Entry" }, "rule-action": "rename", "value": "item_application_entry" },
-    { "rule-type": "transformation", "rule-id": "1042", "rule-name": "rename_item_charge", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Charge" }, "rule-action": "rename", "value": "item_charge" },
-    { "rule-type": "transformation", "rule-id": "1043", "rule-name": "rename_item_cross_reference", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Cross Reference" }, "rule-action": "rename", "value": "item_cross_reference" },
-    { "rule-type": "transformation", "rule-id": "1044", "rule-name": "rename_item_date_range", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Date Range" }, "rule-action": "rename", "value": "item_date_range" },
-    { "rule-type": "transformation", "rule-id": "1045", "rule-name": "rename_item_grouping", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Grouping" }, "rule-action": "rename", "value": "item_grouping" },
-    { "rule-type": "transformation", "rule-id": "1046", "rule-name": "rename_item_history", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item History" }, "rule-action": "rename", "value": "item_history" },
-    { "rule-type": "transformation", "rule-id": "1047", "rule-name": "rename_item_ledger_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Ledger Entry" }, "rule-action": "rename", "value": "item_ledger_entry" },
-    { "rule-type": "transformation", "rule-id": "1048", "rule-name": "rename_item_spec", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Spec" }, "rule-action": "rename", "value": "item_spec" },
-    { "rule-type": "transformation", "rule-id": "1049", "rule-name": "rename_item_unit_of_measure", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Item Unit of Measure" }, "rule-action": "rename", "value": "item_unit_of_measure" },
-    { "rule-type": "transformation", "rule-id": "1050", "rule-name": "rename_location", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Location" }, "rule-action": "rename", "value": "location" },
-    { "rule-type": "transformation", "rule-id": "1051", "rule-name": "rename_lot_no_information", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Lot No[_] Information" }, "rule-action": "rename", "value": "lot_no_information" },
-    { "rule-type": "transformation", "rule-id": "1052", "rule-name": "rename_pallet_bin_content", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Pallet Bin Content" }, "rule-action": "rename", "value": "pallet_bin_content" },
-    { "rule-type": "transformation", "rule-id": "1053", "rule-name": "rename_pallet_movement", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Pallet Movement" }, "rule-action": "rename", "value": "pallet_movement" },
-    { "rule-type": "transformation", "rule-id": "1054", "rule-name": "rename_purch_cr_memo_hdr", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Cr[_] Memo Hdr[_]" }, "rule-action": "rename", "value": "purch_cr_memo_hdr" },
-    { "rule-type": "transformation", "rule-id": "1055", "rule-name": "rename_purch_cr_memo_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Cr[_] Memo Line" }, "rule-action": "rename", "value": "purch_cr_memo_line" },
-    { "rule-type": "transformation", "rule-id": "1056", "rule-name": "rename_purch_inv_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Inv[_] Header" }, "rule-action": "rename", "value": "purch_inv_header" },
-    { "rule-type": "transformation", "rule-id": "1057", "rule-name": "rename_purch_inv_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Inv[_] Line" }, "rule-action": "rename", "value": "purch_inv_line" },
-    { "rule-type": "transformation", "rule-id": "1058", "rule-name": "rename_purch_rcpt_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Rcpt[_] Header" }, "rule-action": "rename", "value": "purch_rcpt_header" },
-    { "rule-type": "transformation", "rule-id": "1059", "rule-name": "rename_purch_rcpt_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purch[_] Rcpt[_] Line" }, "rule-action": "rename", "value": "purch_rcpt_line" },
-    { "rule-type": "transformation", "rule-id": "1060", "rule-name": "rename_purchase_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purchase Header" }, "rule-action": "rename", "value": "purchase_header" },
-    { "rule-type": "transformation", "rule-id": "1061", "rule-name": "rename_purchase_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Purchase Line" }, "rule-action": "rename", "value": "purchase_line" },
-    { "rule-type": "transformation", "rule-id": "1062", "rule-name": "rename_reason_code", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Reason Code" }, "rule-action": "rename", "value": "reason_code" },
-    { "rule-type": "transformation", "rule-id": "1063", "rule-name": "rename_receive_pallet_candidate", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Receive Pallet Candidate" }, "rule-action": "rename", "value": "receive_pallet_candidate" },
-    { "rule-type": "transformation", "rule-id": "1064", "rule-name": "rename_registered_whse_activity_hdr", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Registered Whse[_] Activity Hdr[_]" }, "rule-action": "rename", "value": "registered_whse_activity_hdr" },
-    { "rule-type": "transformation", "rule-id": "1065", "rule-name": "rename_registered_whse_activity_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Registered Whse[_] Activity Line" }, "rule-action": "rename", "value": "registered_whse_activity_line" },
-    { "rule-type": "transformation", "rule-id": "1066", "rule-name": "rename_return_reason", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Return Reason" }, "rule-action": "rename", "value": "return_reason" },
-    { "rule-type": "transformation", "rule-id": "1067", "rule-name": "rename_return_receipt_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Return Receipt Header" }, "rule-action": "rename", "value": "return_receipt_header" },
-    { "rule-type": "transformation", "rule-id": "1068", "rule-name": "rename_return_receipt_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Return Receipt Line" }, "rule-action": "rename", "value": "return_receipt_line" },
-    { "rule-type": "transformation", "rule-id": "1069", "rule-name": "rename_return_shipment_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Return Shipment Header" }, "rule-action": "rename", "value": "return_shipment_header" },
-    { "rule-type": "transformation", "rule-id": "1070", "rule-name": "rename_sales_cr_memo_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Cr[_]Memo Header" }, "rule-action": "rename", "value": "sales_cr_memo_header" },
-    { "rule-type": "transformation", "rule-id": "1071", "rule-name": "rename_sales_cr_memo_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Cr[_]Memo Line" }, "rule-action": "rename", "value": "sales_cr_memo_line" },
-    { "rule-type": "transformation", "rule-id": "1072", "rule-name": "rename_sales_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Header" }, "rule-action": "rename", "value": "sales_header" },
-    { "rule-type": "transformation", "rule-id": "1073", "rule-name": "rename_sales_invoice_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Invoice Header" }, "rule-action": "rename", "value": "sales_invoice_header" },
-    { "rule-type": "transformation", "rule-id": "1074", "rule-name": "rename_sales_invoice_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Invoice Line" }, "rule-action": "rename", "value": "sales_invoice_line" },
-    { "rule-type": "transformation", "rule-id": "1075", "rule-name": "rename_sales_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Line" }, "rule-action": "rename", "value": "sales_line" },
-    { "rule-type": "transformation", "rule-id": "1076", "rule-name": "rename_sales_price", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Price" }, "rule-action": "rename", "value": "sales_price" },
-    { "rule-type": "transformation", "rule-id": "1077", "rule-name": "rename_sales_rebate_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Rebate Header" }, "rule-action": "rename", "value": "sales_rebate_header" },
-    { "rule-type": "transformation", "rule-id": "1078", "rule-name": "rename_sales_rebate_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Rebate Line" }, "rule-action": "rename", "value": "sales_rebate_line" },
-    { "rule-type": "transformation", "rule-id": "1079", "rule-name": "rename_sales_shipment_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Shipment Header" }, "rule-action": "rename", "value": "sales_shipment_header" },
-    { "rule-type": "transformation", "rule-id": "1080", "rule-name": "rename_sales_shipment_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Sales Shipment Line" }, "rule-action": "rename", "value": "sales_shipment_line" },
-    { "rule-type": "transformation", "rule-id": "1081", "rule-name": "rename_salesperson_purchaser", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Salesperson[_]Purchaser" }, "rule-action": "rename", "value": "salesperson_purchaser" },
-    { "rule-type": "transformation", "rule-id": "1082", "rule-name": "rename_short_ship", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Short Ship" }, "rule-action": "rename", "value": "short_ship" },
-    { "rule-type": "transformation", "rule-id": "1083", "rule-name": "rename_state_refund", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "State Refund" }, "rule-action": "rename", "value": "state_refund" },
-    { "rule-type": "transformation", "rule-id": "1084", "rule-name": "rename_stockkeeping_unit", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Stockkeeping Unit" }, "rule-action": "rename", "value": "stockkeeping_unit" },
-    { "rule-type": "transformation", "rule-id": "1085", "rule-name": "rename_storage_fee_ledger_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Storage Fee Ledger Entry" }, "rule-action": "rename", "value": "storage_fee_ledger_entry" },
-    { "rule-type": "transformation", "rule-id": "1086", "rule-name": "rename_tax_detail", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Tax Detail" }, "rule-action": "rename", "value": "tax_detail" },
-    { "rule-type": "transformation", "rule-id": "1087", "rule-name": "rename_transfer_header", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Transfer Header" }, "rule-action": "rename", "value": "transfer_header" },
-    { "rule-type": "transformation", "rule-id": "1088", "rule-name": "rename_transfer_line", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Transfer Line" }, "rule-action": "rename", "value": "transfer_line" },
-    { "rule-type": "transformation", "rule-id": "1089", "rule-name": "rename_user_setup", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "User Setup" }, "rule-action": "rename", "value": "user_setup" },
-    { "rule-type": "transformation", "rule-id": "1090", "rule-name": "rename_value_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Value Entry" }, "rule-action": "rename", "value": "value_entry" },
-    { "rule-type": "transformation", "rule-id": "1091", "rule-name": "rename_vendor", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Vendor" }, "rule-action": "rename", "value": "vendor" },
-    { "rule-type": "transformation", "rule-id": "1092", "rule-name": "rename_vendor_ledger_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Vendor Ledger Entry" }, "rule-action": "rename", "value": "vendor_ledger_entry" },
-    { "rule-type": "transformation", "rule-id": "1093", "rule-name": "rename_warehouse_entry", "rule-target": "table", "object-locator": { "schema-name": "nav", "table-name": "Warehouse Entry" }, "rule-action": "rename", "value": "warehouse_entry" },
-    { "rule-type": "transformation", "rule-id": "9000", "rule-name": "rename_schema_nav_to_dw2_nav", "rule-target": "schema", "object-locator": { "schema-name": "nav" }, "rule-action": "rename", "value": "dw2_nav" }
+    {
+      "rule-type": "transformation",
+      "rule-id": "1001",
+      "rule-name": "rename_acc_schedule_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Acc[_] Schedule Line"
+      },
+      "rule-action": "rename",
+      "value": "acc_schedule_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1002",
+      "rule-name": "rename_accounting_period",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Accounting Period"
+      },
+      "rule-action": "rename",
+      "value": "accounting_period"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1003",
+      "rule-name": "rename_appointment_schedule",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Appointment Schedule"
+      },
+      "rule-action": "rename",
+      "value": "appointment_schedule"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1004",
+      "rule-name": "rename_bank_account",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Bank Account" },
+      "rule-action": "rename",
+      "value": "bank_account"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1005",
+      "rule-name": "rename_bid_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Bid Header" },
+      "rule-action": "rename",
+      "value": "bid_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1006",
+      "rule-name": "rename_bid_line",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Bid Line" },
+      "rule-action": "rename",
+      "value": "bid_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1007",
+      "rule-name": "rename_bin",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Bin" },
+      "rule-action": "rename",
+      "value": "bin"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1008",
+      "rule-name": "rename_bin_content",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Bin Content" },
+      "rule-action": "rename",
+      "value": "bin_content"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1009",
+      "rule-name": "rename_bin_type",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Bin Type" },
+      "rule-action": "rename",
+      "value": "bin_type"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1010",
+      "rule-name": "rename_campaign",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Campaign" },
+      "rule-action": "rename",
+      "value": "campaign"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1011",
+      "rule-name": "rename_campaign_target_group",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Campaign Target Group"
+      },
+      "rule-action": "rename",
+      "value": "campaign_target_group"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1012",
+      "rule-name": "rename_change_log_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Change Log Entry"
+      },
+      "rule-action": "rename",
+      "value": "change_log_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1013",
+      "rule-name": "rename_change_log_entry_full_history",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Change Log Entry (Full History)"
+      },
+      "rule-action": "rename",
+      "value": "change_log_entry_full_history"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1014",
+      "rule-name": "rename_commodity_amt_limit",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity AMT Limit"
+      },
+      "rule-action": "rename",
+      "value": "commodity_amt_limit"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1015",
+      "rule-name": "rename_commodity_component",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Component"
+      },
+      "rule-action": "rename",
+      "value": "commodity_component"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1016",
+      "rule-name": "rename_commodity_lb_limit",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity LB Limit"
+      },
+      "rule-action": "rename",
+      "value": "commodity_lb_limit"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1017",
+      "rule-name": "rename_commodity_ledger_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Ledger Entry"
+      },
+      "rule-action": "rename",
+      "value": "commodity_ledger_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1018",
+      "rule-name": "rename_commodity_manufacturer",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Manufacturer"
+      },
+      "rule-action": "rename",
+      "value": "commodity_manufacturer"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1019",
+      "rule-name": "rename_commodity_opt_out",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Commodity Opt Out"
+      },
+      "rule-action": "rename",
+      "value": "commodity_opt_out"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1020",
+      "rule-name": "rename_contact",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Contact" },
+      "rule-action": "rename",
+      "value": "contact"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1021",
+      "rule-name": "rename_contact_business_relation",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Contact Business Relation"
+      },
+      "rule-action": "rename",
+      "value": "contact_business_relation"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1022",
+      "rule-name": "rename_co_op_distributor_transaction",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Co-op Distributor Transaction"
+      },
+      "rule-action": "rename",
+      "value": "co_op_distributor_transaction"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1023",
+      "rule-name": "rename_cust_ledger_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Cust[_] Ledger Entry"
+      },
+      "rule-action": "rename",
+      "value": "cust_ledger_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1024",
+      "rule-name": "rename_customer",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Customer" },
+      "rule-action": "rename",
+      "value": "customer"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1025",
+      "rule-name": "rename_customer_grouping",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Customer Grouping"
+      },
+      "rule-action": "rename",
+      "value": "customer_grouping"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1026",
+      "rule-name": "rename_default_dimension",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Default Dimension"
+      },
+      "rule-action": "rename",
+      "value": "default_dimension"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1027",
+      "rule-name": "rename_delivery_schedule",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Delivery Schedule"
+      },
+      "rule-action": "rename",
+      "value": "delivery_schedule"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1028",
+      "rule-name": "rename_detailed_cust_ledg_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Detailed Cust[_] Ledg[_] Entry"
+      },
+      "rule-action": "rename",
+      "value": "detailed_cust_ledg_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1029",
+      "rule-name": "rename_detailed_vendor_ledg_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Detailed Vendor Ledg[_] Entry"
+      },
+      "rule-action": "rename",
+      "value": "detailed_vendor_ledg_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1030",
+      "rule-name": "rename_dimension_set_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Dimension Set Entry"
+      },
+      "rule-action": "rename",
+      "value": "dimension_set_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1031",
+      "rule-name": "rename_dimension_value",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Dimension Value"
+      },
+      "rule-action": "rename",
+      "value": "dimension_value"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1032",
+      "rule-name": "rename_employee",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Employee" },
+      "rule-action": "rename",
+      "value": "employee"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1033",
+      "rule-name": "rename_fixed_asset",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Fixed Asset" },
+      "rule-action": "rename",
+      "value": "fixed_asset"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1034",
+      "rule-name": "rename_g_l_account",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "G[_]L Account" },
+      "rule-action": "rename",
+      "value": "g_l_account"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1035",
+      "rule-name": "rename_g_l_entry",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "G[_]L Entry" },
+      "rule-action": "rename",
+      "value": "g_l_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1036",
+      "rule-name": "rename_gsf_item_cost",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "GSF Item Cost" },
+      "rule-action": "rename",
+      "value": "gsf_item_cost"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1037",
+      "rule-name": "rename_gsf_item_cost_history",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "GSF Item Cost History"
+      },
+      "rule-action": "rename",
+      "value": "gsf_item_cost_history"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1038",
+      "rule-name": "rename_gsf_item_usage",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "GSF Item Usage"
+      },
+      "rule-action": "rename",
+      "value": "gsf_item_usage"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1039",
+      "rule-name": "rename_gsf_sales_price",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "GSF Sales Price"
+      },
+      "rule-action": "rename",
+      "value": "gsf_sales_price"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1040",
+      "rule-name": "rename_item",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Item" },
+      "rule-action": "rename",
+      "value": "item"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1041",
+      "rule-name": "rename_item_application_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Application Entry"
+      },
+      "rule-action": "rename",
+      "value": "item_application_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1042",
+      "rule-name": "rename_item_charge",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Item Charge" },
+      "rule-action": "rename",
+      "value": "item_charge"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1043",
+      "rule-name": "rename_item_cross_reference",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Cross Reference"
+      },
+      "rule-action": "rename",
+      "value": "item_cross_reference"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1044",
+      "rule-name": "rename_item_date_range",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Date Range"
+      },
+      "rule-action": "rename",
+      "value": "item_date_range"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1045",
+      "rule-name": "rename_item_grouping",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Item Grouping" },
+      "rule-action": "rename",
+      "value": "item_grouping"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1046",
+      "rule-name": "rename_item_history",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Item History" },
+      "rule-action": "rename",
+      "value": "item_history"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1047",
+      "rule-name": "rename_item_ledger_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Ledger Entry"
+      },
+      "rule-action": "rename",
+      "value": "item_ledger_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1048",
+      "rule-name": "rename_item_spec",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Item Spec" },
+      "rule-action": "rename",
+      "value": "item_spec"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1049",
+      "rule-name": "rename_item_unit_of_measure",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Item Unit of Measure"
+      },
+      "rule-action": "rename",
+      "value": "item_unit_of_measure"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1050",
+      "rule-name": "rename_location",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Location" },
+      "rule-action": "rename",
+      "value": "location"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1051",
+      "rule-name": "rename_lot_no_information",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Lot No[_] Information"
+      },
+      "rule-action": "rename",
+      "value": "lot_no_information"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1052",
+      "rule-name": "rename_pallet_bin_content",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Pallet Bin Content"
+      },
+      "rule-action": "rename",
+      "value": "pallet_bin_content"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1053",
+      "rule-name": "rename_pallet_movement",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Pallet Movement"
+      },
+      "rule-action": "rename",
+      "value": "pallet_movement"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1054",
+      "rule-name": "rename_purch_cr_memo_hdr",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Cr[_] Memo Hdr[_]"
+      },
+      "rule-action": "rename",
+      "value": "purch_cr_memo_hdr"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1055",
+      "rule-name": "rename_purch_cr_memo_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Cr[_] Memo Line"
+      },
+      "rule-action": "rename",
+      "value": "purch_cr_memo_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1056",
+      "rule-name": "rename_purch_inv_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Inv[_] Header"
+      },
+      "rule-action": "rename",
+      "value": "purch_inv_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1057",
+      "rule-name": "rename_purch_inv_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Inv[_] Line"
+      },
+      "rule-action": "rename",
+      "value": "purch_inv_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1058",
+      "rule-name": "rename_purch_rcpt_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Rcpt[_] Header"
+      },
+      "rule-action": "rename",
+      "value": "purch_rcpt_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1059",
+      "rule-name": "rename_purch_rcpt_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purch[_] Rcpt[_] Line"
+      },
+      "rule-action": "rename",
+      "value": "purch_rcpt_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1060",
+      "rule-name": "rename_purchase_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Purchase Header"
+      },
+      "rule-action": "rename",
+      "value": "purchase_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1061",
+      "rule-name": "rename_purchase_line",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Purchase Line" },
+      "rule-action": "rename",
+      "value": "purchase_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1062",
+      "rule-name": "rename_reason_code",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Reason Code" },
+      "rule-action": "rename",
+      "value": "reason_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1063",
+      "rule-name": "rename_receive_pallet_candidate",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Receive Pallet Candidate"
+      },
+      "rule-action": "rename",
+      "value": "receive_pallet_candidate"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1064",
+      "rule-name": "rename_registered_whse_activity_hdr",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Registered Whse[_] Activity Hdr[_]"
+      },
+      "rule-action": "rename",
+      "value": "registered_whse_activity_hdr"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1065",
+      "rule-name": "rename_registered_whse_activity_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Registered Whse[_] Activity Line"
+      },
+      "rule-action": "rename",
+      "value": "registered_whse_activity_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1066",
+      "rule-name": "rename_return_reason",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Return Reason" },
+      "rule-action": "rename",
+      "value": "return_reason"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1067",
+      "rule-name": "rename_return_receipt_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Return Receipt Header"
+      },
+      "rule-action": "rename",
+      "value": "return_receipt_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1068",
+      "rule-name": "rename_return_receipt_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Return Receipt Line"
+      },
+      "rule-action": "rename",
+      "value": "return_receipt_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1069",
+      "rule-name": "rename_return_shipment_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Return Shipment Header"
+      },
+      "rule-action": "rename",
+      "value": "return_shipment_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1070",
+      "rule-name": "rename_sales_cr_memo_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Cr[_]Memo Header"
+      },
+      "rule-action": "rename",
+      "value": "sales_cr_memo_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1071",
+      "rule-name": "rename_sales_cr_memo_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Cr[_]Memo Line"
+      },
+      "rule-action": "rename",
+      "value": "sales_cr_memo_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1072",
+      "rule-name": "rename_sales_header",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Sales Header" },
+      "rule-action": "rename",
+      "value": "sales_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1073",
+      "rule-name": "rename_sales_invoice_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Invoice Header"
+      },
+      "rule-action": "rename",
+      "value": "sales_invoice_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1074",
+      "rule-name": "rename_sales_invoice_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Invoice Line"
+      },
+      "rule-action": "rename",
+      "value": "sales_invoice_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1075",
+      "rule-name": "rename_sales_line",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Sales Line" },
+      "rule-action": "rename",
+      "value": "sales_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1076",
+      "rule-name": "rename_sales_price",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Sales Price" },
+      "rule-action": "rename",
+      "value": "sales_price"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1077",
+      "rule-name": "rename_sales_rebate_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Rebate Header"
+      },
+      "rule-action": "rename",
+      "value": "sales_rebate_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1078",
+      "rule-name": "rename_sales_rebate_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Rebate Line"
+      },
+      "rule-action": "rename",
+      "value": "sales_rebate_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1079",
+      "rule-name": "rename_sales_shipment_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Shipment Header"
+      },
+      "rule-action": "rename",
+      "value": "sales_shipment_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1080",
+      "rule-name": "rename_sales_shipment_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Sales Shipment Line"
+      },
+      "rule-action": "rename",
+      "value": "sales_shipment_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1081",
+      "rule-name": "rename_salesperson_purchaser",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Salesperson[_]Purchaser"
+      },
+      "rule-action": "rename",
+      "value": "salesperson_purchaser"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1082",
+      "rule-name": "rename_short_ship",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Short Ship" },
+      "rule-action": "rename",
+      "value": "short_ship"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1083",
+      "rule-name": "rename_state_refund",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "State Refund" },
+      "rule-action": "rename",
+      "value": "state_refund"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1084",
+      "rule-name": "rename_stockkeeping_unit",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Stockkeeping Unit"
+      },
+      "rule-action": "rename",
+      "value": "stockkeeping_unit"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1085",
+      "rule-name": "rename_storage_fee_ledger_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Storage Fee Ledger Entry"
+      },
+      "rule-action": "rename",
+      "value": "storage_fee_ledger_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1086",
+      "rule-name": "rename_tax_detail",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Tax Detail" },
+      "rule-action": "rename",
+      "value": "tax_detail"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1087",
+      "rule-name": "rename_transfer_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Transfer Header"
+      },
+      "rule-action": "rename",
+      "value": "transfer_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1088",
+      "rule-name": "rename_transfer_line",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Transfer Line" },
+      "rule-action": "rename",
+      "value": "transfer_line"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1089",
+      "rule-name": "rename_user_setup",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "User Setup" },
+      "rule-action": "rename",
+      "value": "user_setup"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1090",
+      "rule-name": "rename_value_entry",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Value Entry" },
+      "rule-action": "rename",
+      "value": "value_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1091",
+      "rule-name": "rename_vendor",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Vendor" },
+      "rule-action": "rename",
+      "value": "vendor"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1092",
+      "rule-name": "rename_vendor_ledger_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Vendor Ledger Entry"
+      },
+      "rule-action": "rename",
+      "value": "vendor_ledger_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1093",
+      "rule-name": "rename_warehouse_entry",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "nav",
+        "table-name": "Warehouse Entry"
+      },
+      "rule-action": "rename",
+      "value": "warehouse_entry"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1094",
+      "rule-name": "rename_completed_bid",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "nav", "table-name": "Completed Bid" },
+      "rule-action": "rename",
+      "value": "completed_bid"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "9000",
+      "rule-name": "rename_schema_nav_to_dw2_nav",
+      "rule-target": "schema",
+      "object-locator": { "schema-name": "nav" },
+      "rule-action": "rename",
+      "value": "dw2_nav"
+    }
   ]
 }

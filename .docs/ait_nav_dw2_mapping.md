@@ -8,7 +8,7 @@
 **Database:** ait_db  
 **Schema:** dw2_nav  
 **Source:** Microsoft Dynamics NAV Data Warehouse (DW2.nav)  
-**Total Tables:** 59
+**Total Tables:** 60
 
 ---
 
@@ -38,8 +38,8 @@ This schema represents the PostgreSQL conversion of Gold Star Foods' Microsoft D
 
 | Metric                   | Value |
 | ------------------------ | ----- |
-| Total Tables             | 59    |
-| Total Columns            | 1956  |
+| Total Tables             | 60    |
+| Total Columns            | 1963  |
 | Business Domains         | 11    |
 | Tables with Composite PK | 27    |
 
@@ -2766,6 +2766,22 @@ The following NAV naming patterns are preserved:
 | 145 | `freight_amount`               | `decimal`       |     | decimal          |
 | 146 | `usda_quote_no_`               | `text`          |     | nvarchar(10)     |
 | 147 | `usda_po_no_`                  | `text`          |     | nvarchar(20)     |
+
+### completed_bid
+
+**Original NAV Table:** `Completed Bid`
+**Columns:** 7
+**Primary Key:** `(source_db, sales_code, customer_bid_no)`
+
+| #   | Column Name        | PostgreSQL Type | PK  | Original MS SQL |
+| --- | ------------------ | --------------- | --- | --------------- |
+| 1   | `source_db`        | `text`          | ✓   | nvarchar(20)    |
+| 2   | `hash`             | `text`          |     | nvarchar(66)    |
+| 3   | `sales_type`       | `integer`       |     | int             |
+| 4   | `sales_code`       | `text`          | ✓   | nvarchar(20)    |
+| 5   | `customer_bid_no_` | `text`          | ✓   | nvarchar(20)    |
+| 6   | `data_inserted`    | `text`          |     | nvarchar(20)    |
+| 7   | `user_name`        | `text`          |     | nvarchar(50)    |
 
 ---
 

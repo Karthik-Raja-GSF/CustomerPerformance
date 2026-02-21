@@ -15,7 +15,7 @@ datasource db {
 }
 
 // ============================================
-// DW2_NAV SCHEMA - NAV Data Warehouse Tables (14 models)
+// DW2_NAV SCHEMA - NAV Data Warehouse Tables (15 models)
 // ============================================
 // READ-ONLY external tables - Prisma won't manage migrations
 // Source: Microsoft Dynamics NAV Data Warehouse (DW2.nav)
@@ -1023,6 +1023,20 @@ model SalesLine {
 
   @@id([sourceDb, documentType, documentNo, lineNo])
   @@map("sales_line")
+  @@schema("dw2_nav")
+}
+
+model CompletedBid {
+  sourceDb      String  @map("source_db")
+  hash          String?
+  salesType     Int?    @map("sales_type")
+  salesCode     String  @map("sales_code")
+  customerBidNo String  @map("customer_bid_no_")
+  dataInserted  String? @map("data_inserted")
+  userName      String? @map("user_name")
+
+  @@id([sourceDb, salesCode, customerBidNo])
+  @@map("completed_bid")
   @@schema("dw2_nav")
 }
 
