@@ -1,0 +1,505 @@
+openapi: "3.0.3"
+info:
+  title: Bid Exports API
+  description: |
+    API for managing customer bid export queues and webhook-based nightly exports.
+
+    ## Authentication
+    All endpoints require a Cognito ID token in the `Authorization` header:
+    ```
+    Authorization: Bearer <cognito_id_token>
+    ```
+
+    ## Webhook Integration Flow
+    ```
+    1. GET  /bid-exports/webhook/siq              → { runId, data }
+    2. [external system processes data]
+    3. POST /bid-exports/webhook/siq/{runId}/complete  → { runId, totalExported }
+    ```
+    The GET is idempotent — calling it again before completing returns the same run.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8887
+    description: Local development
+  - url: https://api.example.com
+    description: Production (replace with actual URL)
+
+tags:
+  - name: Webhook
+    description: Nightly export endpoints for external system integration
+  - name: Queue
+    description: Queue management for bid export items
+  - name: History
+    description: Export run history and audit trail
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─── Webhook Endpoints ─────────────────────────────────────
+
+  /bid-exports/webhook/siq:
+    get:
+      tags: [Webhook]
+      summary: Prepare webhook export
+      description: |
+        Returns all QUEUED SIQ bid items with a `runId`.
+
+        **Idempotent**: If an IN_PROGRESS webhook run already exists, returns that same run
+        and its associated data instead of creating a new one.
+
+        Returns `runId: null` with empty data if no items are queued.
+      operationId: prepareWebhookExport
+      responses:
+        "200":
+          description: Queued bid data with run ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_WebhookExportResult"
+              example:
+                status: success
+                data:
+                  runId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  data:
+                    - sourceDb: "NAV"
+                      itemCode: "ITEM-001"
+                      siteCode: "SITE-A"
+                      customerBillToCode: "CUST-123"
+                      schoolYear: "2026-2027"
+                      customerName: "Acme Corp"
+                      estimates:
+                        jan: 150
+                        feb: 200
+                        mar: 0
+                        apr: null
+                        may: 100
+                        jun: null
+                        jul: null
+                        aug: 50
+                        sep: 75
+                        oct: 0
+                        nov: null
+                        dec: null
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bid-exports/webhook/siq/{runId}/complete:
+    post:
+      tags: [Webhook]
+      summary: Confirm webhook export success
+      description: |
+        Called by the external system after successfully processing the data from the GET endpoint.
+        Marks all QUEUED items for this run as EXPORTED and updates export tracking on bid records.
+
+        The run must be IN_PROGRESS — returns an error if the run is already COMPLETED or not found.
+      operationId: completeWebhookExport
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          description: The run ID returned by the GET endpoint
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Export confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_WebhookCompleteResult"
+              example:
+                status: success
+                data:
+                  runId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  totalExported: 42
+        "400":
+          description: Invalid runId or run not IN_PROGRESS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Queue Management ──────────────────────────────────────
+
+  /bid-exports/queue-by-keys:
+    post:
+      tags: [Queue]
+      summary: Queue items by composite keys
+      description: Queue specific bid items for SIQ export using their composite keys.
+      operationId: queueBidExportByKeys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueueByKeysRequest"
+            example:
+              exportType: "SIQ"
+              keys:
+                - sourceDb: "NAV"
+                  siteCode: "SITE-A"
+                  customerBillTo: "CUST-123"
+                  itemNo: "ITEM-001"
+                  schoolYear: "2026-2027"
+      responses:
+        "201":
+          description: Items queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_QueueResult"
+              example:
+                status: success
+                data:
+                  itemsQueued: 1
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bid-exports/queue-summary:
+    get:
+      tags: [Queue]
+      summary: Get queue counts
+      description: Returns the count of QUEUED items by export type.
+      operationId: getQueueSummary
+      responses:
+        "200":
+          description: Queue summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_QueueSummary"
+              example:
+                status: success
+                data:
+                  csv: 0
+                  siq: 42
+                  total: 42
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bid-exports/cancel:
+    post:
+      tags: [Queue]
+      summary: Cancel all queued items
+      description: Cancel all QUEUED items, optionally filtered by export type.
+      operationId: cancelQueuedExports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exportType:
+                  $ref: "#/components/schemas/BidExportType"
+      responses:
+        "200":
+          description: Items cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      cancelled:
+                        type: integer
+                        example: 42
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── History ────────────────────────────────────────────────
+
+  /bid-exports/runs:
+    get:
+      tags: [History]
+      summary: Get export run history
+      description: Returns recent export runs (most recent first). Includes both manual and webhook-triggered runs.
+      operationId: getBidExportRuns
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Max number of runs to return (1–100, default 20)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Export run history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BidExportRuns"
+              example:
+                status: success
+                data:
+                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    status: "COMPLETED"
+                    exportType: "SIQ"
+                    triggeredBy: "webhook"
+                    totalRecords: 42
+                    startedAt: "2026-02-22T03:00:00.000Z"
+                    completedAt: "2026-02-22T03:00:01.234Z"
+                    durationMs: 1234
+                    errorMessage: null
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito ID token
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            status: error
+            message: "Unauthorized"
+
+  schemas:
+    # ─── Enums ────────────────────────────────────────────────
+
+    BidExportType:
+      type: string
+      enum: [CSV, SIQ]
+
+    BidExportRunStatus:
+      type: string
+      enum: [IN_PROGRESS, COMPLETED, FAILED]
+
+    # ─── Webhook Schemas ──────────────────────────────────────
+
+    WebhookEstimates:
+      type: object
+      description: Monthly demand estimates (null = no estimate)
+      properties:
+        jan: { type: number, nullable: true }
+        feb: { type: number, nullable: true }
+        mar: { type: number, nullable: true }
+        apr: { type: number, nullable: true }
+        may: { type: number, nullable: true }
+        jun: { type: number, nullable: true }
+        jul: { type: number, nullable: true }
+        aug: { type: number, nullable: true }
+        sep: { type: number, nullable: true }
+        oct: { type: number, nullable: true }
+        nov: { type: number, nullable: true }
+        dec: { type: number, nullable: true }
+
+    WebhookBidRow:
+      type: object
+      required: [itemCode, schoolYear, estimates]
+      properties:
+        sourceDb:
+          type: string
+          nullable: true
+          example: "NAV"
+        itemCode:
+          type: string
+          example: "ITEM-001"
+        siteCode:
+          type: string
+          nullable: true
+          example: "SITE-A"
+        customerBillToCode:
+          type: string
+          nullable: true
+          example: "CUST-123"
+        schoolYear:
+          type: string
+          example: "2026-2027"
+        customerName:
+          type: string
+          nullable: true
+          example: "Acme Corp"
+        estimates:
+          $ref: "#/components/schemas/WebhookEstimates"
+
+    WebhookExportResult:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+          nullable: true
+          description: "null when no items are queued"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookBidRow"
+
+    WebhookCompleteResult:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        totalExported:
+          type: integer
+
+    # ─── Queue Schemas ────────────────────────────────────────
+
+    BidCompositeKey:
+      type: object
+      required: [sourceDb, siteCode, customerBillTo, itemNo, schoolYear]
+      properties:
+        sourceDb:
+          type: string
+          example: "NAV"
+        siteCode:
+          type: string
+          example: "SITE-A"
+        customerBillTo:
+          type: string
+          example: "CUST-123"
+        itemNo:
+          type: string
+          example: "ITEM-001"
+        schoolYear:
+          type: string
+          example: "2026-2027"
+
+    QueueByKeysRequest:
+      type: object
+      required: [exportType, keys]
+      properties:
+        exportType:
+          $ref: "#/components/schemas/BidExportType"
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/BidCompositeKey"
+          minItems: 1
+          maxItems: 5000
+
+    QueueResult:
+      type: object
+      properties:
+        itemsQueued:
+          type: integer
+
+    QueueSummary:
+      type: object
+      properties:
+        csv:
+          type: integer
+        siq:
+          type: integer
+        total:
+          type: integer
+
+    # ─── History Schemas ──────────────────────────────────────
+
+    BidExportRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/BidExportRunStatus"
+        exportType:
+          $ref: "#/components/schemas/BidExportType"
+        triggeredBy:
+          type: string
+          description: "'manual' for UI exports, 'webhook' for nightly exports"
+          example: "webhook"
+        totalRecords:
+          type: integer
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+
+    # ─── Wrapper Schemas ──────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+
+    ApiResponse_WebhookExportResult:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          $ref: "#/components/schemas/WebhookExportResult"
+
+    ApiResponse_WebhookCompleteResult:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          $ref: "#/components/schemas/WebhookCompleteResult"
+
+    ApiResponse_QueueResult:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          $ref: "#/components/schemas/QueueResult"
+
+    ApiResponse_QueueSummary:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          $ref: "#/components/schemas/QueueSummary"
+
+    ApiResponse_BidExportRuns:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BidExportRun"

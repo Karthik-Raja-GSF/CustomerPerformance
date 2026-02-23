@@ -357,4 +357,60 @@ router.get(
   }
 );
 
+/**
+ * GET /bid-exports/webhook/siq
+ * Prepare a webhook export — returns all QUEUED SIQ items with a runId.
+ * Idempotent: returns existing IN_PROGRESS run if one exists.
+ */
+router.get(
+  "/webhook/siq",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const service = container.resolve<IBidExportService>(
+        BID_EXPORT_SERVICE_TOKEN
+      );
+      const userEmail = req.user?.email || "unknown";
+      const result = await service.prepareWebhookExport(userEmail);
+
+      res.json({ status: "success", data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /bid-exports/webhook/siq/:runId/complete
+ * Confirm a webhook export was successfully processed.
+ * Marks items as EXPORTED and the run as COMPLETED.
+ */
+router.post(
+  "/webhook/siq/:runId/complete",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { runId } = req.params;
+
+      if (!runId) {
+        res.status(400).json({
+          status: "error",
+          message: "runId is required",
+        });
+        return;
+      }
+
+      const service = container.resolve<IBidExportService>(
+        BID_EXPORT_SERVICE_TOKEN
+      );
+      const userEmail = req.user?.email || "unknown";
+      const result = await service.completeWebhookExport(runId, userEmail);
+
+      res.json({ status: "success", data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

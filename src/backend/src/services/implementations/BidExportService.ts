@@ -14,6 +14,9 @@ import {
   BidExportProcessResultDto,
   BidExportType,
   BidExportRunStatus,
+  WebhookExportResultDto,
+  WebhookCompleteResultDto,
+  WebhookBidRowDto,
 } from "@/contracts/dtos/bid-export.dto";
 import { CustomerBidDto } from "@/contracts/dtos/customer-bid.dto";
 import { createChildLogger } from "@/telemetry/logger";
@@ -32,6 +35,7 @@ const logger = createChildLogger("bid-export");
 interface QueuedBidRow {
   sourceDb: string | null;
   siteCode: string | null;
+  schoolYear: string;
   customerName: string | null;
   customerBillTo: string | null;
   coOpCode: string | null;
@@ -521,6 +525,172 @@ export class BidExportService implements IBidExportService {
     return totalCleared;
   }
 
+  async prepareWebhookExport(
+    userEmail: string
+  ): Promise<WebhookExportResultDto> {
+    logger.info(
+      { event: "bid-export.webhook.prepare.start", userEmail },
+      "Preparing webhook export for SIQ"
+    );
+
+    // Check for an existing IN_PROGRESS SIQ run (idempotent)
+    const existingRun = await this.prisma.customerBidExportRun.findFirst({
+      where: {
+        status: "IN_PROGRESS",
+        exportType: "SIQ",
+        triggeredBy: "webhook",
+      },
+      orderBy: { startedAt: "desc" },
+    });
+
+    if (existingRun) {
+      logger.info(
+        { event: "bid-export.webhook.prepare.existing", runId: existingRun.id },
+        "Returning existing IN_PROGRESS webhook run"
+      );
+
+      // Fetch data for items already associated with this run
+      const rows = await this.getQueuedBidRows(
+        "SIQ",
+        undefined,
+        existingRun.id
+      );
+      const data = rows.map((row) => this.mapToWebhookRow(row));
+
+      return { runId: existingRun.id, data };
+    }
+
+    // No existing run — create a new one atomically
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Fetch all QUEUED SIQ items
+      const rows = await this.getQueuedBidRows("SIQ", tx);
+
+      if (rows.length === 0) {
+        return { runId: null, data: [] as WebhookBidRowDto[] };
+      }
+
+      // Create an IN_PROGRESS run
+      const run = await tx.customerBidExportRun.create({
+        data: {
+          exportType: "SIQ",
+          triggeredBy: "webhook",
+          status: "IN_PROGRESS",
+        },
+      });
+
+      // Associate all QUEUED SIQ items with this run (keep status QUEUED)
+      await tx.customerBidExportItem.updateMany({
+        where: {
+          status: "QUEUED",
+          exportType: "SIQ",
+        },
+        data: {
+          runId: run.id,
+        },
+      });
+
+      const data = rows.map((row) => this.mapToWebhookRow(row));
+      return { runId: run.id, data };
+    });
+
+    logger.info(
+      {
+        event: "bid-export.webhook.prepare.complete",
+        runId: result.runId,
+        totalItems: result.data.length,
+      },
+      `Prepared webhook export with ${result.data.length} items`
+    );
+
+    return result;
+  }
+
+  async completeWebhookExport(
+    runId: string,
+    userEmail: string
+  ): Promise<WebhookCompleteResultDto> {
+    const startTime = Date.now();
+
+    logger.info(
+      { event: "bid-export.webhook.complete.start", runId, userEmail },
+      "Completing webhook export"
+    );
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Verify run exists and is IN_PROGRESS
+      const run = await tx.customerBidExportRun.findUnique({
+        where: { id: runId },
+      });
+
+      if (!run) {
+        throw new Error(`Export run not found: ${runId}`);
+      }
+
+      if (run.status !== "IN_PROGRESS") {
+        throw new Error(
+          `Export run ${runId} is not IN_PROGRESS (current status: ${run.status})`
+        );
+      }
+
+      // Find all QUEUED items for this run
+      const queuedItems = await tx.customerBidExportItem.findMany({
+        where: {
+          runId,
+          status: "QUEUED",
+        },
+        select: {
+          sourceDb: true,
+          siteCode: true,
+          customerBillTo: true,
+          itemNo: true,
+          schoolYear: true,
+        },
+      });
+
+      // Mark QUEUED → EXPORTED for this run
+      await tx.customerBidExportItem.updateMany({
+        where: {
+          runId,
+          status: "QUEUED",
+        },
+        data: {
+          status: "EXPORTED",
+        },
+      });
+
+      // Update lastExportedAt/By on CustomerBidData
+      if (queuedItems.length > 0) {
+        await this.updateBidDataExportTracking(tx, queuedItems, userEmail);
+      }
+
+      // Mark run COMPLETED
+      const durationMs = Date.now() - startTime;
+      await tx.customerBidExportRun.update({
+        where: { id: runId },
+        data: {
+          status: "COMPLETED",
+          totalRecords: queuedItems.length,
+          completedAt: new Date(),
+          durationMs,
+        },
+      });
+
+      return { runId, totalExported: queuedItems.length };
+    });
+
+    logger.info(
+      {
+        event: "bid-export.webhook.complete.done",
+        runId: result.runId,
+        totalExported: result.totalExported,
+        durationMs: Date.now() - startTime,
+      },
+      `Webhook export completed: ${result.totalExported} items exported`
+    );
+
+    return result;
+  }
+
   async processPendingExports(): Promise<BidExportProcessResultDto> {
     // Infrastructure placeholder — the nightly push action (API/FTP) is TBD.
     // When enabled via BID_EXPORT_PROCESS_CRON, this method will be called
@@ -539,13 +709,18 @@ export class BidExportService implements IBidExportService {
    */
   private async getQueuedBidRows(
     exportType: BidExportType,
-    client?: Prisma.TransactionClient
+    client?: Prisma.TransactionClient,
+    runId?: string
   ): Promise<QueuedBidRow[]> {
     const db = client ?? this.prisma;
+    const runFilter = runId
+      ? Prisma.sql`AND ei.run_id = ${runId}::uuid`
+      : Prisma.empty;
     return db.$queryRaw<QueuedBidRow[]>(Prisma.sql`
       SELECT DISTINCT
           cbd.source_db AS "sourceDb",
           cbd.site_code AS "siteCode",
+          cbd.school_year AS "schoolYear",
           c."name" AS "customerName",
           cbd.customer_bill_to AS "customerBillTo",
           c.co_op_code AS "coOpCode",
@@ -601,6 +776,7 @@ export class BidExportService implements IBidExportService {
           AND cbd.source_db = i.source_db
       WHERE ei.status = 'QUEUED'
         AND ei.export_type = ${exportType}::"ait"."BidExportType"
+        ${runFilter}
       ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
     `);
   }
@@ -723,6 +899,34 @@ export class BidExportService implements IBidExportService {
       lastExportedBy: row.lastExportedBy ?? null,
       yearAround: row.yearAround ?? false,
       ...mapEstimates(row),
+    };
+  }
+
+  /**
+   * Map a raw query row to the webhook bid row format with nested estimates
+   */
+  private mapToWebhookRow(row: QueuedBidRow): WebhookBidRowDto {
+    return {
+      sourceDb: row.sourceDb,
+      itemCode: row.itemNo,
+      siteCode: row.siteCode,
+      customerBillToCode: row.customerBillTo,
+      schoolYear: row.schoolYear,
+      customerName: row.customerName,
+      estimates: {
+        jan: decimalToNumber(row.estimateJan),
+        feb: decimalToNumber(row.estimateFeb),
+        mar: decimalToNumber(row.estimateMar),
+        apr: decimalToNumber(row.estimateApr),
+        may: decimalToNumber(row.estimateMay),
+        jun: decimalToNumber(row.estimateJun),
+        jul: decimalToNumber(row.estimateJul),
+        aug: decimalToNumber(row.estimateAug),
+        sep: decimalToNumber(row.estimateSep),
+        oct: decimalToNumber(row.estimateOct),
+        nov: decimalToNumber(row.estimateNov),
+        dec: decimalToNumber(row.estimateDec),
+      },
     };
   }
 }

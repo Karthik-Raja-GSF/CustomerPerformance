@@ -125,3 +125,51 @@ export interface BidExportProcessResultDto {
   totalProcessed: number;
   failed: number;
 }
+
+/**
+ * Monthly estimates grouped in a nested object
+ */
+export interface WebhookEstimatesDto {
+  jan: number | null;
+  feb: number | null;
+  mar: number | null;
+  apr: number | null;
+  may: number | null;
+  jun: number | null;
+  jul: number | null;
+  aug: number | null;
+  sep: number | null;
+  oct: number | null;
+  nov: number | null;
+  dec: number | null;
+}
+
+/**
+ * Single bid row returned by the webhook GET endpoint.
+ * Uses composite key fields + nested estimates.
+ */
+export interface WebhookBidRowDto {
+  sourceDb: string | null;
+  itemCode: string;
+  siteCode: string | null;
+  customerBillToCode: string | null;
+  schoolYear: string;
+  customerName: string | null;
+  estimates: WebhookEstimatesDto;
+}
+
+/**
+ * Response for GET /webhook/siq — prepare export and return bid data
+ */
+export interface WebhookExportResultDto {
+  runId: string | null;
+  data: WebhookBidRowDto[];
+}
+
+/**
+ * Response for POST /webhook/siq/:runId/complete — confirm export success
+ */
+export interface WebhookCompleteResultDto {
+  runId: string;
+  totalExported: number;
+}

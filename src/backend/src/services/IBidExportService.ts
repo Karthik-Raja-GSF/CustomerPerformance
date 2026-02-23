@@ -10,6 +10,8 @@ import {
   QueueSummaryDto,
   BidExportProcessResultDto,
   BidExportType,
+  WebhookExportResultDto,
+  WebhookCompleteResultDto,
 } from "@/contracts/dtos/bid-export.dto";
 import { CustomerBidDto } from "@/contracts/dtos/customer-bid.dto";
 
@@ -105,4 +107,20 @@ export interface IBidExportService {
    * Currently a no-op placeholder that logs and returns.
    */
   processPendingExports(): Promise<BidExportProcessResultDto>;
+
+  /**
+   * Prepare a webhook export — find all QUEUED SIQ items, create an IN_PROGRESS run,
+   * and return bid data in webhook format.
+   * Idempotent: if an IN_PROGRESS SIQ run already exists, returns that same run.
+   */
+  prepareWebhookExport(userEmail: string): Promise<WebhookExportResultDto>;
+
+  /**
+   * Complete a webhook export — mark the run's items as EXPORTED and the run as COMPLETED.
+   * Called by the external system after successfully processing the data.
+   */
+  completeWebhookExport(
+    runId: string,
+    userEmail: string
+  ): Promise<WebhookCompleteResultDto>;
 }
