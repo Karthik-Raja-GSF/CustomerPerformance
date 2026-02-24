@@ -12034,6 +12034,97 @@
     },
     {
       "rule-type": "transformation",
+      "rule-id": "20900",
+      "rule-name": "completed_bid_col_source_db",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "Source DB"
+      },
+      "rule-action": "rename",
+      "value": "source_db"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20901",
+      "rule-name": "completed_bid_col_hash",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "Hash"
+      },
+      "rule-action": "rename",
+      "value": "hash"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20902",
+      "rule-name": "completed_bid_col_sales_type",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "Sales Type"
+      },
+      "rule-action": "rename",
+      "value": "sales_type"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20903",
+      "rule-name": "completed_bid_col_sales_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "Sales Code"
+      },
+      "rule-action": "rename",
+      "value": "sales_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20904",
+      "rule-name": "completed_bid_col_customer_bid_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "Customer Bid No[_]"
+      },
+      "rule-action": "rename",
+      "value": "customer_bid_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20905",
+      "rule-name": "completed_bid_col_data_inserted",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "Data Inserted"
+      },
+      "rule-action": "rename",
+      "value": "data_inserted"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20906",
+      "rule-name": "completed_bid_col_user_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Completed Bid",
+        "column-name": "User Name"
+      },
+      "rule-action": "rename",
+      "value": "user_name"
+    },
+    {
+      "rule-type": "transformation",
       "rule-id": "9000",
       "rule-name": "rename_schema_ait_to_dw2_nav",
       "rule-target": "schema",
