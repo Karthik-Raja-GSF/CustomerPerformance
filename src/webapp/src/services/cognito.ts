@@ -30,6 +30,8 @@ export interface CognitoUserInfo {
   email: string;
   firstName: string;
   lastName: string;
+  groups: string[];
+  role?: string;
 }
 
 /**
@@ -116,27 +118,58 @@ function extractNameFromEmail(email: string): {
 }
 
 /**
- * Extract user info from Cognito ID token
+ * Sanitize a string claim: strip tab/newline characters and trim whitespace
  */
-function extractUserFromIdToken(idToken: CognitoIdToken): CognitoUserInfo {
-  const payload = idToken.payload;
+function sanitize(value: unknown): string {
+  if (!value || typeof value !== "string") return "";
+  return value.replace(/[\t\r\n]/g, " ").trim();
+}
 
+/**
+ * Parse groups from a custom:groups claim (comma-separated string or array)
+ */
+function parseGroups(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String);
+  const str = String(value).trim();
+  if (!str) return [];
+  return str
+    .split(",")
+    .map((g) => g.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Extract user info from a raw JWT payload object
+ */
+function extractUserFromPayload(
+  payload: Record<string, unknown>
+): CognitoUserInfo {
   const email =
-    (payload.email as string) || (payload["custom:email"] as string) || "";
+    sanitize(payload.email) || sanitize(payload["custom:email"]) || "";
   const fallbackName = extractNameFromEmail(email);
 
   return {
     userId: payload.sub as string,
     email,
     firstName:
-      (payload.given_name as string) ||
-      (payload["custom:firstName"] as string) ||
+      sanitize(payload.given_name) ||
+      sanitize(payload["custom:firstName"]) ||
       fallbackName.firstName,
     lastName:
-      (payload.family_name as string) ||
-      (payload["custom:lastName"] as string) ||
+      sanitize(payload.family_name) ||
+      sanitize(payload["custom:lastName"]) ||
       fallbackName.lastName,
+    groups: parseGroups(payload["custom:groups"]),
+    role: sanitize(payload["custom:role"]) || undefined,
   };
+}
+
+/**
+ * Extract user info from Cognito ID token
+ */
+function extractUserFromIdToken(idToken: CognitoIdToken): CognitoUserInfo {
+  return extractUserFromPayload(idToken.payload as Record<string, unknown>);
 }
 
 /**
@@ -276,31 +309,12 @@ async function refreshWithOAuthEndpoint(
     localStorage.setItem("refresh_token", tokens.refresh_token);
   }
 
-  const email =
-    (idTokenPayload.email as string) ||
-    (idTokenPayload["custom:email"] as string) ||
-    "";
-  const fallbackName = extractNameFromEmail(email);
-
-  const user: CognitoUserInfo = {
-    userId: idTokenPayload.sub as string,
-    email,
-    firstName:
-      (idTokenPayload.given_name as string) ||
-      (idTokenPayload["custom:firstName"] as string) ||
-      fallbackName.firstName,
-    lastName:
-      (idTokenPayload.family_name as string) ||
-      (idTokenPayload["custom:lastName"] as string) ||
-      fallbackName.lastName,
-  };
-
   return {
     idToken: tokens.id_token,
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token || refreshToken,
     expiresIn: tokens.expires_in,
-    user,
+    user: extractUserFromPayload(idTokenPayload),
   };
 }
 
@@ -401,26 +415,12 @@ export function getCurrentSession(): Promise<CognitoAuthResult | null> {
 
           if (exp > now) {
             // Token is still valid, restore session from localStorage
-            const email = (payload.email as string) || "";
-            const fallbackName = extractNameFromEmail(email);
-
             resolve({
               idToken: storedIdToken,
               accessToken: storedAccessToken,
               refreshToken: "", // OAuth doesn't store refresh token in localStorage
               expiresIn: exp - now,
-              user: {
-                userId: payload.sub as string,
-                email,
-                firstName:
-                  (payload.given_name as string) ||
-                  (payload["custom:firstName"] as string) ||
-                  fallbackName.firstName,
-                lastName:
-                  (payload.family_name as string) ||
-                  (payload["custom:lastName"] as string) ||
-                  fallbackName.lastName,
-              },
+              user: extractUserFromPayload(payload),
             });
             return;
           }
@@ -826,31 +826,12 @@ export async function handleAuthCallback(
   // Parse ID token to extract user information
   const idTokenPayload = parseJwtPayload(tokens.id_token);
 
-  const email =
-    (idTokenPayload.email as string) ||
-    (idTokenPayload["custom:email"] as string) ||
-    "";
-  const fallbackName = extractNameFromEmail(email);
-
-  const user: CognitoUserInfo = {
-    userId: idTokenPayload.sub as string,
-    email,
-    firstName:
-      (idTokenPayload.given_name as string) ||
-      (idTokenPayload["custom:firstName"] as string) ||
-      fallbackName.firstName,
-    lastName:
-      (idTokenPayload.family_name as string) ||
-      (idTokenPayload["custom:lastName"] as string) ||
-      fallbackName.lastName,
-  };
-
   return {
     idToken: tokens.id_token,
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     expiresIn: tokens.expires_in,
-    user,
+    user: extractUserFromPayload(idTokenPayload),
   };
 }
 

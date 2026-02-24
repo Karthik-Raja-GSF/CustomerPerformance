@@ -48,7 +48,46 @@ export class McpClientService implements IMcpClientService {
     return obj;
   }
 
+  private isSafeSelectQuery(sql: string): boolean {
+    const normalized = sql.trim().toUpperCase();
+
+    // Must start with SELECT or WITH (for CTEs)
+    if (!normalized.startsWith("SELECT") && !normalized.startsWith("WITH")) {
+      return false;
+    }
+
+    // Block dangerous keywords anywhere in the query (whole-word match)
+    const forbidden = [
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "DROP",
+      "ALTER",
+      "TRUNCATE",
+      "CREATE",
+      "GRANT",
+      "REVOKE",
+      "EXECUTE",
+      "COPY",
+    ];
+    for (const keyword of forbidden) {
+      const regex = new RegExp(`\\b${keyword}\\b`, "i");
+      if (regex.test(sql)) return false;
+    }
+
+    // Block semicolons to prevent multi-statement injection
+    if (sql.includes(";")) return false;
+
+    return true;
+  }
+
   async executeQuery(sql: string): Promise<unknown> {
+    if (!this.isSafeSelectQuery(sql)) {
+      throw new McpConnectionError(
+        "Query rejected: only SELECT queries are allowed"
+      );
+    }
+
     try {
       const result = await this.prisma.$queryRawUnsafe(sql);
       // Convert BigInt and Decimal to Number for JSON serialization

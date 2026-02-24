@@ -48,9 +48,6 @@ export interface ChatStreamMetadata {
   confidenceReasoning: string; // AI's explanation for the confidence percentage
   accuracy: number;
   usage: TokenUsageBreakdown;
-  // Debug fields for troubleshooting
-  rawSql: string | null;
-  rawResult: unknown;
   sqlStatus: SqlStatus;
   // Chat log ID for feedback
   chatLogId: string | null;

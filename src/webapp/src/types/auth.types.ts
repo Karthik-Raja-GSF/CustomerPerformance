@@ -20,6 +20,8 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
+  groups: string[];
+  role?: string;
 }
 
 export interface CognitoIdTokenPayload {
@@ -27,10 +29,10 @@ export interface CognitoIdTokenPayload {
   email?: string;
   given_name?: string;
   family_name?: string;
-  'custom:role'?: string;
-  'custom:firstName'?: string;
-  'custom:lastName'?: string;
-  'custom:email'?: string;
+  "custom:role"?: string;
+  "custom:firstName"?: string;
+  "custom:lastName"?: string;
+  "custom:email"?: string;
   iat: number;
   exp: number;
 }

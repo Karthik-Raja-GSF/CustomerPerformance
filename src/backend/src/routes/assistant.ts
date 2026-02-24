@@ -193,8 +193,14 @@ router.post(
             });
 
             if (isConnectionAlive) {
+              // Strip sensitive debug fields before sending to client
+              const {
+                rawSql: _rawSql,
+                rawResult: _rawResult,
+                ...clientMetadata
+              } = metadata;
               res.write(
-                `data: ${JSON.stringify({ type: "complete", metadata: { ...metadata, chatLogId } })}\n\n`
+                `data: ${JSON.stringify({ type: "complete", metadata: { ...clientMetadata, chatLogId } })}\n\n`
               );
               getChatStreamEvents().add(1, { event_type: "complete" });
               res.end();
@@ -209,7 +215,7 @@ router.post(
               "Stream error"
             );
             res.write(
-              `data: ${JSON.stringify({ type: "error", message: error.message })}\n\n`
+              `data: ${JSON.stringify({ type: "error", message: "An error occurred while processing your request." })}\n\n`
             );
             getChatStreamEvents().add(1, { event_type: "error" });
             res.end();
@@ -227,7 +233,7 @@ router.post(
       );
       if (isConnectionAlive) {
         res.write(
-          `data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : "Unknown error" })}\n\n`
+          `data: ${JSON.stringify({ type: "error", message: "An error occurred while processing your request." })}\n\n`
         );
         getChatStreamEvents().add(1, { event_type: "error" });
         res.end();

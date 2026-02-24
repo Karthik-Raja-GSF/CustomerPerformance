@@ -31,4 +31,10 @@ export interface TokenPayload {
   federatedProviderType?: string;
   idpEmail?: string;
   cognitoUsername?: string;
+
+  // Azure AD groups & roles (from SAML custom attributes)
+  groups: string[];
+  role?: string;
+  // Cognito-internal groups (includes IdP auto-group)
+  cognitoGroups: string[];
 }

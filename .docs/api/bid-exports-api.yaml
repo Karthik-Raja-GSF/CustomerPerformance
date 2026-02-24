@@ -10,6 +10,94 @@ info:
     Authorization: Bearer <cognito_id_token>
     ```
 
+    ## Obtaining a Cognito ID Token
+
+    This API validates **Cognito ID tokens only** (not access tokens). External systems
+    (webhooks, Power Automate, scripts) must authenticate against AWS Cognito to obtain one.
+
+    **Prerequisites:**
+    - A Cognito user account (self-signup is disabled — an admin must create the account)
+    - The **User Pool ID** and **Client ID** for the target environment
+    - Region: `us-east-1`
+
+    > **Important:** No client secret is required. The app client is configured without a secret,
+    > so you do not need to compute a `SECRET_HASH`.
+
+    ### Method 1: AWS CLI
+
+    ```bash
+    aws cognito-idp initiate-auth \
+      --region us-east-1 \
+      --auth-flow USER_PASSWORD_AUTH \
+      --client-id <CLIENT_ID> \
+      --auth-parameters USERNAME=<EMAIL>,PASSWORD=<PASSWORD>
+    ```
+
+    The response JSON contains `AuthenticationResult.IdToken` — use that value as your Bearer token.
+
+    ```json
+    {
+      "AuthenticationResult": {
+        "IdToken": "eyJraWQ...",
+        "AccessToken": "eyJraWQ...",
+        "RefreshToken": "eyJjdHk...",
+        "ExpiresIn": 3600,
+        "TokenType": "Bearer"
+      }
+    }
+    ```
+
+    ### Method 2: Direct HTTP Request (curl)
+
+    ```bash
+    curl -X POST \
+      https://cognito-idp.us-east-1.amazonaws.com/ \
+      -H "Content-Type: application/x-amz-json-1.1" \
+      -H "X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth" \
+      -d '{
+        "AuthFlow": "USER_PASSWORD_AUTH",
+        "ClientId": "<CLIENT_ID>",
+        "AuthParameters": {
+          "USERNAME": "<EMAIL>",
+          "PASSWORD": "<PASSWORD>"
+        }
+      }'
+    ```
+
+    Extract `AuthenticationResult.IdToken` from the JSON response.
+
+    ### Method 3: OAuth2 Token Endpoint
+
+    If using the Cognito Hosted UI domain (e.g., `ait-dev.auth.us-east-1.amazoncognito.com`),
+    you can exchange a previously obtained authorization code for tokens:
+
+    ```bash
+    curl -X POST \
+      https://<COGNITO_DOMAIN>/oauth2/token \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=authorization_code&client_id=<CLIENT_ID>&code=<AUTH_CODE>&redirect_uri=<REDIRECT_URI>"
+    ```
+
+    The `id_token` field in the response is the token to use.
+
+    ### Token Expiration and Refresh
+
+    - **ID tokens expire after 1 hour.**
+    - **Refresh tokens are valid for 30 days.**
+    - To refresh without re-entering credentials, use the `REFRESH_TOKEN_AUTH` flow:
+
+    ```bash
+    aws cognito-idp initiate-auth \
+      --region us-east-1 \
+      --auth-flow REFRESH_TOKEN_AUTH \
+      --client-id <CLIENT_ID> \
+      --auth-parameters REFRESH_TOKEN=<REFRESH_TOKEN>
+    ```
+
+    This returns a new `IdToken` without requiring the password again.
+
+    > **Warning:** This API rejects access tokens. Always send the **IdToken**, not the AccessToken.
+
     ## Webhook Integration Flow
     ```
     1. GET  /bid-exports/webhook/siq              → { runId, data }

@@ -52,8 +52,30 @@ export class TokenService implements ITokenService {
         throw new TokenExpiredError("Cognito token has expired");
       }
 
-      throw new InvalidTokenError(`Invalid Cognito token: ${err.message}`);
+      throw new InvalidTokenError("Invalid authentication token");
     }
+  }
+
+  /**
+   * Sanitize a string claim: strip tab/newline characters and trim whitespace
+   */
+  private sanitize(value: string | undefined): string {
+    if (!value) return "";
+    return value.replace(/[\t\r\n]/g, " ").trim();
+  }
+
+  /**
+   * Parse a comma-separated or single-value string into a string array
+   */
+  private parseGroupsClaim(value: unknown): string[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(String);
+    const str = String(value).trim();
+    if (!str) return [];
+    return str
+      .split(",")
+      .map((g) => g.trim())
+      .filter(Boolean);
   }
 
   /**
@@ -62,14 +84,14 @@ export class TokenService implements ITokenService {
   private parseCognitoPayload(
     cognitoPayload: Record<string, unknown>
   ): TokenPayload {
-    // Standard claims
+    // Standard claims (sanitized)
     const userId = cognitoPayload.sub as string;
     const email =
-      (cognitoPayload.email as string) ||
-      (cognitoPayload["custom:email"] as string) ||
+      this.sanitize(cognitoPayload.email as string) ||
+      this.sanitize(cognitoPayload["custom:email"] as string) ||
       "";
-    const firstName = (cognitoPayload.given_name as string) || "";
-    const lastName = (cognitoPayload.family_name as string) || "";
+    const firstName = this.sanitize(cognitoPayload.given_name as string);
+    const lastName = this.sanitize(cognitoPayload.family_name as string);
     const iat = cognitoPayload.iat as number;
     const exp = cognitoPayload.exp as number;
 
@@ -87,7 +109,11 @@ export class TokenService implements ITokenService {
 
     if (identitiesRaw) {
       try {
-        const identities = JSON.parse(identitiesRaw) as FederatedIdentity[];
+        const identities = (
+          typeof identitiesRaw === "string"
+            ? JSON.parse(identitiesRaw)
+            : identitiesRaw
+        ) as FederatedIdentity[];
         const primaryIdentity = identities[0];
         if (primaryIdentity) {
           isFederated = true;
@@ -98,6 +124,16 @@ export class TokenService implements ITokenService {
         // Invalid JSON, treat as non-federated
       }
     }
+
+    // Azure AD groups & roles (from SAML custom attributes)
+    const groups = this.parseGroupsClaim(cognitoPayload["custom:groups"]);
+    const role =
+      this.sanitize(cognitoPayload["custom:role"] as string) || undefined;
+
+    // Cognito-internal groups (includes IdP auto-group)
+    const cognitoGroups = Array.isArray(cognitoPayload["cognito:groups"])
+      ? (cognitoPayload["cognito:groups"] as string[])
+      : [];
 
     if (!userId || !email) {
       throw new InvalidTokenError(
@@ -117,6 +153,9 @@ export class TokenService implements ITokenService {
       federatedProviderType,
       idpEmail,
       cognitoUsername,
+      groups,
+      role,
+      cognitoGroups,
     };
   }
 }

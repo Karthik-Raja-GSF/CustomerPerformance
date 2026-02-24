@@ -1027,7 +1027,7 @@ model SalesLine {
 }
 
 model CompletedBid {
-  sourceDb      String  @map("source_db")
+  sourceDb      String? @map("source_db")
   hash          String?
   salesType     Int?    @map("sales_type")
   salesCode     String  @map("sales_code")
@@ -1035,7 +1035,7 @@ model CompletedBid {
   dataInserted  String? @map("data_inserted")
   userName      String? @map("user_name")
 
-  @@id([sourceDb, salesCode, customerBidNo])
+  @@id([salesCode, customerBidNo])
   @@map("completed_bid")
   @@schema("dw2_nav")
 }

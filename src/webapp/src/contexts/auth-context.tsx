@@ -61,6 +61,8 @@ function toAuthResponse(result: CognitoAuthResult): AuthResponse {
       email: result.user.email,
       firstName: result.user.firstName,
       lastName: result.user.lastName,
+      groups: result.user.groups,
+      role: result.user.role,
     },
   };
 }

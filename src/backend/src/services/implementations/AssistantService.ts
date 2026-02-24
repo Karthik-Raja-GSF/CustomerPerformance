@@ -63,13 +63,22 @@ export class AssistantService implements IAssistantService {
     }
   }
 
+  private sanitizeUserInput(input: string): string {
+    const sanitized = input
+      .replace(/```/g, "") // Remove code fences that could break prompt structure
+      .replace(/\{\{.*?\}\}/g, ""); // Remove template variable patterns
+
+    return `<user_question>\n${sanitized}\n</user_question>`;
+  }
+
   private buildSqlGenerationPrompt(
     question: string,
     additionalContext: string
   ): string {
+    const sanitizedQuestion = this.sanitizeUserInput(question);
     return this.sqlGenerationPromptTemplate
       .replace("{{additional_context}}", additionalContext)
-      .replace("{{question}}", question);
+      .replace("{{question}}", sanitizedQuestion);
   }
 
   private extractSqlFromResponse(response: string): string | null {
