@@ -28,7 +28,9 @@ export const config = {
   port: process.env.PORT || 8887,
   nodeEnv: process.env.NODE_ENV || "development",
   databaseUrl,
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3030",
+  corsOrigin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+    : ["http://localhost:3030"],
   cognito: {
     userPoolId: process.env.AWS_COGNITO_USER_POOL_ID || "",
     clientId: process.env.AWS_COGNITO_CLIENT_ID || "",

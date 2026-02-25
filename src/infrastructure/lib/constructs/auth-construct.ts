@@ -16,6 +16,8 @@ export interface AuthConstructProps {
   azureAdMetadataUrl?: string;
   /** Set to true only for new User Pools. Existing pools have custom attributes added via CLI. */
   createCustomAttributes?: boolean;
+  /** Additional frontend URLs for Cognito callback/logout (e.g., private frontend via other team's ALB) */
+  additionalFrontendUrls?: string[];
 }
 
 export class AuthConstruct extends Construct {
@@ -225,6 +227,11 @@ export class AuthConstruct extends Construct {
         callbackUrls: [
           frontendUrl,
           `${frontendUrl}/auth/callback`,
+          // Additional frontend URLs (e.g., private frontend via other team's ALB)
+          ...(props.additionalFrontendUrls || []).flatMap((url) => [
+            url,
+            `${url}/auth/callback`,
+          ]),
           // Only include localhost for non-production
           ...(isProd
             ? []
@@ -234,6 +241,12 @@ export class AuthConstruct extends Construct {
           frontendUrl,
           `${frontendUrl}/login`,
           `${frontendUrl}/login?sso_logout=1`,
+          // Additional frontend URLs
+          ...(props.additionalFrontendUrls || []).flatMap((url) => [
+            url,
+            `${url}/login`,
+            `${url}/login?sso_logout=1`,
+          ]),
           // Only include localhost for non-production
           ...(isProd
             ? []

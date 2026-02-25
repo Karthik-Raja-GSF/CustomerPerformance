@@ -4,7 +4,7 @@ import "./telemetry/instrumentation";
 import { createChildLogger } from "./telemetry/logger";
 
 import "reflect-metadata"; // Must be imported for DI to work
-import express, { Application } from "express";
+import express, { Application, Router } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -84,20 +84,28 @@ class Server {
   }
 
   private initializeRoutes(): void {
-    // Health check endpoint
-    this.app.get("/health", (_req, res) => {
-      res.json({ status: "ok", timestamp: new Date().toISOString() });
-    });
-
     // Setup DI container with application dependencies
     setupContainer(this.prisma);
 
+    // Create a shared API router for all routes
+    const apiRouter = Router();
+
+    // Health check endpoint
+    apiRouter.get("/health", (_req, res) => {
+      res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
+
     // Register routes
-    this.app.use("/prompts", promptsRouter);
-    this.app.use("/assistant", assistantRouter);
-    this.app.use("/stockiq", stockiqRouter);
-    this.app.use("/customer-bids", customerBidsRouter);
-    this.app.use("/bid-exports", bidExportsRouter);
+    apiRouter.use("/prompts", promptsRouter);
+    apiRouter.use("/assistant", assistantRouter);
+    apiRouter.use("/stockiq", stockiqRouter);
+    apiRouter.use("/customer-bids", customerBidsRouter);
+    apiRouter.use("/bid-exports", bidExportsRouter);
+
+    // Mount at root (existing public ALB, container health check)
+    this.app.use("/", apiRouter);
+    // Mount at /api (shared ALB path-based routing for private flow)
+    this.app.use("/api", apiRouter);
   }
 
   private initializeErrorHandling(): void {

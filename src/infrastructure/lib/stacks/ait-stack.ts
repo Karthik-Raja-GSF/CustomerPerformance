@@ -3,7 +3,12 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import { Construct } from "constructs";
 import { EnvironmentConfig } from "../config/environments";
-import { NamingConfig, Environment } from "../config/naming";
+import {
+  NamingConfig,
+  Environment,
+  createNamingHelper,
+  ResourceTypes,
+} from "../config/naming";
 import { addStandardTags } from "../config/tags";
 import { VpcConstruct } from "../constructs/vpc-construct";
 import { DatabaseConstruct } from "../constructs/database-construct";
@@ -18,9 +23,9 @@ import { EventBridgeConstruct } from "../constructs/eventbridge-construct";
 import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
 import { WafConstruct } from "../constructs/waf-construct";
-import { PrivateHostedZoneConstruct } from "../constructs/private-hosted-zone-construct";
 import { FrontendEcsConstruct } from "../constructs/frontend-ecs-construct";
 import { defaultWafConfigs } from "../config/waf-config";
+import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 
 export interface CrossAccountRoute53Config {
   roleArn: string; // ARN of IAM role in dev account that can manage Route53
@@ -102,23 +107,6 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
-    // Private Hosted Zone (goldstarfoods.com)
-    // ===================
-    let privateHostedZoneConstruct: PrivateHostedZoneConstruct | undefined;
-    if (config.privateDomain) {
-      privateHostedZoneConstruct = new PrivateHostedZoneConstruct(
-        this,
-        "PrivateHostedZone",
-        {
-          envName: config.envName,
-          zoneName: config.privateDomain,
-          vpc: vpcConstruct.vpc,
-          naming,
-        }
-      );
-    }
-
-    // ===================
     // VPC Peering (imported - manually created)
     // ===================
     if (config.vpcPeering?.enabled && config.vpcPeering.peeringConnectionId) {
@@ -175,11 +163,25 @@ export class AitStack extends cdk.Stack {
     const azureAdMetadataUrl =
       "https://login.microsoftonline.com/7760617a-f510-47d2-acec-31e328b33785/federationmetadata/2007-06/federationmetadata.xml?appid=4b806a35-c7a1-4cfc-bf92-896c8a5da703";
 
+    // For prod (private-only), the primary frontend URL is the private one
+    const primaryFrontendUrl =
+      config.publicFrontend === false && config.privateFrontendUrl
+        ? config.privateFrontendUrl
+        : `https://${domains.frontend}`;
+
+    // Additional frontend URLs for Cognito callbacks (e.g., private frontend via other team's ALB)
+    const additionalFrontendUrls: string[] = [];
+    if (config.privateFrontendUrl && config.publicFrontend !== false) {
+      // Dev: public is primary, private is additional
+      additionalFrontendUrls.push(config.privateFrontendUrl);
+    }
+
     const authConstruct = new AuthConstruct(this, "Auth", {
       envName: config.envName,
-      frontendUrl: `https://${domains.frontend}`,
+      frontendUrl: primaryFrontendUrl,
       naming,
       azureAdMetadataUrl,
+      additionalFrontendUrls,
     });
 
     // ===================
@@ -196,27 +198,30 @@ export class AitStack extends cdk.Stack {
     // ===================
     const wafConfig = config.waf || defaultWafConfigs[envCode];
     let cloudfrontWaf: WafConstruct | undefined;
+    let frontendConstruct: FrontendConstruct | undefined;
 
-    if (wafConfig.enabled && wafConfig.cloudfront.enabled) {
-      cloudfrontWaf = new WafConstruct(this, "CloudFrontWaf", {
+    if (config.publicFrontend !== false) {
+      if (wafConfig.enabled && wafConfig.cloudfront.enabled) {
+        cloudfrontWaf = new WafConstruct(this, "CloudFrontWaf", {
+          naming,
+          config: wafConfig,
+          scope: "CLOUDFRONT",
+          scopeId: "frontend",
+        });
+      }
+
+      // ===================
+      // Frontend (S3 + CloudFront)
+      // ===================
+      frontendConstruct = new FrontendConstruct(this, "Frontend", {
+        envName: config.envName,
+        domainName: domains.frontend,
+        hostedZone,
         naming,
-        config: wafConfig,
-        scope: "CLOUDFRONT",
-        scopeId: "frontend",
+        crossAccountRoute53,
+        webAclId: cloudfrontWaf?.getWebAclArn(),
       });
     }
-
-    // ===================
-    // Frontend (S3 + CloudFront)
-    // ===================
-    const frontendConstruct = new FrontendConstruct(this, "Frontend", {
-      envName: config.envName,
-      domainName: domains.frontend,
-      hostedZone,
-      naming,
-      crossAccountRoute53,
-      webAclId: cloudfrontWaf?.getWebAclArn(),
-    });
 
     // ===================
     // External Database Secrets (DMS sources, StockIQ API)
@@ -234,6 +239,12 @@ export class AitStack extends cdk.Stack {
       desiredCount: config.ecs.desiredCount,
     };
 
+    // Build CORS origin(s) — include both public and private frontend URLs when applicable
+    const corsOrigins = [primaryFrontendUrl];
+    if (additionalFrontendUrls.length > 0) {
+      corsOrigins.push(...additionalFrontendUrls);
+    }
+
     const backendConstruct = new BackendConstruct(this, "Backend", {
       envName: config.envName,
       vpc: vpcConstruct.vpc,
@@ -243,11 +254,12 @@ export class AitStack extends cdk.Stack {
       cognitoUserPoolId: authConstruct.userPool.userPoolId,
       cognitoClientId: authConstruct.userPoolClient.userPoolClientId,
       domainName: domains.backend,
-      frontendUrl: `https://${domains.frontend}`,
+      frontendUrl: corsOrigins.join(","),
       hostedZone,
       config: ecsConfig,
       naming,
       crossAccountRoute53,
+      createPublicAlb: config.backendPublicAlb !== false,
     });
 
     // Allow Fargate to connect to Aurora
@@ -261,7 +273,11 @@ export class AitStack extends cdk.Stack {
     // ===================
     let albWaf: WafConstruct | undefined;
 
-    if (wafConfig.enabled && wafConfig.alb.enabled) {
+    if (
+      wafConfig.enabled &&
+      wafConfig.alb.enabled &&
+      backendConstruct.loadBalancer
+    ) {
       albWaf = new WafConstruct(this, "AlbWaf", {
         naming,
         config: wafConfig,
@@ -269,7 +285,7 @@ export class AitStack extends cdk.Stack {
         scopeId: "backend",
       });
 
-      // Associate WAF with ALB
+      // Associate WAF with public ALB
       albWaf.associateWithAlb(backendConstruct.loadBalancer);
     }
 
@@ -277,22 +293,68 @@ export class AitStack extends cdk.Stack {
     // Frontend ECS (Private deployment via nginx + internal ALB)
     // ===================
     let frontendEcsConstruct: FrontendEcsConstruct | undefined;
-    if (
-      config.frontendEcs &&
-      privateHostedZoneConstruct &&
-      config.privateDomain
-    ) {
+    if (config.frontendEcs) {
       frontendEcsConstruct = new FrontendEcsConstruct(this, "FrontendEcs", {
         envName: config.envName,
         vpc: vpcConstruct.vpc,
         cluster: backendConstruct.cluster,
         ecrRepository: ecrConstruct.webappRepository,
-        privateHostedZone: privateHostedZoneConstruct.hostedZone,
-        domainName: config.privateDomain,
+        // No privateHostedZone or domainName — DNS managed by other team
         config: config.frontendEcs,
         naming,
         peerVpcCidr: config.vpcPeering?.peerVpcCidr,
       });
+
+      // ===================
+      // Shared ALB: route /api/* to backend ECS tasks
+      // ===================
+      const n = createNamingHelper(naming);
+
+      const sharedAlbBackendTg = new elbv2.ApplicationTargetGroup(
+        this,
+        "SharedAlbBackendTg",
+        {
+          vpc: vpcConstruct.vpc,
+          targetGroupName: n.name(
+            ResourceTypes.TARGET_GROUP,
+            "api-backend",
+            "01"
+          ),
+          port: 8887,
+          protocol: elbv2.ApplicationProtocol.HTTP,
+          targetType: elbv2.TargetType.IP,
+          healthCheck: {
+            path: "/api/health",
+            healthyHttpCodes: "200",
+            interval: cdk.Duration.seconds(30),
+            timeout: cdk.Duration.seconds(5),
+            healthyThresholdCount: 2,
+            unhealthyThresholdCount: 3,
+          },
+        }
+      );
+
+      // Path-based routing rule: /api/* → backend target group
+      new elbv2.ApplicationListenerRule(this, "BackendApiRule", {
+        listener: frontendEcsConstruct.httpListener,
+        priority: 10,
+        conditions: [elbv2.ListenerCondition.pathPatterns(["/api/*"])],
+        targetGroups: [sharedAlbBackendTg],
+      });
+
+      // Register backend service with the shared ALB's backend target group
+      backendConstruct.service.attachToApplicationTargetGroup(
+        sharedAlbBackendTg
+      );
+
+      // Allow shared frontend ALB to reach backend ECS tasks
+      backendConstruct
+        .getSecurityGroup()
+        .addIngressRule(
+          frontendEcsConstruct.loadBalancer.connections.securityGroups[0],
+          ec2.Port.tcp(8887),
+          "Allow shared frontend ALB to reach backend"
+        );
     }
 
     // ===================
@@ -390,25 +452,31 @@ export class AitStack extends cdk.Stack {
       description: "ECR Repository URI",
     });
 
-    new cdk.CfnOutput(this, "FrontendUrl", {
-      value: `https://${domains.frontend}`,
-      description: "Frontend URL",
-    });
+    // Public frontend outputs (only when CloudFront is deployed)
+    if (frontendConstruct) {
+      new cdk.CfnOutput(this, "FrontendUrl", {
+        value: `https://${domains.frontend}`,
+        description: "Frontend URL",
+      });
 
-    new cdk.CfnOutput(this, "BackendUrl", {
-      value: `https://${domains.backend}`,
-      description: "Backend URL",
-    });
+      new cdk.CfnOutput(this, "CloudFrontDistributionId", {
+        value: frontendConstruct.distribution.distributionId,
+        description: "CloudFront Distribution ID",
+      });
 
-    new cdk.CfnOutput(this, "CloudFrontDistributionId", {
-      value: frontendConstruct.distribution.distributionId,
-      description: "CloudFront Distribution ID",
-    });
+      new cdk.CfnOutput(this, "S3BucketName", {
+        value: frontendConstruct.bucket.bucketName,
+        description: "S3 Bucket Name",
+      });
+    }
 
-    new cdk.CfnOutput(this, "S3BucketName", {
-      value: frontendConstruct.bucket.bucketName,
-      description: "S3 Bucket Name",
-    });
+    // Public backend URL (only when public ALB is deployed)
+    if (backendConstruct.loadBalancer) {
+      new cdk.CfnOutput(this, "BackendUrl", {
+        value: `https://${domains.backend}`,
+        description: "Backend URL",
+      });
+    }
 
     new cdk.CfnOutput(this, "EcsClusterName", {
       value: backendConstruct.cluster.clusterName,
@@ -499,29 +567,25 @@ export class AitStack extends cdk.Stack {
       });
     }
 
-    if (privateHostedZoneConstruct) {
-      new cdk.CfnOutput(this, "PrivateHostedZoneId", {
-        value: privateHostedZoneConstruct.hostedZone.hostedZoneId,
-        description: `Private Hosted Zone ID (${config.privateDomain})`,
-      });
-    }
-
-    // Frontend ECS Outputs
+    // Frontend ECS Outputs (shared ALB serves both frontend and backend /api/*)
     if (frontendEcsConstruct) {
       new cdk.CfnOutput(this, "FrontendEcsServiceName", {
         value: frontendEcsConstruct.service.serviceName,
         description: "Frontend ECS Service Name",
       });
 
-      new cdk.CfnOutput(this, "FrontendInternalAlbDns", {
+      new cdk.CfnOutput(this, "SharedInternalAlbDns", {
         value: frontendEcsConstruct.loadBalancer.loadBalancerDnsName,
-        description: "Frontend Internal ALB DNS Name",
+        description:
+          "Shared Internal ALB DNS (serves frontend + /api/* backend routing)",
       });
 
-      new cdk.CfnOutput(this, "FrontendPrivateUrl", {
-        value: `https://${config.privateDomain}`,
-        description: "Frontend Private URL",
-      });
+      if (config.privateFrontendUrl) {
+        new cdk.CfnOutput(this, "FrontendPrivateUrl", {
+          value: config.privateFrontendUrl,
+          description: "Frontend Private URL (managed by other team)",
+        });
+      }
 
       new cdk.CfnOutput(this, "WebappEcrRepositoryUri", {
         value: ecrConstruct.webappRepository.repositoryUri,

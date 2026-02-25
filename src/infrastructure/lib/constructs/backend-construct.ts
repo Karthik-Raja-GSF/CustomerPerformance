@@ -39,13 +39,14 @@ export interface BackendConstructProps {
   config: EcsConfig;
   naming: NamingConfig;
   crossAccountRoute53?: CrossAccountRoute53Config; // For cross-account DNS
+  createPublicAlb?: boolean; // Create public-facing ALB (default: true)
 }
 
 export class BackendConstruct extends Construct {
   public readonly cluster: ecs.Cluster;
   public readonly service: ecs.FargateService;
-  public readonly loadBalancer: elbv2.ApplicationLoadBalancer;
-  public readonly certificate: acm.ICertificate;
+  public readonly loadBalancer?: elbv2.ApplicationLoadBalancer;
+  public readonly certificate?: acm.ICertificate;
 
   constructor(scope: Construct, id: string, props: BackendConstructProps) {
     super(scope, id);
@@ -273,89 +274,7 @@ export class BackendConstruct extends Construct {
     databaseSecret.grantRead(taskDefinition.executionRole!);
     siqSecret.grantRead(taskDefinition.executionRole!);
 
-    // ACM Certificate
-    // Import existing cert if ARN provided, otherwise create with DNS validation
-    if (certificateArn) {
-      this.certificate = acm.Certificate.fromCertificateArn(
-        this,
-        "Certificate",
-        certificateArn
-      );
-    } else if (hostedZone) {
-      this.certificate = new acm.Certificate(this, "Certificate", {
-        domainName: domainName,
-        validation: acm.CertificateValidation.fromDns(hostedZone),
-      });
-    } else {
-      // No hosted zone and no cert ARN - create cert with DNS validation
-      // User will need to manually add DNS validation records
-      this.certificate = new acm.Certificate(this, "Certificate", {
-        domainName: domainName,
-        validation: acm.CertificateValidation.fromDns(),
-      });
-    }
-
-    // Security Group for ALB
-    const albSecurityGroup = new ec2.SecurityGroup(this, "ALBSecurityGroup", {
-      vpc,
-      securityGroupName: albSgName,
-      description: "Security group for ALB",
-      allowAllOutbound: true,
-    });
-    albSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(443),
-      "Allow HTTPS"
-    );
-    albSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(80),
-      "Allow HTTP for redirect"
-    );
-
-    // Application Load Balancer
-    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "ALB", {
-      vpc,
-      loadBalancerName: albName,
-      internetFacing: true,
-      securityGroup: albSecurityGroup,
-    });
-
-    // Target Group
-    const targetGroup = new elbv2.ApplicationTargetGroup(this, "TargetGroup", {
-      vpc,
-      targetGroupName: tgName,
-      port: 8887,
-      protocol: elbv2.ApplicationProtocol.HTTP,
-      targetType: elbv2.TargetType.IP,
-      healthCheck: {
-        path: "/health",
-        healthyHttpCodes: "200",
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(5),
-        healthyThresholdCount: 2,
-        unhealthyThresholdCount: 3,
-      },
-    });
-
-    // HTTPS Listener
-    const httpsListener = this.loadBalancer.addListener("HTTPSListener", {
-      port: 443,
-      certificates: [this.certificate],
-      defaultTargetGroups: [targetGroup],
-    });
-
-    // HTTP to HTTPS redirect
-    const httpListener = this.loadBalancer.addListener("HTTPListener", {
-      port: 80,
-      defaultAction: elbv2.ListenerAction.redirect({
-        protocol: "HTTPS",
-        port: "443",
-        permanent: true,
-      }),
-    });
-
-    // Security Group for ECS Service
+    // Security Group for ECS Service (always created — shared ALB wiring adds rules externally)
     const serviceSecurityGroup = new ec2.SecurityGroup(
       this,
       "ServiceSecurityGroup",
@@ -366,13 +285,8 @@ export class BackendConstruct extends Construct {
         allowAllOutbound: true,
       }
     );
-    serviceSecurityGroup.addIngressRule(
-      albSecurityGroup,
-      ec2.Port.tcp(8887),
-      "Allow ALB to reach container"
-    );
 
-    // ECS Service - allows desiredCount: 0
+    // ECS Service - always created regardless of ALB mode
     this.service = new ecs.FargateService(this, "Service", {
       cluster: this.cluster,
       taskDefinition,
@@ -390,42 +304,189 @@ export class BackendConstruct extends Construct {
       maxHealthyPercent: 200,
     });
 
-    // Register service with target group (only if desiredCount > 0)
-    if (config.desiredCount > 0) {
-      this.service.attachToApplicationTargetGroup(targetGroup);
-    }
+    // ===================
+    // Public ALB (optional — disabled for private-only deployments)
+    // ===================
+    const shouldCreatePublicAlb = props.createPublicAlb !== false;
 
-    // Route53 A record
-    if (hostedZone) {
-      // Same-account: use native Route53 construct
-      new route53.ARecord(this, "AliasRecord", {
-        zone: hostedZone,
-        recordName: domainName,
-        target: route53.RecordTarget.fromAlias(
-          new route53Targets.LoadBalancerTarget(this.loadBalancer)
-        ),
+    if (shouldCreatePublicAlb) {
+      // ACM Certificate
+      if (certificateArn) {
+        this.certificate = acm.Certificate.fromCertificateArn(
+          this,
+          "Certificate",
+          certificateArn
+        );
+      } else if (hostedZone) {
+        this.certificate = new acm.Certificate(this, "Certificate", {
+          domainName: domainName,
+          validation: acm.CertificateValidation.fromDns(hostedZone),
+        });
+      } else {
+        this.certificate = new acm.Certificate(this, "Certificate", {
+          domainName: domainName,
+          validation: acm.CertificateValidation.fromDns(),
+        });
+      }
+
+      // Security Group for public ALB
+      const albSecurityGroup = new ec2.SecurityGroup(this, "ALBSecurityGroup", {
+        vpc,
+        securityGroupName: albSgName,
+        description: "Security group for ALB",
+        allowAllOutbound: true,
       });
-    } else if (crossAccountRoute53) {
-      // Cross-account: use custom resource with role assumption
-      new CrossAccountRoute53RecordConstruct(this, "CrossAccountRecord", {
-        recordName: domainName,
-        hostedZoneId: crossAccountRoute53.hostedZoneId,
-        delegationRoleArn: crossAccountRoute53.roleArn,
-        target: {
-          type: "alb",
-          loadBalancer: this.loadBalancer,
-        },
+      albSecurityGroup.addIngressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(443),
+        "Allow HTTPS"
+      );
+      albSecurityGroup.addIngressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(80),
+        "Allow HTTP for redirect"
+      );
+
+      // Application Load Balancer (public)
+      this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "ALB", {
+        vpc,
+        loadBalancerName: albName,
+        internetFacing: true,
+        securityGroup: albSecurityGroup,
       });
-    } else {
-      // Output ALB DNS for manual DNS setup if no hosted zone
-      new cdk.CfnOutput(this, "ALBDnsName", {
-        value: this.loadBalancer.loadBalancerDnsName,
-        description: `ALB DNS - create CNAME ${domainName} -> this value`,
+
+      // Target Group
+      const targetGroup = new elbv2.ApplicationTargetGroup(
+        this,
+        "TargetGroup",
+        {
+          vpc,
+          targetGroupName: tgName,
+          port: 8887,
+          protocol: elbv2.ApplicationProtocol.HTTP,
+          targetType: elbv2.TargetType.IP,
+          healthCheck: {
+            path: "/health",
+            healthyHttpCodes: "200",
+            interval: cdk.Duration.seconds(30),
+            timeout: cdk.Duration.seconds(5),
+            healthyThresholdCount: 2,
+            unhealthyThresholdCount: 3,
+          },
+        }
+      );
+
+      // HTTPS Listener
+      const httpsListener = this.loadBalancer.addListener("HTTPSListener", {
+        port: 443,
+        certificates: [this.certificate],
+        defaultTargetGroups: [targetGroup],
       });
+
+      // HTTP to HTTPS redirect
+      const httpListener = this.loadBalancer.addListener("HTTPListener", {
+        port: 80,
+        defaultAction: elbv2.ListenerAction.redirect({
+          protocol: "HTTPS",
+          port: "443",
+          permanent: true,
+        }),
+      });
+
+      // Allow public ALB to reach ECS tasks
+      serviceSecurityGroup.addIngressRule(
+        albSecurityGroup,
+        ec2.Port.tcp(8887),
+        "Allow ALB to reach container"
+      );
+
+      // Register service with target group (only if desiredCount > 0)
+      if (config.desiredCount > 0) {
+        this.service.attachToApplicationTargetGroup(targetGroup);
+      }
+
+      // Route53 A record
+      if (hostedZone) {
+        new route53.ARecord(this, "AliasRecord", {
+          zone: hostedZone,
+          recordName: domainName,
+          target: route53.RecordTarget.fromAlias(
+            new route53Targets.LoadBalancerTarget(this.loadBalancer)
+          ),
+        });
+      } else if (crossAccountRoute53) {
+        new CrossAccountRoute53RecordConstruct(this, "CrossAccountRecord", {
+          recordName: domainName,
+          hostedZoneId: crossAccountRoute53.hostedZoneId,
+          delegationRoleArn: crossAccountRoute53.roleArn,
+          target: {
+            type: "alb",
+            loadBalancer: this.loadBalancer,
+          },
+        });
+      } else {
+        new cdk.CfnOutput(this, "ALBDnsName", {
+          value: this.loadBalancer.loadBalancerDnsName,
+          description: `ALB DNS - create CNAME ${domainName} -> this value`,
+        });
+      }
+
+      // Public ALB tags
+      addStandardTags(this.loadBalancer, naming.env, albName);
+      addStandardTags(httpsListener, naming.env, httpsListenerName);
+      addStandardTags(httpListener, naming.env, httpListenerName);
+      addStandardTags(albSecurityGroup, naming.env, albSgName);
+      addStandardTags(targetGroup, naming.env, tgName);
+      if (!certificateArn) {
+        addStandardTags(
+          this.certificate as acm.Certificate,
+          naming.env,
+          certName
+        );
+      }
+
+      // Public ALB CloudWatch Alarms (Production only)
+      if (naming.env === "prd" && config.autoScaling) {
+        const http5xxMetric = targetGroup.metrics.httpCodeTarget(
+          elbv2.HttpCodeTarget.TARGET_5XX_COUNT,
+          {
+            period: cdk.Duration.minutes(1),
+            statistic: "Sum",
+          }
+        );
+
+        new cloudwatch.Alarm(this, "High5xxErrorsAlarm", {
+          alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-5xx", "01"),
+          metric: http5xxMetric,
+          threshold: 10,
+          evaluationPeriods: 1,
+          comparisonOperator:
+            cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+          alarmDescription: "Alert when 5xx errors exceed 10 per minute",
+        });
+
+        const unhealthyHostMetric = targetGroup.metrics.unhealthyHostCount({
+          period: cdk.Duration.minutes(2),
+        });
+
+        new cloudwatch.Alarm(this, "UnhealthyTargetsAlarm", {
+          alarmName: n.name(
+            ResourceTypes.CLOUDWATCH_ALARM,
+            "unhealthy-targets",
+            "01"
+          ),
+          metric: unhealthyHostMetric,
+          threshold: 0,
+          evaluationPeriods: 1,
+          comparisonOperator:
+            cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+          alarmDescription: "Alert when any target is unhealthy",
+        });
+      }
     }
 
     // ===================
-    // Auto Scaling
+    // Auto Scaling (always — applies to ECS service regardless of ALB mode)
     // ===================
     if (config.autoScaling && config.desiredCount > 0) {
       const scaling = this.service.autoScaleTaskCount({
@@ -433,7 +494,6 @@ export class BackendConstruct extends Construct {
         maxCapacity: config.autoScaling.maxCount,
       });
 
-      // CPU-based scaling
       scaling.scaleOnCpuUtilization("CpuScaling", {
         targetUtilizationPercent: config.autoScaling.cpuTargetPercent,
         scaleInCooldown: cdk.Duration.seconds(
@@ -444,7 +504,6 @@ export class BackendConstruct extends Construct {
         ),
       });
 
-      // Memory-based scaling (optional)
       if (config.autoScaling.memoryTargetPercent) {
         scaling.scaleOnMemoryUtilization("MemoryScaling", {
           targetUtilizationPercent: config.autoScaling.memoryTargetPercent,
@@ -459,10 +518,9 @@ export class BackendConstruct extends Construct {
     }
 
     // ===================
-    // CloudWatch Alarms (Production only)
+    // CloudWatch Alarms — ECS service metrics (Production only)
     // ===================
     if (naming.env === "prd" && config.autoScaling) {
-      // High CPU Utilization Alarm
       new cloudwatch.Alarm(this, "HighCpuAlarm", {
         alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-cpu", "01"),
         metric: this.service.metricCpuUtilization({
@@ -476,7 +534,6 @@ export class BackendConstruct extends Construct {
           "Alert when CPU utilization exceeds 80% for 10 minutes",
       });
 
-      // High Memory Utilization Alarm
       new cloudwatch.Alarm(this, "HighMemoryAlarm", {
         alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-memory", "01"),
         metric: this.service.metricMemoryUtilization({
@@ -490,46 +547,6 @@ export class BackendConstruct extends Construct {
           "Alert when memory utilization exceeds 80% for 10 minutes",
       });
 
-      // HTTP 5xx Errors Alarm
-      const http5xxMetric = targetGroup.metrics.httpCodeTarget(
-        elbv2.HttpCodeTarget.TARGET_5XX_COUNT,
-        {
-          period: cdk.Duration.minutes(1),
-          statistic: "Sum",
-        }
-      );
-
-      new cloudwatch.Alarm(this, "High5xxErrorsAlarm", {
-        alarmName: n.name(ResourceTypes.CLOUDWATCH_ALARM, "high-5xx", "01"),
-        metric: http5xxMetric,
-        threshold: 10,
-        evaluationPeriods: 1,
-        comparisonOperator:
-          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        alarmDescription: "Alert when 5xx errors exceed 10 per minute",
-      });
-
-      // Unhealthy Target Count Alarm
-      const unhealthyHostMetric = targetGroup.metrics.unhealthyHostCount({
-        period: cdk.Duration.minutes(2),
-      });
-
-      new cloudwatch.Alarm(this, "UnhealthyTargetsAlarm", {
-        alarmName: n.name(
-          ResourceTypes.CLOUDWATCH_ALARM,
-          "unhealthy-targets",
-          "01"
-        ),
-        metric: unhealthyHostMetric,
-        threshold: 0,
-        evaluationPeriods: 1,
-        comparisonOperator:
-          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        alarmDescription: "Alert when any target is unhealthy",
-      });
-
-      // Failed Task Count Alarm (tasks that stopped unexpectedly)
-      // Note: This is approximated using running task count dropping below minimum
       const runningTaskMetric = new cloudwatch.Metric({
         namespace: "AWS/ECS",
         metricName: "CPUUtilization",
@@ -556,26 +573,12 @@ export class BackendConstruct extends Construct {
       });
     }
 
-    // Tags
+    // Tags (always)
     addStandardTags(this.cluster, naming.env, clusterName);
     addStandardTags(this.service, naming.env, serviceName);
     addStandardTags(taskDefinition, naming.env, taskFamily);
-    addStandardTags(this.loadBalancer, naming.env, albName);
-    addStandardTags(httpsListener, naming.env, httpsListenerName);
-    addStandardTags(httpListener, naming.env, httpListenerName);
-    addStandardTags(albSecurityGroup, naming.env, albSgName);
     addStandardTags(serviceSecurityGroup, naming.env, ecsSgName);
-    addStandardTags(targetGroup, naming.env, tgName);
     addStandardTags(logGroup, naming.env, logGroupName);
-    // OTEL log groups are imported (not CDK-managed), tags set via AWS CLI
-    // Only tag certificate if it was created (not imported)
-    if (!certificateArn) {
-      addStandardTags(
-        this.certificate as acm.Certificate,
-        naming.env,
-        certName
-      );
-    }
   }
 
   /**

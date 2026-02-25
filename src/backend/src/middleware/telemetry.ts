@@ -39,7 +39,8 @@ export function telemetryMiddleware(
   req.startTime = Date.now();
 
   // Skip telemetry for health checks (high frequency, low value)
-  if (req.path === "/health") {
+  // Check both root and /api prefix (shared ALB path-based routing)
+  if (req.path === "/health" || req.path === "/api/health") {
     return next();
   }
 

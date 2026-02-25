@@ -92,7 +92,7 @@ export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
   baseDomain: string; // 'tratin.com'
-  privateDomain?: string; // Private hosted zone domain (e.g., 'stg-ait.goldstarfoods.com')
+  privateDomain?: string; // Private hosted zone domain (deprecated — DNS managed by other team)
   aurora: AuroraConfig;
   ecs: EcsConfig;
   vpc: VpcConfig;
@@ -100,6 +100,9 @@ export interface EnvironmentConfig {
   dms?: DmsConfig;
   waf?: WafConfig;
   frontendEcs?: EcsConfig; // Private frontend deployment via nginx + ECS
+  privateFrontendUrl?: string; // Private frontend URL managed by other team (e.g., 'https://aitdev.goldstarfoods.com')
+  backendPublicAlb?: boolean; // Create public-facing backend ALB (default: true)
+  publicFrontend?: boolean; // Create CloudFront + S3 frontend (default: true)
 }
 
 export const environments: Record<string, EnvironmentConfig> = {
@@ -107,7 +110,9 @@ export const environments: Record<string, EnvironmentConfig> = {
     envName: "dev",
     domainPrefix: "dev", // dev.tratin.com, dev-be.tratin.com
     baseDomain: "tratin.com",
-    privateDomain: "stg-ait.goldstarfoods.com",
+    privateFrontendUrl: "https://aitdev.goldstarfoods.com",
+    backendPublicAlb: true,
+    publicFrontend: true,
     aurora: {
       minCapacity: 0.5, // Min 0.5 ACU (~$0.06/hour when active)
       maxCapacity: 2, // Max 2 ACU
@@ -173,7 +178,9 @@ export const environments: Record<string, EnvironmentConfig> = {
     envName: "prd",
     domainPrefix: "", // ait.tratin.com (без префикса dev)
     baseDomain: "tratin.com",
-    privateDomain: "ait.goldstarfoods.com",
+    privateFrontendUrl: "https://ait.goldstarfoods.com",
+    backendPublicAlb: false,
+    publicFrontend: false,
     aurora: {
       minCapacity: 0.5, // Scales to 0.5 at idle
       maxCapacity: 8, // Max 8 ACU for load

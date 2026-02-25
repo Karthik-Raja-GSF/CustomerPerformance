@@ -21,8 +21,8 @@ export interface FrontendEcsConstructProps {
   vpc: ec2.IVpc;
   cluster: ecs.ICluster;
   ecrRepository: ecr.IRepository;
-  privateHostedZone: route53.IPrivateHostedZone;
-  domainName: string;
+  privateHostedZone?: route53.IPrivateHostedZone;
+  domainName?: string;
   certificateArn?: string;
   config: EcsConfig;
   naming: NamingConfig;
@@ -32,6 +32,7 @@ export interface FrontendEcsConstructProps {
 export class FrontendEcsConstruct extends Construct {
   public readonly service: ecs.FargateService;
   public readonly loadBalancer: elbv2.ApplicationLoadBalancer;
+  public readonly httpListener: elbv2.ApplicationListener;
   public readonly certificate?: acm.ICertificate;
 
   constructor(scope: Construct, id: string, props: FrontendEcsConstructProps) {
@@ -184,7 +185,6 @@ export class FrontendEcsConstruct extends Construct {
 
     // Listeners: HTTPS + redirect when cert available, HTTP-only otherwise
     let httpsListener: elbv2.ApplicationListener | undefined;
-    let httpListener: elbv2.ApplicationListener;
 
     if (this.certificate) {
       // HTTPS Listener (primary)
@@ -195,7 +195,7 @@ export class FrontendEcsConstruct extends Construct {
       });
 
       // HTTP → HTTPS redirect
-      httpListener = this.loadBalancer.addListener("HTTPListener", {
+      this.httpListener = this.loadBalancer.addListener("HTTPListener", {
         port: 80,
         defaultAction: elbv2.ListenerAction.redirect({
           protocol: "HTTPS",
@@ -205,7 +205,7 @@ export class FrontendEcsConstruct extends Construct {
       });
     } else {
       // HTTP-only (no certificate)
-      httpListener = this.loadBalancer.addListener("HTTPListener", {
+      this.httpListener = this.loadBalancer.addListener("HTTPListener", {
         port: 80,
         defaultTargetGroups: [targetGroup],
       });
@@ -247,14 +247,16 @@ export class FrontendEcsConstruct extends Construct {
       this.service.attachToApplicationTargetGroup(targetGroup);
     }
 
-    // Route53 A Record in Private Hosted Zone
-    new route53.ARecord(this, "PrivateAliasRecord", {
-      zone: privateHostedZone,
-      recordName: domainName,
-      target: route53.RecordTarget.fromAlias(
-        new route53Targets.LoadBalancerTarget(this.loadBalancer)
-      ),
-    });
+    // Route53 A Record in Private Hosted Zone (only when PHZ is provided)
+    if (privateHostedZone && domainName) {
+      new route53.ARecord(this, "PrivateAliasRecord", {
+        zone: privateHostedZone,
+        recordName: domainName,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.LoadBalancerTarget(this.loadBalancer)
+        ),
+      });
+    }
 
     // Auto Scaling
     if (config.autoScaling && config.desiredCount > 0) {
@@ -293,7 +295,7 @@ export class FrontendEcsConstruct extends Construct {
     if (httpsListener) {
       addStandardTags(httpsListener, naming.env, httpsListenerName);
     }
-    addStandardTags(httpListener, naming.env, httpListenerName);
+    addStandardTags(this.httpListener, naming.env, httpListenerName);
     addStandardTags(albSecurityGroup, naming.env, albSgName);
     addStandardTags(serviceSecurityGroup, naming.env, ecsSgName);
     addStandardTags(targetGroup, naming.env, tgName);
