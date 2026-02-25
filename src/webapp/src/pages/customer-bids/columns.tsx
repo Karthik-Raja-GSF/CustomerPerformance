@@ -37,6 +37,7 @@ import { EditableCheckboxCell } from "@/components/editable-cells/EditableCheckb
 import { EditableMonthsCell } from "@/components/editable-cells/EditableMonthsCell";
 import {
   ESTIMATE_MONTHS,
+  LY_MONTHS,
   YEAR_AROUND_ESTIMATE_MONTHS,
   type MonthKey,
 } from "@/utils/menu-months";
@@ -64,6 +65,24 @@ function getVisibleEstimateMonths(
   }
   // Show only months selected in local menu month state
   return ESTIMATE_MONTHS.filter((m) => menuMonths[m.menuKey]);
+}
+
+/**
+ * Get visible LY months based on yearAround flag and local menu month state.
+ * Mirrors getVisibleEstimateMonths but returns LY_MONTHS entries.
+ */
+function getVisibleLyMonths(
+  data: CustomerBidDto,
+  menuMonths: Record<MonthKey, boolean>
+): (typeof LY_MONTHS)[number][] {
+  if (data.yearAround) {
+    return LY_MONTHS.filter((m) =>
+      YEAR_AROUND_ESTIMATE_MONTHS.includes(
+        m.menuKey as (typeof YEAR_AROUND_ESTIMATE_MONTHS)[number]
+      )
+    );
+  }
+  return LY_MONTHS.filter((m) => menuMonths[m.menuKey]);
 }
 
 interface SortableHeaderProps<TData, TValue> {
@@ -640,6 +659,123 @@ export function createColumns(
         </div>
       ),
     },
+    {
+      accessorKey: "lyNovember",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Nov
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyNovember"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyDecember",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Dec
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyDecember"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyJanuary",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Jan
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyJanuary"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyFebruary",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Feb
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyFebruary"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyMarch",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Mar
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyMarch"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyApril",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Apr
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyApril"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyMay",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY May
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyMay"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyJune",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Jun
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyJune"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "lyJuly",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          LY Jul
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("lyJuly"))}
+        </div>
+      ),
+    },
     // User-editable columns
     {
       accessorKey: "yearAround",
@@ -693,6 +829,41 @@ export function createColumns(
               onMenuMonthsChange(row.original, months);
             }}
           />
+        );
+      },
+    },
+    // Dynamic LY column - shows last year values for selected menu months (read-only)
+    {
+      id: "lyMonths",
+      header: () => (
+        <div className="text-center text-muted-foreground font-medium">
+          LY Actuals By Months
+        </div>
+      ),
+      cell: ({ row }) => {
+        const menuMonths = getMenuMonths(row.original);
+        const visibleMonths = getVisibleLyMonths(row.original, menuMonths);
+
+        if (visibleMonths.length === 0) {
+          return <div className="text-center text-muted-foreground">-</div>;
+        }
+
+        return (
+          <div className="flex gap-2 justify-center">
+            {visibleMonths.map((month) => (
+              <div
+                key={month.menuKey}
+                className="flex flex-col items-center min-w-[60px]"
+              >
+                <span className="text-xs text-muted-foreground mb-1">
+                  LY {month.label}
+                </span>
+                <div className="text-right font-medium tabular-nums">
+                  {formatNumber(row.original[month.lyKey])}
+                </div>
+              </div>
+            ))}
+          </div>
         );
       },
     },

@@ -203,7 +203,7 @@ function handleCustomerBidError(
  *
  * Response includes:
  * - dateRange: The date range used for querying based on schoolYear
- * - Pre-calculated fields: lastYearBidQty, lastYearActual, lyAugust, lySeptember, lyOctober, isLost
+ * - Pre-calculated fields: lastYearBidQty, lastYearActual, lyAugust-lyJuly (all 12 months), isLost
  * - User-editable fields: confirmed, augustDemand, septemberDemand, octoberDemand
  */
 router.get(

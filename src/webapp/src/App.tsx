@@ -47,7 +47,25 @@ function App() {
           <Route path="/customer-bids-sync" element={<CustomerBidsSync />} />
           <Route
             path="/back-to-school"
-            element={<CustomerBids defaultExcludeItemPrefixes="6,8" />}
+            element={
+              <CustomerBids
+                defaultExcludeItemPrefixes="6,8"
+                defaultColumnVisibility={{
+                  lyAugust: false,
+                  lySeptember: false,
+                  lyOctober: false,
+                  lyNovember: false,
+                  lyDecember: false,
+                  lyJanuary: false,
+                  lyFebruary: false,
+                  lyMarch: false,
+                  lyApril: false,
+                  lyMay: false,
+                  lyJune: false,
+                  lyJuly: false,
+                }}
+              />
+            }
           />
           <Route
             path="/demand-planning/monthly-forecast"

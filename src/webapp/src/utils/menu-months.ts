@@ -44,6 +44,26 @@ export const ESTIMATE_MONTHS = [
 export type EstimateKey = (typeof ESTIMATE_MONTHS)[number]["estimateKey"];
 
 /**
+ * Last Year months mapping - links menu month keys to LY field keys on CustomerBidDto
+ */
+export const LY_MONTHS = [
+  { menuKey: "menuJan", lyKey: "lyJanuary", label: "Jan" },
+  { menuKey: "menuFeb", lyKey: "lyFebruary", label: "Feb" },
+  { menuKey: "menuMar", lyKey: "lyMarch", label: "Mar" },
+  { menuKey: "menuApr", lyKey: "lyApril", label: "Apr" },
+  { menuKey: "menuMay", lyKey: "lyMay", label: "May" },
+  { menuKey: "menuJun", lyKey: "lyJune", label: "Jun" },
+  { menuKey: "menuJul", lyKey: "lyJuly", label: "Jul" },
+  { menuKey: "menuAug", lyKey: "lyAugust", label: "Aug" },
+  { menuKey: "menuSep", lyKey: "lySeptember", label: "Sep" },
+  { menuKey: "menuOct", lyKey: "lyOctober", label: "Oct" },
+  { menuKey: "menuNov", lyKey: "lyNovember", label: "Nov" },
+  { menuKey: "menuDec", lyKey: "lyDecember", label: "Dec" },
+] as const;
+
+export type LyKey = (typeof LY_MONTHS)[number]["lyKey"];
+
+/**
  * Default months to show for Year Around items: Aug, Sep, Oct
  */
 export const YEAR_AROUND_ESTIMATE_MONTHS = [

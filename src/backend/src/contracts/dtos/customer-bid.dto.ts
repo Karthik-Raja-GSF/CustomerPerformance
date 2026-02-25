@@ -56,6 +56,24 @@ export interface CustomerBidDto {
   lySeptember: number | null;
   /** Last year October sales amount */
   lyOctober: number | null;
+  /** Last year November sales amount */
+  lyNovember: number | null;
+  /** Last year December sales amount */
+  lyDecember: number | null;
+  /** Last year January sales amount */
+  lyJanuary: number | null;
+  /** Last year February sales amount */
+  lyFebruary: number | null;
+  /** Last year March sales amount */
+  lyMarch: number | null;
+  /** Last year April sales amount */
+  lyApril: number | null;
+  /** Last year May sales amount */
+  lyMay: number | null;
+  /** Last year June sales amount */
+  lyJune: number | null;
+  /** Last year July sales amount */
+  lyJuly: number | null;
   /** True if item was in previous year but NOT in current year */
   isLost: boolean;
 

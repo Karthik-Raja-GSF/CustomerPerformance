@@ -61,6 +61,15 @@ interface BaseBidRow {
   lyAugust: Prisma.Decimal | null;
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
+  lyNovember: Prisma.Decimal | null;
+  lyDecember: Prisma.Decimal | null;
+  lyJanuary: Prisma.Decimal | null;
+  lyFebruary: Prisma.Decimal | null;
+  lyMarch: Prisma.Decimal | null;
+  lyApril: Prisma.Decimal | null;
+  lyMay: Prisma.Decimal | null;
+  lyJune: Prisma.Decimal | null;
+  lyJuly: Prisma.Decimal | null;
   isLost: boolean | null;
   lastUpdatedAt: Date | null;
   lastUpdatedBy: string | null;
@@ -181,6 +190,15 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_august AS "lyAugust",
             cbd.ly_september AS "lySeptember",
             cbd.ly_october AS "lyOctober",
+            cbd.ly_november AS "lyNovember",
+            cbd.ly_december AS "lyDecember",
+            cbd.ly_january AS "lyJanuary",
+            cbd.ly_february AS "lyFebruary",
+            cbd.ly_march AS "lyMarch",
+            cbd.ly_april AS "lyApril",
+            cbd.ly_may AS "lyMay",
+            cbd.ly_june AS "lyJune",
+            cbd.ly_july AS "lyJuly",
             cbd.is_lost AS "isLost",
             cbd.last_updated_at AS "lastUpdatedAt",
             cbd.last_updated_by AS "lastUpdatedBy",
@@ -244,6 +262,15 @@ export class CustomerBidService implements ICustomerBidService {
         lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
         lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
         lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
+        lyNovember: row.lyNovember ? Number(row.lyNovember) : null,
+        lyDecember: row.lyDecember ? Number(row.lyDecember) : null,
+        lyJanuary: row.lyJanuary ? Number(row.lyJanuary) : null,
+        lyFebruary: row.lyFebruary ? Number(row.lyFebruary) : null,
+        lyMarch: row.lyMarch ? Number(row.lyMarch) : null,
+        lyApril: row.lyApril ? Number(row.lyApril) : null,
+        lyMay: row.lyMay ? Number(row.lyMay) : null,
+        lyJune: row.lyJune ? Number(row.lyJune) : null,
+        lyJuly: row.lyJuly ? Number(row.lyJuly) : null,
         isLost: row.isLost ?? false,
         lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
         lastUpdatedBy: row.lastUpdatedBy ?? null,
@@ -696,6 +723,15 @@ export class CustomerBidService implements ICustomerBidService {
     lyAugust: Prisma.Decimal | null;
     lySeptember: Prisma.Decimal | null;
     lyOctober: Prisma.Decimal | null;
+    lyNovember: Prisma.Decimal | null;
+    lyDecember: Prisma.Decimal | null;
+    lyJanuary: Prisma.Decimal | null;
+    lyFebruary: Prisma.Decimal | null;
+    lyMarch: Prisma.Decimal | null;
+    lyApril: Prisma.Decimal | null;
+    lyMay: Prisma.Decimal | null;
+    lyJune: Prisma.Decimal | null;
+    lyJuly: Prisma.Decimal | null;
     isLost: boolean;
     lastUpdatedAt: Date | null;
     lastUpdatedBy: string | null;
@@ -740,6 +776,15 @@ export class CustomerBidService implements ICustomerBidService {
       lyAugust: decimalToNumber(record.lyAugust),
       lySeptember: decimalToNumber(record.lySeptember),
       lyOctober: decimalToNumber(record.lyOctober),
+      lyNovember: decimalToNumber(record.lyNovember),
+      lyDecember: decimalToNumber(record.lyDecember),
+      lyJanuary: decimalToNumber(record.lyJanuary),
+      lyFebruary: decimalToNumber(record.lyFebruary),
+      lyMarch: decimalToNumber(record.lyMarch),
+      lyApril: decimalToNumber(record.lyApril),
+      lyMay: decimalToNumber(record.lyMay),
+      lyJune: decimalToNumber(record.lyJune),
+      lyJuly: decimalToNumber(record.lyJuly),
       isLost: record.isLost,
       lastUpdatedAt: record.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: record.lastUpdatedBy ?? null,
@@ -1001,6 +1046,15 @@ export class CustomerBidService implements ICustomerBidService {
           augQty: Prisma.Decimal;
           sepQty: Prisma.Decimal;
           octQty: Prisma.Decimal;
+          novQty: Prisma.Decimal;
+          decQty: Prisma.Decimal;
+          janQty: Prisma.Decimal;
+          febQty: Prisma.Decimal;
+          marQty: Prisma.Decimal;
+          aprQty: Prisma.Decimal;
+          mayQty: Prisma.Decimal;
+          junQty: Prisma.Decimal;
+          julQty: Prisma.Decimal;
         }
       >();
       const lastYearSales = await this.prisma.$queryRaw<
@@ -1013,6 +1067,15 @@ export class CustomerBidService implements ICustomerBidService {
           august_qty: Prisma.Decimal;
           september_qty: Prisma.Decimal;
           october_qty: Prisma.Decimal;
+          november_qty: Prisma.Decimal;
+          december_qty: Prisma.Decimal;
+          january_qty: Prisma.Decimal;
+          february_qty: Prisma.Decimal;
+          march_qty: Prisma.Decimal;
+          april_qty: Prisma.Decimal;
+          may_qty: Prisma.Decimal;
+          june_qty: Prisma.Decimal;
+          july_qty: Prisma.Decimal;
         }>
       >(Prisma.sql`
         SELECT
@@ -1023,7 +1086,16 @@ export class CustomerBidService implements ICustomerBidService {
             ABS(SUM(ile.quantity)) AS total_quantity,
             ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 8 THEN ile.quantity ELSE 0 END)) AS august_qty,
             ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 9 THEN ile.quantity ELSE 0 END)) AS september_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 10 THEN ile.quantity ELSE 0 END)) AS october_qty
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 10 THEN ile.quantity ELSE 0 END)) AS october_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 11 THEN ile.quantity ELSE 0 END)) AS november_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 12 THEN ile.quantity ELSE 0 END)) AS december_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 1 THEN ile.quantity ELSE 0 END)) AS january_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 2 THEN ile.quantity ELSE 0 END)) AS february_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 3 THEN ile.quantity ELSE 0 END)) AS march_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 4 THEN ile.quantity ELSE 0 END)) AS april_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 5 THEN ile.quantity ELSE 0 END)) AS may_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 6 THEN ile.quantity ELSE 0 END)) AS june_qty,
+            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 7 THEN ile.quantity ELSE 0 END)) AS july_qty
         FROM dw2_nav.item_ledger_entry ile
         INNER JOIN dw2_nav.sales_invoice_header sih
             ON ile.document_no_ = sih.no_
@@ -1060,6 +1132,15 @@ export class CustomerBidService implements ICustomerBidService {
           augQty: row.august_qty,
           sepQty: row.september_qty,
           octQty: row.october_qty,
+          novQty: row.november_qty,
+          decQty: row.december_qty,
+          janQty: row.january_qty,
+          febQty: row.february_qty,
+          marQty: row.march_qty,
+          aprQty: row.april_qty,
+          mayQty: row.may_qty,
+          junQty: row.june_qty,
+          julQty: row.july_qty,
         });
       }
 
@@ -1143,6 +1224,15 @@ export class CustomerBidService implements ICustomerBidService {
             lyAugust: salesData?.augQty ?? null,
             lySeptember: salesData?.sepQty ?? null,
             lyOctober: salesData?.octQty ?? null,
+            lyNovember: salesData?.novQty ?? null,
+            lyDecember: salesData?.decQty ?? null,
+            lyJanuary: salesData?.janQty ?? null,
+            lyFebruary: salesData?.febQty ?? null,
+            lyMarch: salesData?.marQty ?? null,
+            lyApril: salesData?.aprQty ?? null,
+            lyMay: salesData?.mayQty ?? null,
+            lyJune: salesData?.junQty ?? null,
+            lyJuly: salesData?.julQty ?? null,
           };
         });
 
@@ -1153,7 +1243,10 @@ export class CustomerBidService implements ICustomerBidService {
               source_db, site_code, customer_bill_to, item_no, school_year,
               bid_qty, bid_start, bid_end, erp_status,
               last_year_bid_qty, is_lost, last_year_actual,
-              ly_august, ly_september, ly_october, synced_at, updated_at
+              ly_august, ly_september, ly_october,
+              ly_november, ly_december, ly_january, ly_february,
+              ly_march, ly_april, ly_may, ly_june, ly_july,
+              synced_at, updated_at
             )
             SELECT * FROM UNNEST(
               ${batchData.map((d) => d.sourceDb)}::text[],
@@ -1171,6 +1264,15 @@ export class CustomerBidService implements ICustomerBidService {
               ${batchData.map((d) => (d.lyAugust ? Number(d.lyAugust) : null))}::decimal[],
               ${batchData.map((d) => (d.lySeptember ? Number(d.lySeptember) : null))}::decimal[],
               ${batchData.map((d) => (d.lyOctober ? Number(d.lyOctober) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyNovember ? Number(d.lyNovember) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyDecember ? Number(d.lyDecember) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyJanuary ? Number(d.lyJanuary) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyFebruary ? Number(d.lyFebruary) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyMarch ? Number(d.lyMarch) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyApril ? Number(d.lyApril) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyMay ? Number(d.lyMay) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyJune ? Number(d.lyJune) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyJuly ? Number(d.lyJuly) : null))}::decimal[],
               ${batchData.map(() => now)}::timestamp[],
               ${batchData.map(() => now)}::timestamp[]
             )
@@ -1186,6 +1288,15 @@ export class CustomerBidService implements ICustomerBidService {
               ly_august = EXCLUDED.ly_august,
               ly_september = EXCLUDED.ly_september,
               ly_october = EXCLUDED.ly_october,
+              ly_november = EXCLUDED.ly_november,
+              ly_december = EXCLUDED.ly_december,
+              ly_january = EXCLUDED.ly_january,
+              ly_february = EXCLUDED.ly_february,
+              ly_march = EXCLUDED.ly_march,
+              ly_april = EXCLUDED.ly_april,
+              ly_may = EXCLUDED.ly_may,
+              ly_june = EXCLUDED.ly_june,
+              ly_july = EXCLUDED.ly_july,
               synced_at = EXCLUDED.synced_at,
               updated_at = EXCLUDED.updated_at
             RETURNING xmax::text
@@ -1251,6 +1362,15 @@ export class CustomerBidService implements ICustomerBidService {
             lyAugust: salesData?.augQty ?? null,
             lySeptember: salesData?.sepQty ?? null,
             lyOctober: salesData?.octQty ?? null,
+            lyNovember: salesData?.novQty ?? null,
+            lyDecember: salesData?.decQty ?? null,
+            lyJanuary: salesData?.janQty ?? null,
+            lyFebruary: salesData?.febQty ?? null,
+            lyMarch: salesData?.marQty ?? null,
+            lyApril: salesData?.aprQty ?? null,
+            lyMay: salesData?.mayQty ?? null,
+            lyJune: salesData?.junQty ?? null,
+            lyJuly: salesData?.julQty ?? null,
             syncedAt,
           };
         });
@@ -1261,7 +1381,10 @@ export class CustomerBidService implements ICustomerBidService {
             INSERT INTO ait.customer_bid_data (
               source_db, site_code, customer_bill_to, item_no, school_year,
               erp_status, last_year_bid_qty, is_lost,
-              last_year_actual, ly_august, ly_september, ly_october, synced_at, updated_at
+              last_year_actual, ly_august, ly_september, ly_october,
+              ly_november, ly_december, ly_january, ly_february,
+              ly_march, ly_april, ly_may, ly_june, ly_july,
+              synced_at, updated_at
             )
             SELECT * FROM UNNEST(
               ${batchData.map((d) => d.sourceDb)}::text[],
@@ -1276,6 +1399,15 @@ export class CustomerBidService implements ICustomerBidService {
               ${batchData.map((d) => (d.lyAugust ? Number(d.lyAugust) : null))}::decimal[],
               ${batchData.map((d) => (d.lySeptember ? Number(d.lySeptember) : null))}::decimal[],
               ${batchData.map((d) => (d.lyOctober ? Number(d.lyOctober) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyNovember ? Number(d.lyNovember) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyDecember ? Number(d.lyDecember) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyJanuary ? Number(d.lyJanuary) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyFebruary ? Number(d.lyFebruary) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyMarch ? Number(d.lyMarch) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyApril ? Number(d.lyApril) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyMay ? Number(d.lyMay) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyJune ? Number(d.lyJune) : null))}::decimal[],
+              ${batchData.map((d) => (d.lyJuly ? Number(d.lyJuly) : null))}::decimal[],
               ${batchData.map(() => syncedAt)}::timestamp[],
               ${batchData.map(() => syncedAt)}::timestamp[]
             )
@@ -1288,6 +1420,15 @@ export class CustomerBidService implements ICustomerBidService {
               ly_august = EXCLUDED.ly_august,
               ly_september = EXCLUDED.ly_september,
               ly_october = EXCLUDED.ly_october,
+              ly_november = EXCLUDED.ly_november,
+              ly_december = EXCLUDED.ly_december,
+              ly_january = EXCLUDED.ly_january,
+              ly_february = EXCLUDED.ly_february,
+              ly_march = EXCLUDED.ly_march,
+              ly_april = EXCLUDED.ly_april,
+              ly_may = EXCLUDED.ly_may,
+              ly_june = EXCLUDED.ly_june,
+              ly_july = EXCLUDED.ly_july,
               synced_at = EXCLUDED.synced_at,
               updated_at = EXCLUDED.updated_at
             RETURNING xmax::text

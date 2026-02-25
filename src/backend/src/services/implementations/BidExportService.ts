@@ -56,6 +56,15 @@ interface QueuedBidRow {
   lyAugust: Prisma.Decimal | null;
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
+  lyNovember: Prisma.Decimal | null;
+  lyDecember: Prisma.Decimal | null;
+  lyJanuary: Prisma.Decimal | null;
+  lyFebruary: Prisma.Decimal | null;
+  lyMarch: Prisma.Decimal | null;
+  lyApril: Prisma.Decimal | null;
+  lyMay: Prisma.Decimal | null;
+  lyJune: Prisma.Decimal | null;
+  lyJuly: Prisma.Decimal | null;
   isLost: boolean | null;
   lastUpdatedAt: Date | null;
   lastUpdatedBy: string | null;
@@ -741,6 +750,15 @@ export class BidExportService implements IBidExportService {
           cbd.ly_august AS "lyAugust",
           cbd.ly_september AS "lySeptember",
           cbd.ly_october AS "lyOctober",
+          cbd.ly_november AS "lyNovember",
+          cbd.ly_december AS "lyDecember",
+          cbd.ly_january AS "lyJanuary",
+          cbd.ly_february AS "lyFebruary",
+          cbd.ly_march AS "lyMarch",
+          cbd.ly_april AS "lyApril",
+          cbd.ly_may AS "lyMay",
+          cbd.ly_june AS "lyJune",
+          cbd.ly_july AS "lyJuly",
           cbd.is_lost AS "isLost",
           cbd.last_updated_at AS "lastUpdatedAt",
           cbd.last_updated_by AS "lastUpdatedBy",
@@ -890,6 +908,15 @@ export class BidExportService implements IBidExportService {
       lyAugust: decimalToNumber(row.lyAugust),
       lySeptember: decimalToNumber(row.lySeptember),
       lyOctober: decimalToNumber(row.lyOctober),
+      lyNovember: decimalToNumber(row.lyNovember),
+      lyDecember: decimalToNumber(row.lyDecember),
+      lyJanuary: decimalToNumber(row.lyJanuary),
+      lyFebruary: decimalToNumber(row.lyFebruary),
+      lyMarch: decimalToNumber(row.lyMarch),
+      lyApril: decimalToNumber(row.lyApril),
+      lyMay: decimalToNumber(row.lyMay),
+      lyJune: decimalToNumber(row.lyJune),
+      lyJuly: decimalToNumber(row.lyJuly),
       isLost: row.isLost ?? false,
       lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: row.lastUpdatedBy ?? null,

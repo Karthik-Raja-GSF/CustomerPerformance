@@ -57,18 +57,6 @@ export function EditableMonthsCell({
     }));
   };
 
-  const handleSelectAll = () => {
-    setLocalMonths(
-      MENU_MONTHS.reduce(
-        (acc, m) => {
-          acc[m.key] = true;
-          return acc;
-        },
-        {} as Record<MonthKey, boolean>
-      )
-    );
-  };
-
   const handleClearAll = () => {
     setLocalMonths(
       MENU_MONTHS.reduce(
@@ -159,24 +147,14 @@ export function EditableMonthsCell({
           {/* Header with select all / clear all */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Menu Months</span>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={handleSelectAll}
-              >
-                All
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={handleClearAll}
-              >
-                None
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={handleClearAll}
+            >
+              None
+            </Button>
           </div>
 
           {/* Month toggles in a 4x3 grid */}
