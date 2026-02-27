@@ -176,12 +176,17 @@ export class AitStack extends cdk.Stack {
       additionalFrontendUrls.push(config.privateFrontendUrl);
     }
 
+    const isProd = config.envName === "prd" || config.envName === "prod";
+
     const authConstruct = new AuthConstruct(this, "Auth", {
       envName: config.envName,
       frontendUrl: primaryFrontendUrl,
       naming,
       azureAdMetadataUrl,
       additionalFrontendUrls,
+      // Prod: CloudFormation manages custom attributes (added by previous CDK deploy).
+      // Dev: custom attributes were added via CLI — omit to avoid property mismatch.
+      createCustomAttributes: isProd,
     });
 
     // ===================

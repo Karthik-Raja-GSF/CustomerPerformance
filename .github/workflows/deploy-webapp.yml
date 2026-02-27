@@ -134,154 +134,157 @@ jobs:
           echo "❌ Frontend health check failed after 10 attempts"
           exit 1
 
-  approval-gate:
-    name: Approve Production Deployment
-    needs: deploy-dev
-    runs-on: ubuntu-latest
-    environment: approval
-
-    steps:
-      - name: Production deployment approved
-        run: |
-          echo "## Production Deployment Approved ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Dev deployment successful. Proceeding with prod build and deployment..." >> $GITHUB_STEP_SUMMARY
-
-  build-prod:
-    name: Build Frontend (Prod)
-    needs: approval-gate
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm --filter webapp typecheck
-
-      - name: Build webapp (Prod)
-        run: pnpm --filter webapp build
-        env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID_PROD }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID_PROD }}
-          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION_PROD }}
-          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN_PROD }}
-          VITE_COGNITO_AZURE_AD_IDP_NAME: ${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME_PROD }}
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD }}
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: webapp-dist-prod
-          path: src/webapp/dist
-          retention-days: 7
-
-  deploy-prod:
-    name: Deploy to Prod
-    needs: build-prod
-    runs-on: ubuntu-latest
-    environment: production
-
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: webapp-dist-prod
-          path: dist
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy to S3
-        run: |
-          echo "Deploying to S3 bucket: ${{ secrets.S3_BUCKET_PROD }}"
-
-          # Sync static assets with aggressive caching (1 year)
-          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_PROD }} \
-            --delete \
-            --cache-control "public, max-age=31536000, immutable" \
-            --exclude "index.html" \
-            --exclude "*.json"
-
-          # Upload index.html with no-cache (always fetch latest)
-          aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET_PROD }}/index.html \
-            --cache-control "no-cache, no-store, must-revalidate"
-
-          # Upload any JSON files with no-cache (if they exist)
-          if ls dist/*.json 1> /dev/null 2>&1; then
-            aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_PROD }} \
-              --exclude "*" \
-              --include "*.json" \
-              --cache-control "no-cache, no-store, must-revalidate"
-          fi
-
-          echo "✅ S3 sync complete"
-
-      - name: Invalidate CloudFront cache
-        run: |
-          echo "Invalidating CloudFront cache for distribution: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}"
-
-          INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
-            --paths "/*" \
-            --query 'Invalidation.Id' \
-            --output text)
-
-          echo "Invalidation ID: $INVALIDATION_ID"
-
-          echo "Waiting for cache invalidation to complete..."
-          aws cloudfront wait invalidation-completed \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
-            --id $INVALIDATION_ID \
-            --cli-read-timeout 300 || echo "⚠️ Invalidation still in progress"
-
-          echo "✅ CloudFront cache invalidation complete"
-
-      - name: Verify frontend health
-        run: |
-          FRONTEND_URL="https://ait.tratin.com"
-          echo "Verifying frontend is accessible at $FRONTEND_URL..."
-
-          for i in {1..10}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $FRONTEND_URL || echo "000")
-
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Frontend health check passed (HTTP $HTTP_CODE)"
-              exit 0
-            fi
-
-            echo "⏳ Health check attempt $i/10 failed (HTTP $HTTP_CODE), retrying..."
-            sleep 6
-          done
-
-          echo "❌ Frontend health check failed after 10 attempts"
-          exit 1
-
-      - name: Deployment summary
-        if: success()
-        run: |
-          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** production" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://ait.tratin.com" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ S3 sync complete" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ CloudFront cache invalidated" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Frontend health check passed" >> $GITHUB_STEP_SUMMARY
+  # [DEPRECATION] Production deployment disabled — prod frontend is served via ECS privately.
+  # Uncomment the jobs below to re-enable S3/CloudFront production deployment.
+  #
+  # approval-gate:
+  #   name: Approve Production Deployment
+  #   needs: deploy-dev
+  #   runs-on: ubuntu-latest
+  #   environment: approval
+  #
+  #   steps:
+  #     - name: Production deployment approved
+  #       run: |
+  #         echo "## Production Deployment Approved ✅" >> $GITHUB_STEP_SUMMARY
+  #         echo "" >> $GITHUB_STEP_SUMMARY
+  #         echo "Dev deployment successful. Proceeding with prod build and deployment..." >> $GITHUB_STEP_SUMMARY
+  #
+  # build-prod:
+  #   name: Build Frontend (Prod)
+  #   needs: approval-gate
+  #   runs-on: ubuntu-latest
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v4
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: "pnpm"
+  #
+  #     - name: Install dependencies
+  #       run: pnpm install --frozen-lockfile
+  #
+  #     - name: Typecheck
+  #       run: pnpm --filter webapp typecheck
+  #
+  #     - name: Build webapp (Prod)
+  #       run: pnpm --filter webapp build
+  #       env:
+  #         VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID_PROD }}
+  #         VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID_PROD }}
+  #         VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION_PROD }}
+  #         VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN_PROD }}
+  #         VITE_COGNITO_AZURE_AD_IDP_NAME: ${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME_PROD }}
+  #         VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD }}
+  #
+  #     - name: Upload build artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: webapp-dist-prod
+  #         path: src/webapp/dist
+  #         retention-days: 7
+  #
+  # deploy-prod:
+  #   name: Deploy to Prod
+  #   needs: build-prod
+  #   runs-on: ubuntu-latest
+  #   environment: production
+  #
+  #   steps:
+  #     - name: Download build artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: webapp-dist-prod
+  #         path: dist
+  #
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+  #         aws-region: ${{ env.AWS_REGION }}
+  #
+  #     - name: Deploy to S3
+  #       run: |
+  #         echo "Deploying to S3 bucket: ${{ secrets.S3_BUCKET_PROD }}"
+  #
+  #         # Sync static assets with aggressive caching (1 year)
+  #         aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_PROD }} \
+  #           --delete \
+  #           --cache-control "public, max-age=31536000, immutable" \
+  #           --exclude "index.html" \
+  #           --exclude "*.json"
+  #
+  #         # Upload index.html with no-cache (always fetch latest)
+  #         aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET_PROD }}/index.html \
+  #           --cache-control "no-cache, no-store, must-revalidate"
+  #
+  #         # Upload any JSON files with no-cache (if they exist)
+  #         if ls dist/*.json 1> /dev/null 2>&1; then
+  #           aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_PROD }} \
+  #             --exclude "*" \
+  #             --include "*.json" \
+  #             --cache-control "no-cache, no-store, must-revalidate"
+  #         fi
+  #
+  #         echo "✅ S3 sync complete"
+  #
+  #     - name: Invalidate CloudFront cache
+  #       run: |
+  #         echo "Invalidating CloudFront cache for distribution: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}"
+  #
+  #         INVALIDATION_ID=$(aws cloudfront create-invalidation \
+  #           --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
+  #           --paths "/*" \
+  #           --query 'Invalidation.Id' \
+  #           --output text)
+  #
+  #         echo "Invalidation ID: $INVALIDATION_ID"
+  #
+  #         echo "Waiting for cache invalidation to complete..."
+  #         aws cloudfront wait invalidation-completed \
+  #           --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
+  #           --id $INVALIDATION_ID \
+  #           --cli-read-timeout 300 || echo "⚠️ Invalidation still in progress"
+  #
+  #         echo "✅ CloudFront cache invalidation complete"
+  #
+  #     - name: Verify frontend health
+  #       run: |
+  #         FRONTEND_URL="https://ait.tratin.com"
+  #         echo "Verifying frontend is accessible at $FRONTEND_URL..."
+  #
+  #         for i in {1..10}; do
+  #           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $FRONTEND_URL || echo "000")
+  #
+  #           if [ "$HTTP_CODE" = "200" ]; then
+  #             echo "✅ Frontend health check passed (HTTP $HTTP_CODE)"
+  #             exit 0
+  #           fi
+  #
+  #           echo "⏳ Health check attempt $i/10 failed (HTTP $HTTP_CODE), retrying..."
+  #           sleep 6
+  #         done
+  #
+  #         echo "❌ Frontend health check failed after 10 attempts"
+  #         exit 1
+  #
+  #     - name: Deployment summary
+  #       if: success()
+  #       run: |
+  #         echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+  #         echo "" >> $GITHUB_STEP_SUMMARY
+  #         echo "**Environment:** production" >> $GITHUB_STEP_SUMMARY
+  #         echo "**URL:** https://ait.tratin.com" >> $GITHUB_STEP_SUMMARY
+  #         echo "" >> $GITHUB_STEP_SUMMARY
+  #         echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+  #         echo "- ✅ S3 sync complete" >> $GITHUB_STEP_SUMMARY
+  #         echo "- ✅ CloudFront cache invalidated" >> $GITHUB_STEP_SUMMARY
+  #         echo "- ✅ Frontend health check passed" >> $GITHUB_STEP_SUMMARY
