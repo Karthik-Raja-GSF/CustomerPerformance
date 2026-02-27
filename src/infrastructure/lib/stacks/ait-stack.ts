@@ -260,6 +260,7 @@ export class AitStack extends cdk.Stack {
       naming,
       crossAccountRoute53,
       createPublicAlb: config.backendPublicAlb !== false,
+      rbac: config.rbac,
     });
 
     // Allow Fargate to connect to Aurora

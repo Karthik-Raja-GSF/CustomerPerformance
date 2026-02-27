@@ -6,6 +6,8 @@ import {
   BID_EXPORT_SERVICE_TOKEN,
 } from "@/services/IBidExportService";
 import { authenticate } from "@/middleware/authenticate";
+import { requireFeature } from "@/middleware/authorize";
+import { Feature } from "@/contracts/rbac/feature";
 
 const router: IRouter = Router();
 
@@ -78,6 +80,7 @@ const cancelByKeysSchema = z.object({
 router.post(
   "/queue",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = queueExportSchema.safeParse(req.body);
@@ -109,6 +112,7 @@ router.post(
 router.get(
   "/queued-data",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = exportTypeQuerySchema.safeParse(req.query);
@@ -139,6 +143,7 @@ router.get(
 router.get(
   "/queue-summary",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const service = container.resolve<IBidExportService>(
@@ -160,6 +165,7 @@ router.get(
 router.post(
   "/mark-exported",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = markExportedSchema.safeParse(req.body);
@@ -191,6 +197,7 @@ router.post(
 router.post(
   "/queue-by-keys",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = queueByKeysSchema.safeParse(req.body);
@@ -222,6 +229,7 @@ router.post(
 router.post(
   "/export",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = exportSchema.safeParse(req.body);
@@ -256,6 +264,7 @@ router.post(
 router.post(
   "/cancel",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = cancelSchema.safeParse(req.body);
@@ -280,6 +289,7 @@ router.post(
 router.post(
   "/cancel-by-keys",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = cancelByKeysSchema.safeParse(req.body);
@@ -310,6 +320,7 @@ router.post(
 router.post(
   "/clear-export-by-keys",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = cancelByKeysSchema.safeParse(req.body);
@@ -340,6 +351,7 @@ router.post(
 router.get(
   "/runs",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = historyQuerySchema.safeParse(req.query);
@@ -365,6 +377,7 @@ router.get(
 router.get(
   "/webhook/siq",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const service = container.resolve<IBidExportService>(
@@ -388,6 +401,7 @@ router.get(
 router.post(
   "/webhook/siq/:runId/complete",
   authenticate,
+  requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { runId } = req.params;

@@ -6,6 +6,8 @@ import {
   STOCKIQ_SERVICE_TOKEN,
 } from "@/services/IStockIqService";
 import { authenticate } from "@/middleware/authenticate";
+import { requireFeature } from "@/middleware/authorize";
+import { Feature } from "@/contracts/rbac/feature";
 import {
   StockIqApiError,
   StockIqAuthError,
@@ -72,6 +74,7 @@ function handleStockIqError(
 router.post(
   "/sync",
   authenticate,
+  requireFeature(Feature.STOCKIQ_SYNC),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const stockIqService = container.resolve<IStockIqService>(
@@ -96,6 +99,7 @@ router.post(
 router.get(
   "/sync/status",
   authenticate,
+  requireFeature(Feature.STOCKIQ_SYNC),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const stockIqService = container.resolve<IStockIqService>(
@@ -120,6 +124,7 @@ router.get(
 router.get(
   "/sync/history",
   authenticate,
+  requireFeature(Feature.STOCKIQ_SYNC),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = syncHistoryQuerySchema.safeParse(req.query);
@@ -147,6 +152,7 @@ router.get(
 router.get(
   "/orphans",
   authenticate,
+  requireFeature(Feature.STOCKIQ_SYNC),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const stockIqService = container.resolve<IStockIqService>(
@@ -172,6 +178,7 @@ router.get(
 router.delete(
   "/orphans",
   authenticate,
+  requireFeature(Feature.STOCKIQ_SYNC),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const stockIqService = container.resolve<IStockIqService>(

@@ -6,6 +6,8 @@ import {
   CUSTOMER_BID_SERVICE_TOKEN,
 } from "@/services/ICustomerBidService";
 import { authenticate } from "@/middleware/authenticate";
+import { requireFeature } from "@/middleware/authorize";
+import { Feature } from "@/contracts/rbac/feature";
 import {
   CustomerBidQueryError,
   CustomerBidDatabaseError,
@@ -209,6 +211,7 @@ function handleCustomerBidError(
 router.get(
   "/",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate query parameters
@@ -243,6 +246,7 @@ router.get(
 router.get(
   "/filter-options",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const customerBidService = container.resolve<ICustomerBidService>(
@@ -280,6 +284,7 @@ router.get(
 router.patch(
   "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate path parameters
@@ -332,6 +337,7 @@ router.patch(
 router.post(
   "/bulk-update/preview",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = bulkUpdateSchema.safeParse(req.body);
@@ -374,6 +380,7 @@ router.post(
 router.post(
   "/bulk-update",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request body
@@ -414,6 +421,7 @@ router.post(
 router.post(
   "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/confirm",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const pathParsed = pathParamsSchema.safeParse(req.params);
@@ -453,6 +461,7 @@ router.post(
 router.post(
   "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/unconfirm",
   authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const pathParsed = pathParamsSchema.safeParse(req.params);
@@ -497,6 +506,7 @@ router.post(
 router.post(
   "/sync",
   authenticate,
+  requireFeature(Feature.CUSTOMER_BIDS_SYNC),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request body
@@ -536,6 +546,7 @@ router.post(
 router.get(
   "/sync/status",
   authenticate,
+  requireFeature(Feature.CUSTOMER_BIDS_SYNC),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const customerBidService = container.resolve<ICustomerBidService>(
@@ -567,6 +578,7 @@ router.get(
 router.get(
   "/sync/history",
   authenticate,
+  requireFeature(Feature.CUSTOMER_BIDS_SYNC),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate query parameters

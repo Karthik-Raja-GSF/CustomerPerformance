@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/shadcn/components/sonner";
+import { Feature } from "@/config/features";
+import { FeatureGuard } from "@/components/feature-guard";
 import AIAgent from "@/pages/AIAgent";
 import Settings from "@/pages/Settings";
 import Prompts from "@/pages/settings/Prompts";
@@ -42,41 +44,86 @@ function App() {
 
         {/* Protected routes with layout */}
         <Route element={<ProtectedLayout />}>
-          <Route path="/" element={<AIAgent />} />
-          <Route path="/stockiq-sync" element={<StockiqSync />} />
-          <Route path="/customer-bids-sync" element={<CustomerBidsSync />} />
+          <Route
+            path="/"
+            element={
+              <FeatureGuard feature={Feature.STARQ}>
+                <AIAgent />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/stockiq-sync"
+            element={
+              <FeatureGuard feature={Feature.STOCKIQ_SYNC}>
+                <StockiqSync />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/customer-bids-sync"
+            element={
+              <FeatureGuard feature={Feature.CUSTOMER_BIDS_SYNC}>
+                <CustomerBidsSync />
+              </FeatureGuard>
+            }
+          />
           <Route
             path="/back-to-school"
             element={
-              <CustomerBids
-                defaultExcludeItemPrefixes="6,8"
-                defaultColumnVisibility={{
-                  lyAugust: false,
-                  lySeptember: false,
-                  lyOctober: false,
-                  lyNovember: false,
-                  lyDecember: false,
-                  lyJanuary: false,
-                  lyFebruary: false,
-                  lyMarch: false,
-                  lyApril: false,
-                  lyMay: false,
-                  lyJune: false,
-                  lyJuly: false,
-                }}
-              />
+              <FeatureGuard feature={Feature.BACK_TO_SCHOOL}>
+                <CustomerBids
+                  defaultExcludeItemPrefixes="6,8"
+                  defaultColumnVisibility={{
+                    lyAugust: false,
+                    lySeptember: false,
+                    lyOctober: false,
+                    lyNovember: false,
+                    lyDecember: false,
+                    lyJanuary: false,
+                    lyFebruary: false,
+                    lyMarch: false,
+                    lyApril: false,
+                    lyMay: false,
+                    lyJune: false,
+                    lyJuly: false,
+                  }}
+                />
+              </FeatureGuard>
             }
           />
           <Route
             path="/demand-planning/monthly-forecast"
-            element={<MonthlyForecast />}
+            element={
+              <FeatureGuard feature={Feature.MONTHLY_FORECAST}>
+                <MonthlyForecast />
+              </FeatureGuard>
+            }
           />
           <Route
             path="/demand-planning/confirmed-bid-items"
-            element={<ConfirmedBidItems />}
+            element={
+              <FeatureGuard feature={Feature.CONFIRMED_BID_ITEMS}>
+                <ConfirmedBidItems />
+              </FeatureGuard>
+            }
           />
-          <Route path="/bid-export-history" element={<BidExportHistory />} />
-          <Route path="/settings" element={<Settings />}>
+          <Route
+            path="/bid-export-history"
+            element={
+              <FeatureGuard feature={Feature.BID_EXPORT}>
+                <BidExportHistory />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <FeatureGuard feature={Feature.PROMPT_BUILDER}>
+                <Settings />
+              </FeatureGuard>
+            }
+          >
             <Route index element={<Prompts />} />
           </Route>
         </Route>

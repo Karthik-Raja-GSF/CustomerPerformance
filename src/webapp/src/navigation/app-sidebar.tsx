@@ -1,6 +1,8 @@
 import * as React from "react";
 import { Settings2, GraduationCap, TrendingUp } from "lucide-react";
 import { StarqIcon } from "@/components/icons/starq-icon";
+import { Feature } from "@/config/features";
+import { usePermissions } from "@/contexts/permissions-context";
 
 import { Branding } from "@/navigation/branding";
 import { NavMain } from "@/navigation/nav-main";
@@ -13,18 +15,20 @@ import {
   SidebarRail,
 } from "@/shadcn/components/sidebar";
 
-// Navigation data
+// Navigation data with feature requirements
 const data = {
   navMain: [
     {
       title: "StarQ",
       url: "/",
       icon: StarqIcon,
+      feature: Feature.STARQ,
     },
     {
       title: "Back to School",
       url: "/back-to-school",
       icon: GraduationCap,
+      feature: Feature.BACK_TO_SCHOOL,
     },
     {
       title: "Demand Planning",
@@ -34,10 +38,12 @@ const data = {
         {
           title: "Monthly Forecast",
           url: "/demand-planning/monthly-forecast",
+          feature: Feature.MONTHLY_FORECAST,
         },
         {
           title: "Confirmed Bid Items",
           url: "/demand-planning/confirmed-bid-items",
+          feature: Feature.CONFIRMED_BID_ITEMS,
         },
       ],
     },
@@ -50,18 +56,22 @@ const data = {
         {
           title: "Prompt Builder",
           url: "/settings",
+          feature: Feature.PROMPT_BUILDER,
         },
         {
           title: "StockIQ Sync",
           url: "/stockiq-sync",
+          feature: Feature.STOCKIQ_SYNC,
         },
         {
           title: "Customer Bids Sync",
           url: "/customer-bids-sync",
+          feature: Feature.CUSTOMER_BIDS_SYNC,
         },
         {
           title: "Bid Items Export History",
           url: "/bid-export-history",
+          feature: Feature.BID_EXPORT,
         },
       ],
     },
@@ -69,13 +79,35 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { hasFeature } = usePermissions();
+
+  // Filter nav items based on user's feature access
+  const filteredNavMain = data.navMain
+    .map((item) => {
+      // For items with sub-items, filter the sub-items first
+      if (item.items) {
+        const filteredSubItems = item.items.filter((sub) =>
+          hasFeature(sub.feature)
+        );
+        // Hide parent if no sub-items remain
+        if (filteredSubItems.length === 0) return null;
+        return { ...item, items: filteredSubItems };
+      }
+      // For top-level items with a feature requirement
+      if (item.feature && !hasFeature(item.feature)) {
+        return null;
+      }
+      return item;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <Branding />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={filteredNavMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

@@ -6,6 +6,8 @@ import {
   PROMPT_SERVICE_TOKEN,
 } from "@/services/IPromptService";
 import { authenticate } from "@/middleware/authenticate";
+import { requireFeature } from "@/middleware/authorize";
+import { Feature } from "@/contracts/rbac/feature";
 import { validateRequest } from "@/middleware/validate-request";
 import {
   PromptNotFoundError,
@@ -76,6 +78,7 @@ function handlePromptError(
 router.post(
   "/",
   authenticate,
+  requireFeature(Feature.PROMPT_BUILDER),
   validateRequest(createPromptSchema, "body"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -100,6 +103,7 @@ router.post(
 router.get(
   "/",
   authenticate,
+  requireFeature(Feature.PROMPT_BUILDER),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const promptService =
@@ -123,6 +127,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
+  requireFeature(Feature.PROMPT_BUILDER),
   validateRequest(idParamSchema, "params"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -156,6 +161,7 @@ router.get(
 router.delete(
   "/:id",
   authenticate,
+  requireFeature(Feature.PROMPT_BUILDER),
   validateRequest(idParamSchema, "params"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -178,6 +184,7 @@ router.delete(
 router.put(
   "/:id",
   authenticate,
+  requireFeature(Feature.PROMPT_BUILDER),
   validateRequest(idParamSchema, "params"),
   validateRequest(updatePromptSchema, "body"),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -204,6 +211,7 @@ router.put(
 router.patch(
   "/:id/activate",
   authenticate,
+  requireFeature(Feature.PROMPT_BUILDER),
   validateRequest(idParamSchema, "params"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

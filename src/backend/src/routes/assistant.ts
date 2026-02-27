@@ -10,6 +10,8 @@ import {
   CHAT_LOG_SERVICE_TOKEN,
 } from "@/services/IChatLogService";
 import { authenticate } from "@/middleware/authenticate";
+import { requireFeature } from "@/middleware/authorize";
+import { Feature } from "@/contracts/rbac/feature";
 import { validateRequest } from "@/middleware/validate-request";
 import {
   NoActivePromptError,
@@ -86,6 +88,7 @@ function handleAssistantError(
 router.post(
   "/chat",
   authenticate,
+  requireFeature(Feature.STARQ),
   validateRequest(chatRequestSchema, "body"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -112,6 +115,7 @@ router.post(
 router.post(
   "/chat/stream",
   authenticate,
+  requireFeature(Feature.STARQ),
   validateRequest(chatRequestSchema, "body"),
   async (req: Request, res: Response, _next: NextFunction) => {
     getChatRequests().add(1, { endpoint: "stream" });
@@ -258,6 +262,7 @@ const feedbackSchema = z.object({
 router.patch(
   "/chat/:chatLogId/feedback",
   authenticate,
+  requireFeature(Feature.STARQ),
   validateRequest(feedbackParamsSchema, "params"),
   validateRequest(feedbackSchema, "body"),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -296,16 +301,21 @@ router.patch(
  * GET /assistant/models
  * Get list of available AI models
  */
-router.get("/models", authenticate, async (_req: Request, res: Response) => {
-  const assistantService = container.resolve<IAssistantService>(
-    ASSISTANT_SERVICE_TOKEN
-  );
-  const models = assistantService.getAvailableModels();
+router.get(
+  "/models",
+  authenticate,
+  requireFeature(Feature.STARQ),
+  async (_req: Request, res: Response) => {
+    const assistantService = container.resolve<IAssistantService>(
+      ASSISTANT_SERVICE_TOKEN
+    );
+    const models = assistantService.getAvailableModels();
 
-  res.json({
-    status: "success",
-    data: models,
-  });
-});
+    res.json({
+      status: "success",
+      data: models,
+    });
+  }
+);
 
 export default router;

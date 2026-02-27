@@ -48,6 +48,8 @@ import {
   BID_EXPORT_SERVICE_TOKEN,
 } from "@/services/IBidExportService";
 import { BidExportService } from "@/services/implementations/BidExportService";
+import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
+import { RbacService } from "@/services/implementations/RbacService";
 
 /**
  * DI Container Configuration
@@ -68,6 +70,9 @@ export function setupContainer(prisma: PrismaClient): void {
   container.register<PrismaClient>("PrismaClient", {
     useValue: prisma,
   });
+
+  // Register RbacService for role-based access control (singleton — config is immutable)
+  container.registerSingleton<IRbacService>(RBAC_SERVICE_TOKEN, RbacService);
 
   // Register TokenService for JWT verification
   container.register<ITokenService>(TOKEN_SERVICE_TOKEN, {

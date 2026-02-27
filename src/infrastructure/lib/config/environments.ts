@@ -88,6 +88,16 @@ export interface DmsSchedulerConfig {
   timezone?: string; // default: "America/Los_Angeles" (PST/PDT)
 }
 
+export interface RbacConfig {
+  enabled: boolean;
+  groupAdmin: string;
+  groupSales: string;
+  groupCatman: string;
+  groupDemandPlanner: string;
+  groupPurchasing: string;
+  groupEarlyAdopter: string;
+}
+
 export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
@@ -99,6 +109,7 @@ export interface EnvironmentConfig {
   vpcPeering?: VpcPeeringConfig;
   dms?: DmsConfig;
   waf?: WafConfig;
+  rbac?: RbacConfig; // Azure AD group-to-role mapping
   frontendEcs?: EcsConfig; // Private frontend deployment via nginx + ECS
   privateFrontendUrl?: string; // Private frontend URL managed by other team (e.g., 'https://aitdev.goldstarfoods.com')
   backendPublicAlb?: boolean; // Create public-facing backend ALB (default: true)
@@ -167,6 +178,15 @@ export const environments: Record<string, EnvironmentConfig> = {
       },
     },
     waf: defaultWafConfigs.dev,
+    rbac: {
+      enabled: true,
+      groupAdmin: "f2e25746-a556-4e57-a31f-735e08ef5cb1",
+      groupSales: "dcdcdc52-d022-44db-b411-dee01c883879",
+      groupCatman: "ceb05fa2-1f3c-4cd8-95f3-a20f6ef984db",
+      groupDemandPlanner: "a31185f0-c0a8-494c-8883-8dada64e9849",
+      groupPurchasing: "2341154d-ffd2-4c66-9d43-a42737d63f6e",
+      groupEarlyAdopter: "9c5aba67-2af0-4e42-b0ed-cab449333bc6",
+    },
     frontendEcs: {
       cpu: 256, // 0.25 vCPU (nginx is lightweight)
       memory: 512, // 512 MB
@@ -190,7 +210,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     ecs: {
       cpu: 2048, // 2 vCPU
       memory: 4096, // 4 GB
-      desiredCount: 0, // Start with 2 tasks for HA
+      desiredCount: 2, // Start with 2 tasks for HA
       autoScaling: {
         minCount: 2, // Always at least 2 tasks (high availability)
         maxCount: 4,
@@ -242,6 +262,15 @@ export const environments: Record<string, EnvironmentConfig> = {
       },
     },
     waf: defaultWafConfigs.prd,
+    rbac: {
+      enabled: true,
+      groupAdmin: "f2e25746-a556-4e57-a31f-735e08ef5cb1",
+      groupSales: "dcdcdc52-d022-44db-b411-dee01c883879",
+      groupCatman: "ceb05fa2-1f3c-4cd8-95f3-a20f6ef984db",
+      groupDemandPlanner: "a31185f0-c0a8-494c-8883-8dada64e9849",
+      groupPurchasing: "2341154d-ffd2-4c66-9d43-a42737d63f6e",
+      groupEarlyAdopter: "9c5aba67-2af0-4e42-b0ed-cab449333bc6",
+    },
     frontendEcs: {
       cpu: 256,
       memory: 512,

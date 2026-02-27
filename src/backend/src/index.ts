@@ -24,6 +24,7 @@ import assistantRouter from "./routes/assistant";
 import stockiqRouter from "./routes/stockiq";
 import customerBidsRouter from "./routes/customer-bids";
 import bidExportsRouter from "./routes/bid-exports";
+import authRouter from "./routes/auth";
 
 const serverLogger = createChildLogger("server");
 
@@ -96,6 +97,7 @@ class Server {
     });
 
     // Register routes
+    apiRouter.use("/auth", authRouter);
     apiRouter.use("/prompts", promptsRouter);
     apiRouter.use("/assistant", assistantRouter);
     apiRouter.use("/stockiq", stockiqRouter);

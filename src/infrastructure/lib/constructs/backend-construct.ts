@@ -14,7 +14,7 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as fs from "fs";
 import * as path from "path";
-import { EcsConfig } from "../config/environments";
+import { EcsConfig, RbacConfig } from "../config/environments";
 import {
   NamingConfig,
   createNamingHelper,
@@ -40,6 +40,7 @@ export interface BackendConstructProps {
   naming: NamingConfig;
   crossAccountRoute53?: CrossAccountRoute53Config; // For cross-account DNS
   createPublicAlb?: boolean; // Create public-facing ALB (default: true)
+  rbac?: RbacConfig; // Azure AD group-to-role mapping
 }
 
 export class BackendConstruct extends Construct {
@@ -175,6 +176,18 @@ export class BackendConstruct extends Construct {
         STOCKIQ_SYNC_CRON: "30 11 * * *",
         // Customer Bid scheduled sync - daily at 5:00 AM PST (13:00 UTC)
         CUSTOMER_BID_SYNC_CRON: "0 13 * * *",
+        // RBAC — Azure AD group-to-role mapping
+        ...(props.rbac
+          ? {
+              RBAC_ENABLED: String(props.rbac.enabled),
+              RBAC_GROUP_ADMIN: props.rbac.groupAdmin,
+              RBAC_GROUP_SALES: props.rbac.groupSales,
+              RBAC_GROUP_CATMAN: props.rbac.groupCatman,
+              RBAC_GROUP_DEMAND_PLANNER: props.rbac.groupDemandPlanner,
+              RBAC_GROUP_PURCHASING: props.rbac.groupPurchasing,
+              RBAC_GROUP_EARLY_ADOPTER: props.rbac.groupEarlyAdopter,
+            }
+          : {}),
       },
       secrets: {
         // Pass Aurora secret fields individually - backend builds DATABASE_URL from these

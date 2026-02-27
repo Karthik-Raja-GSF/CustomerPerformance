@@ -1,4 +1,7 @@
 import dotenv from "dotenv";
+import { Role } from "@/contracts/rbac/role";
+import { Feature } from "@/contracts/rbac/feature";
+import type { RoleDefinition } from "@/contracts/rbac/role-config";
 
 dotenv.config();
 
@@ -73,5 +76,54 @@ export const config = {
     // Cron expression for scheduled export processing (empty string disables scheduling)
     // Push method (API/FTP) is TBD — leave disabled until decided
     processCronExpression: process.env.BID_EXPORT_PROCESS_CRON || "",
+  },
+  // RBAC Configuration
+  // When enabled=false (default), all authorization is bypassed — all users get full access.
+  // Set RBAC_ENABLED=true and configure RBAC_GROUP_* env vars to enforce feature-based access.
+  rbac: {
+    enabled: process.env.RBAC_ENABLED === "true",
+    roles: [
+      {
+        enumKey: Role.SALES,
+        displayName: "Sales",
+        groupId: process.env.RBAC_GROUP_SALES || "",
+        features: [Feature.BACK_TO_SCHOOL],
+      },
+      {
+        enumKey: Role.CATMAN,
+        displayName: "Catman",
+        groupId: process.env.RBAC_GROUP_CATMAN || "",
+        features: [],
+      },
+      {
+        enumKey: Role.DEMAND_PLANNER,
+        displayName: "Demand Planning",
+        groupId: process.env.RBAC_GROUP_DEMAND_PLANNER || "",
+        features: [Feature.MONTHLY_FORECAST, Feature.CONFIRMED_BID_ITEMS],
+      },
+      {
+        enumKey: Role.PURCHASING,
+        displayName: "Purchasing",
+        groupId: process.env.RBAC_GROUP_PURCHASING || "",
+        features: [],
+      },
+      {
+        enumKey: Role.EARLY_ADOPTER,
+        displayName: "Early Adopters",
+        groupId: process.env.RBAC_GROUP_EARLY_ADOPTER || "",
+        features: [
+          Feature.STARQ,
+          Feature.BACK_TO_SCHOOL,
+          Feature.MONTHLY_FORECAST,
+          Feature.CONFIRMED_BID_ITEMS,
+        ],
+      },
+      {
+        enumKey: Role.ADMIN,
+        displayName: "Admins",
+        groupId: process.env.RBAC_GROUP_ADMIN || "",
+        features: Object.values(Feature),
+      },
+    ] as RoleDefinition[],
   },
 };

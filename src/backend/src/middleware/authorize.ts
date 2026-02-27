@@ -1,20 +1,24 @@
 import { Request, Response, NextFunction } from "express";
+import { container } from "tsyringe";
+import type { Feature } from "@/contracts/rbac/feature";
+import type { Role } from "@/contracts/rbac/role";
+import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
 
 /**
  * Authorization Middleware Factories
  *
  * Must be used AFTER the `authenticate` middleware (requires `req.user`).
- * Returns 403 Forbidden if the user lacks the required group or role.
+ * When RBAC is disabled, these middleware are effectively no-ops.
  */
 
 /**
- * Require the user to belong to at least one of the specified groups.
- * Groups are matched against `req.user.groups` (Azure AD groups from custom:groups).
+ * Require the user to have access to at least one of the specified features.
+ * Features are resolved from the user's Azure AD groups via the RBAC service.
  *
  * @example
- * router.get('/admin', authenticate, requireGroups('Admins', 'SuperAdmins'), handler);
+ * router.get('/chat', authenticate, requireFeature(Feature.STARQ), handler);
  */
-export function requireGroups(...requiredGroups: string[]) {
+export function requireFeature(...features: Feature[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({
@@ -24,10 +28,11 @@ export function requireGroups(...requiredGroups: string[]) {
       return;
     }
 
+    const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
     const userGroups = req.user.groups;
-    const hasGroup = requiredGroups.some((g) => userGroups.includes(g));
+    const hasAny = features.some((f) => rbacService.hasFeature(userGroups, f));
 
-    if (!hasGroup) {
+    if (!hasAny) {
       res.status(403).json({
         error: "ForbiddenError",
         message: "Insufficient permissions",
@@ -40,13 +45,13 @@ export function requireGroups(...requiredGroups: string[]) {
 }
 
 /**
- * Require the user to have the specified role.
- * Role is matched against `req.user.role` (Azure AD app role from custom:role).
+ * Require the user to have at least one of the specified roles.
+ * Roles are resolved from the user's Azure AD groups via the RBAC service.
  *
  * @example
- * router.delete('/items/:id', authenticate, requireRole('admin'), handler);
+ * router.delete('/items/:id', authenticate, requireRole(Role.ADMIN), handler);
  */
-export function requireRole(...allowedRoles: string[]) {
+export function requireRole(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({
@@ -56,8 +61,12 @@ export function requireRole(...allowedRoles: string[]) {
       return;
     }
 
-    const userRole = req.user.role;
-    if (!userRole || !allowedRoles.includes(userRole)) {
+    const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
+    const userGroups = req.user.groups;
+    const userRoles = rbacService.resolveRoles(userGroups);
+    const hasAny = roles.some((r) => userRoles.some((ur) => ur.enumKey === r));
+
+    if (!hasAny) {
       res.status(403).json({
         error: "ForbiddenError",
         message: "Insufficient permissions",
