@@ -65,6 +65,7 @@ import {
   customerBidExportColumns,
 } from "@/utils/export-csv";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
+import { BatchMenuMonthsPopover } from "@/components/batch-menu-months-popover";
 import { useExportQueue } from "@/pages/customer-bids/use-export-queue";
 import {
   FilterSheet,
@@ -684,6 +685,30 @@ export default function CustomerBids({
     []
   );
 
+  // Batch menu months — eligible bids (skip yearAround items)
+  const batchMenuEligibleBids = useMemo(
+    () => displayedBids.filter((b) => !b.yearAround),
+    [displayedBids]
+  );
+
+  // Batch set menu months for all eligible bids (UI-only, no API call)
+  const handleBatchMenuMonths = useCallback(
+    (months: Record<MonthKey, boolean>) => {
+      setMenuMonthOverrides((prev) => {
+        const next = new Map(prev);
+        for (const bid of batchMenuEligibleBids) {
+          const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
+          next.set(key, months);
+        }
+        return next;
+      });
+      toast.success(
+        `Menu months updated for ${batchMenuEligibleBids.length} record${batchMenuEligibleBids.length !== 1 ? "s" : ""}`
+      );
+    },
+    [batchMenuEligibleBids]
+  );
+
   // Bulk confirm — bids eligible for confirmation on the current page
   const confirmableBids = useMemo(
     () => bids.filter((b) => !b.confirmedAt && canConfirmBid(b)),
@@ -890,6 +915,13 @@ export default function CustomerBids({
               ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Batch Menu Months */}
+        <BatchMenuMonthsPopover
+          eligibleCount={batchMenuEligibleBids.length}
+          disabled={isLoading || batchMenuEligibleBids.length === 0}
+          onApply={handleBatchMenuMonths}
+        />
 
         {/* Export buttons */}
         {showCSVExport && (
