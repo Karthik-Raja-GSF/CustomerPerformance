@@ -901,6 +901,7 @@ export class BidExportService implements IBidExportService {
       itemDescription: row.itemDescription,
       brandName: row.brandName,
       packSize: row.packSize,
+      customerLeadTime: null,
       erpStatus: row.erpStatus,
       bidQuantity: decimalToNumber(row.bidQty),
       lastYearBidQty: decimalToNumber(row.lastYearBidQty),

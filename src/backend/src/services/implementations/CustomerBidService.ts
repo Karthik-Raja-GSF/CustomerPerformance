@@ -31,6 +31,10 @@ import {
   mapEstimates,
 } from "@/services/helpers/bid-converters";
 import { buildBidFilterConditions } from "@/services/helpers/bid-filters";
+import {
+  getSchoolYearBoundaries,
+  getSchoolYearString,
+} from "@/services/helpers/school-year";
 
 const logger = createChildLogger("customer-bid");
 
@@ -51,6 +55,7 @@ interface BaseBidRow {
   itemDescription: string | null;
   brandName: string | null;
   packSize: string | null;
+  customerLeadTime: number | null;
   bidQty: Prisma.Decimal | null;
   bidStart: Date;
   bidEnd: Date | null;
@@ -124,10 +129,10 @@ export class CustomerBidService implements ICustomerBidService {
 
     try {
       // Calculate school year string for query (e.g., "2025-2026")
-      const schoolYearString = this.getSchoolYearString(schoolYear);
+      const schoolYearString = getSchoolYearString(schoolYear);
 
       // Calculate date boundaries for the response dateRange field
-      const { startDate, endDate } = this.getSchoolYearBoundaries(schoolYear);
+      const { startDate, endDate } = getSchoolYearBoundaries(schoolYear);
       const startDateStr = startDate.toISOString().slice(0, 10);
       const endDateStr = endDate.toISOString().slice(0, 10);
 
@@ -181,6 +186,7 @@ export class CustomerBidService implements ICustomerBidService {
             i.description AS "itemDescription",
             i.description_2 AS "brandName",
             i.pack_size AS "packSize",
+            sku.customer_lead_time AS "customerLeadTime",
             cbd.bid_qty AS "bidQty",
             cbd.bid_start AS "bidStart",
             cbd.bid_end AS "bidEnd",
@@ -226,6 +232,10 @@ export class CustomerBidService implements ICustomerBidService {
         INNER JOIN dw2_nav.item i
             ON cbd.item_no = i.no_
             AND cbd.source_db = i.source_db
+        LEFT JOIN dw2_nav.stockkeeping_unit sku
+            ON cbd.item_no = sku.item_no_
+            AND cbd.source_db = sku.source_db
+            AND cbd.site_code = sku.location_code
         WHERE cbd.school_year = ${schoolYearString}
           ${additionalWhere}
         ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
@@ -255,6 +265,7 @@ export class CustomerBidService implements ICustomerBidService {
         itemDescription: row.itemDescription,
         brandName: row.brandName,
         packSize: row.packSize,
+        customerLeadTime: row.customerLeadTime ?? null,
         erpStatus: row.erpStatus,
         bidQuantity: row.bidQty ? Number(row.bidQty) : null,
         lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
@@ -333,51 +344,6 @@ export class CustomerBidService implements ICustomerBidService {
         error instanceof Error ? error : undefined
       );
     }
-  }
-
-  /**
-   * Calculate school year boundaries based on selected school year
-   *
-   * School Year Definition: July 1 - July 31
-   * - Previous: (year-2)-07-01 to (year-1)-07-31
-   * - Current: (year-1)-07-01 to year-07-31
-   * - Next: year-07-01 to (year+1)-07-31
-   *
-   * @param schoolYear - The school year filter option
-   * @returns Start and end dates for the selected school year
-   */
-  private getSchoolYearBoundaries(schoolYear: SchoolYear = "next"): {
-    startDate: Date;
-    endDate: Date;
-  } {
-    const currentYear = new Date().getFullYear();
-
-    switch (schoolYear) {
-      case "previous":
-        return {
-          startDate: new Date(currentYear - 2, 6, 1), // (year-2)-07-01
-          endDate: new Date(currentYear - 1, 6, 31), // (year-1)-07-31
-        };
-      case "current":
-        return {
-          startDate: new Date(currentYear - 1, 6, 1), // (year-1)-07-01
-          endDate: new Date(currentYear, 6, 31), // year-07-31
-        };
-      case "next":
-      default:
-        return {
-          startDate: new Date(currentYear, 6, 1), // year-07-01
-          endDate: new Date(currentYear + 1, 6, 31), // (year+1)-07-31
-        };
-    }
-  }
-
-  /**
-   * Get school year string from boundaries (e.g., "2025-2026")
-   */
-  private getSchoolYearString(schoolYear: SchoolYear = "next"): string {
-    const { startDate } = this.getSchoolYearBoundaries(schoolYear);
-    return `${startDate.getFullYear()}-${startDate.getFullYear() + 1}`;
   }
 
   /**
@@ -769,6 +735,7 @@ export class CustomerBidService implements ICustomerBidService {
       itemDescription: null,
       brandName: null,
       packSize: null,
+      customerLeadTime: null,
       erpStatus: null,
       bidQuantity: null,
       lastYearBidQty: decimalToNumber(record.lastYearBidQty),
@@ -898,7 +865,7 @@ export class CustomerBidService implements ICustomerBidService {
   ): Promise<SyncResultDto> {
     const syncId = crypto.randomUUID();
     const startTime = Date.now();
-    const schoolYearString = this.getSchoolYearString(schoolYear);
+    const schoolYearString = getSchoolYearString(schoolYear);
 
     logger.info(
       { event: "customer-bid.sync.start", syncId, schoolYear, triggeredBy },
@@ -930,7 +897,7 @@ export class CustomerBidService implements ICustomerBidService {
 
     try {
       // Get current and previous year boundaries
-      const { startDate, endDate } = this.getSchoolYearBoundaries(schoolYear);
+      const { startDate, endDate } = getSchoolYearBoundaries(schoolYear);
       const startDateStr = startDate.toISOString().slice(0, 10);
       const endDateStr = endDate.toISOString().slice(0, 10);
 
@@ -998,182 +965,210 @@ export class CustomerBidService implements ICustomerBidService {
         "Found current year bids to sync"
       );
 
-      // Query last year bids for comparison
-      const lastYearBidsMap = new Map<string, Prisma.Decimal>();
-      const lastYearBids = await this.prisma.$queryRaw<
-        Array<{
-          source_db: string;
-          site_code: string;
-          customer_bill_to: string;
-          item_no: string;
-          bid_qty: Prisma.Decimal;
-        }>
-      >(Prisma.sql`
-        SELECT
-            sp.source_db,
-            c.location_code AS site_code,
-            sp.sales_code AS customer_bill_to,
-            sp.item_no_ AS item_no,
-            SUM(sp.customer_bid_qty_) AS bid_qty
-        FROM dw2_nav.sales_price sp
-        INNER JOIN dw2_nav.customer c
-            ON sp.sales_code = c.no_
-            AND sp.source_db = c.source_db
-        WHERE sp.starting_date >= ${lastYearStartStr}::date
-          AND sp.ending_date <= ${lastYearEndStr}::date
-          AND c.location_code IS NOT NULL
-          AND c.location_code != ''
-        GROUP BY sp.source_db, c.location_code, sp.sales_code, sp.item_no_
-      `);
-
-      for (const row of lastYearBids) {
-        const key = buildMapKey(
-          row.source_db,
-          row.site_code,
-          row.customer_bill_to,
-          row.item_no
-        );
-        lastYearBidsMap.set(key, row.bid_qty);
+      // Query last year bids — build Map with plain numbers, release raw array
+      const lastYearBidsMap = new Map<string, number>();
+      {
+        const raw = await this.prisma.$queryRaw<
+          Array<{
+            source_db: string;
+            site_code: string;
+            customer_bill_to: string;
+            item_no: string;
+            bid_qty: Prisma.Decimal;
+          }>
+        >(Prisma.sql`
+          SELECT
+              sp.source_db,
+              c.location_code AS site_code,
+              sp.sales_code AS customer_bill_to,
+              sp.item_no_ AS item_no,
+              SUM(sp.customer_bid_qty_) AS bid_qty
+          FROM dw2_nav.sales_price sp
+          INNER JOIN dw2_nav.customer c
+              ON sp.sales_code = c.no_
+              AND sp.source_db = c.source_db
+          WHERE sp.starting_date >= ${lastYearStartStr}::date
+            AND sp.ending_date <= ${lastYearEndStr}::date
+            AND c.location_code IS NOT NULL
+            AND c.location_code != ''
+          GROUP BY sp.source_db, c.location_code, sp.sales_code, sp.item_no_
+        `);
+        for (const row of raw) {
+          const key = buildMapKey(
+            row.source_db,
+            row.site_code,
+            row.customer_bill_to,
+            row.item_no
+          );
+          lastYearBidsMap.set(key, Number(row.bid_qty));
+        }
+        // raw array goes out of scope here — GC can reclaim Decimal objects
       }
 
-      // Query last year actual sales from item ledger entries joined with invoice headers
-      // entry_type = 1 is Sale, join with sales_invoice_header to get bill_to_customer_no_
-      // quantities are negative so we use ABS()
+      // Store keys for lost bid detection (before any filtering)
+      const lastYearBidKeys = [...lastYearBidsMap.keys()];
+
+      // Query last year actual sales — build Map with plain numbers, release raw array
       const lastYearSalesMap = new Map<
         string,
         {
-          totalQty: Prisma.Decimal;
-          augQty: Prisma.Decimal;
-          sepQty: Prisma.Decimal;
-          octQty: Prisma.Decimal;
-          novQty: Prisma.Decimal;
-          decQty: Prisma.Decimal;
-          janQty: Prisma.Decimal;
-          febQty: Prisma.Decimal;
-          marQty: Prisma.Decimal;
-          aprQty: Prisma.Decimal;
-          mayQty: Prisma.Decimal;
-          junQty: Prisma.Decimal;
-          julQty: Prisma.Decimal;
+          totalQty: number;
+          augQty: number;
+          sepQty: number;
+          octQty: number;
+          novQty: number;
+          decQty: number;
+          janQty: number;
+          febQty: number;
+          marQty: number;
+          aprQty: number;
+          mayQty: number;
+          junQty: number;
+          julQty: number;
         }
       >();
-      const lastYearSales = await this.prisma.$queryRaw<
-        Array<{
-          source_db: string;
-          site_code: string;
-          customer_bill_to: string;
-          item_no: string;
-          total_quantity: Prisma.Decimal;
-          august_qty: Prisma.Decimal;
-          september_qty: Prisma.Decimal;
-          october_qty: Prisma.Decimal;
-          november_qty: Prisma.Decimal;
-          december_qty: Prisma.Decimal;
-          january_qty: Prisma.Decimal;
-          february_qty: Prisma.Decimal;
-          march_qty: Prisma.Decimal;
-          april_qty: Prisma.Decimal;
-          may_qty: Prisma.Decimal;
-          june_qty: Prisma.Decimal;
-          july_qty: Prisma.Decimal;
-        }>
-      >(Prisma.sql`
-        SELECT
-            ile.source_db,
-            c.location_code AS site_code,
-            sih.bill_to_customer_no_ AS customer_bill_to,
-            ile.item_no_ AS item_no,
-            ABS(SUM(ile.quantity)) AS total_quantity,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 8 THEN ile.quantity ELSE 0 END)) AS august_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 9 THEN ile.quantity ELSE 0 END)) AS september_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 10 THEN ile.quantity ELSE 0 END)) AS october_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 11 THEN ile.quantity ELSE 0 END)) AS november_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 12 THEN ile.quantity ELSE 0 END)) AS december_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 1 THEN ile.quantity ELSE 0 END)) AS january_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 2 THEN ile.quantity ELSE 0 END)) AS february_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 3 THEN ile.quantity ELSE 0 END)) AS march_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 4 THEN ile.quantity ELSE 0 END)) AS april_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 5 THEN ile.quantity ELSE 0 END)) AS may_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 6 THEN ile.quantity ELSE 0 END)) AS june_qty,
-            ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 7 THEN ile.quantity ELSE 0 END)) AS july_qty
-        FROM dw2_nav.item_ledger_entry ile
-        INNER JOIN dw2_nav.sales_invoice_header sih
-            ON ile.document_no_ = sih.no_
-            AND ile.source_db = sih.source_db
-        INNER JOIN dw2_nav.customer c
-            ON sih.bill_to_customer_no_ = c.no_
-            AND sih.source_db = c.source_db
-        WHERE ile.entry_type = 1
-          AND sih.posting_date >= ${lastYearStartStr}::date
-          AND sih.posting_date <= ${lastYearEndStr}::date
-          AND c.location_code IS NOT NULL
-          AND c.location_code != ''
-        GROUP BY ile.source_db, c.location_code, sih.bill_to_customer_no_, ile.item_no_
-      `);
+      {
+        const raw = await this.prisma.$queryRaw<
+          Array<{
+            source_db: string;
+            site_code: string;
+            customer_bill_to: string;
+            item_no: string;
+            total_quantity: Prisma.Decimal;
+            august_qty: Prisma.Decimal;
+            september_qty: Prisma.Decimal;
+            october_qty: Prisma.Decimal;
+            november_qty: Prisma.Decimal;
+            december_qty: Prisma.Decimal;
+            january_qty: Prisma.Decimal;
+            february_qty: Prisma.Decimal;
+            march_qty: Prisma.Decimal;
+            april_qty: Prisma.Decimal;
+            may_qty: Prisma.Decimal;
+            june_qty: Prisma.Decimal;
+            july_qty: Prisma.Decimal;
+          }>
+        >(Prisma.sql`
+          SELECT
+              ile.source_db,
+              c.location_code AS site_code,
+              sih.bill_to_customer_no_ AS customer_bill_to,
+              ile.item_no_ AS item_no,
+              ABS(SUM(ile.quantity)) AS total_quantity,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 8 THEN ile.quantity ELSE 0 END)) AS august_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 9 THEN ile.quantity ELSE 0 END)) AS september_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 10 THEN ile.quantity ELSE 0 END)) AS october_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 11 THEN ile.quantity ELSE 0 END)) AS november_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 12 THEN ile.quantity ELSE 0 END)) AS december_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 1 THEN ile.quantity ELSE 0 END)) AS january_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 2 THEN ile.quantity ELSE 0 END)) AS february_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 3 THEN ile.quantity ELSE 0 END)) AS march_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 4 THEN ile.quantity ELSE 0 END)) AS april_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 5 THEN ile.quantity ELSE 0 END)) AS may_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 6 THEN ile.quantity ELSE 0 END)) AS june_qty,
+              ABS(SUM(CASE WHEN EXTRACT(MONTH FROM sih.posting_date) = 7 THEN ile.quantity ELSE 0 END)) AS july_qty
+          FROM dw2_nav.item_ledger_entry ile
+          INNER JOIN dw2_nav.sales_invoice_header sih
+              ON ile.document_no_ = sih.no_
+              AND ile.source_db = sih.source_db
+          INNER JOIN dw2_nav.customer c
+              ON sih.bill_to_customer_no_ = c.no_
+              AND sih.source_db = c.source_db
+          WHERE ile.entry_type = 1
+            AND sih.posting_date >= ${lastYearStartStr}::date
+            AND sih.posting_date <= ${lastYearEndStr}::date
+            AND c.location_code IS NOT NULL
+            AND c.location_code != ''
+          GROUP BY ile.source_db, c.location_code, sih.bill_to_customer_no_, ile.item_no_
+        `);
 
-      logger.debug(
-        {
-          event: "customer-bid.sync.sales-found",
-          syncId,
-          count: lastYearSales.length,
-        },
-        "Found last year sales data"
-      );
-
-      for (const row of lastYearSales) {
-        const key = buildMapKey(
-          row.source_db,
-          row.site_code,
-          row.customer_bill_to,
-          row.item_no
+        logger.debug(
+          {
+            event: "customer-bid.sync.sales-found",
+            syncId,
+            count: raw.length,
+          },
+          "Found last year sales data"
         );
-        lastYearSalesMap.set(key, {
-          totalQty: row.total_quantity,
-          augQty: row.august_qty,
-          sepQty: row.september_qty,
-          octQty: row.october_qty,
-          novQty: row.november_qty,
-          decQty: row.december_qty,
-          janQty: row.january_qty,
-          febQty: row.february_qty,
-          marQty: row.march_qty,
-          aprQty: row.april_qty,
-          mayQty: row.may_qty,
-          junQty: row.june_qty,
-          julQty: row.july_qty,
-        });
+
+        for (const row of raw) {
+          const key = buildMapKey(
+            row.source_db,
+            row.site_code,
+            row.customer_bill_to,
+            row.item_no
+          );
+          lastYearSalesMap.set(key, {
+            totalQty: Number(row.total_quantity),
+            augQty: Number(row.august_qty),
+            sepQty: Number(row.september_qty),
+            octQty: Number(row.october_qty),
+            novQty: Number(row.november_qty),
+            decQty: Number(row.december_qty),
+            janQty: Number(row.january_qty),
+            febQty: Number(row.february_qty),
+            marQty: Number(row.march_qty),
+            aprQty: Number(row.april_qty),
+            mayQty: Number(row.may_qty),
+            junQty: Number(row.june_qty),
+            julQty: Number(row.july_qty),
+          });
+        }
+        // raw array goes out of scope — GC can reclaim Decimal objects
       }
 
-      // Query ERP status for all items (latest by last_date_modified)
+      // Collect unique (source_db, item_no) pairs for scoped ERP query
+      const relevantItemKeys = new Set<string>();
+      for (const bid of currentYearBids) {
+        relevantItemKeys.add(`${bid.source_db}|${bid.item_no}`);
+      }
+      for (const mapKey of lastYearBidKeys) {
+        const parts = mapKey.split("|");
+        relevantItemKeys.add(`${parts[0]}|${parts[3]}`);
+      }
+
+      // Query ERP status only for relevant items (not entire catalog)
       const erpStatusMap = new Map<string, string>();
-      const erpStatuses = await this.prisma.$queryRaw<
-        Array<{
-          source_db: string;
-          item_no: string;
-          status: string;
-        }>
-      >(Prisma.sql`
-        SELECT DISTINCT ON (item_no_, source_db)
-            source_db,
-            item_no_ AS item_no,
-            status
-        FROM dw2_nav.stockkeeping_unit
-        ORDER BY item_no_, source_db, last_date_modified DESC
-      `);
+      if (relevantItemKeys.size > 0) {
+        const relevantItems = [...relevantItemKeys].map((k) => {
+          const [sourceDb, itemNo] = k.split("|");
+          return { sourceDb, itemNo };
+        });
 
-      for (const row of erpStatuses) {
-        const key = `${row.source_db}|${row.item_no}`;
-        erpStatusMap.set(key, row.status);
+        const erpStatuses = await this.prisma.$queryRaw<
+          Array<{
+            source_db: string;
+            item_no: string;
+            status: string;
+          }>
+        >(Prisma.sql`
+          SELECT DISTINCT ON (item_no_, source_db)
+              source_db,
+              item_no_ AS item_no,
+              status
+          FROM dw2_nav.stockkeeping_unit
+          WHERE (source_db, item_no_) IN (
+            SELECT * FROM UNNEST(
+              ${relevantItems.map((i) => i.sourceDb)}::text[],
+              ${relevantItems.map((i) => i.itemNo)}::text[]
+            )
+          )
+          ORDER BY item_no_, source_db, last_date_modified DESC
+        `);
+
+        for (const row of erpStatuses) {
+          erpStatusMap.set(`${row.source_db}|${row.item_no}`, row.status);
+        }
+
+        logger.debug(
+          {
+            event: "customer-bid.sync.erp-status-found",
+            syncId,
+            count: erpStatuses.length,
+          },
+          "Found ERP status data"
+        );
       }
-
-      logger.debug(
-        {
-          event: "customer-bid.sync.erp-status-found",
-          syncId,
-          count: erpStatuses.length,
-        },
-        "Found ERP status data"
-      );
 
       // Create set of current year keys for isLost calculation
       const currentYearKeys = new Set(
@@ -1191,50 +1186,74 @@ export class CustomerBidService implements ICustomerBidService {
 
       for (let i = 0; i < currentYearBids.length; i += batchSize) {
         const batch = currentYearBids.slice(i, i + batchSize);
+        const len = batch.length;
 
-        // Build batch data with all computed values
-        const batchData = batch.map((bid) => {
+        // Build all UNNEST arrays in a single pass (avoid 26 separate .map() calls)
+        const sourceDbs: string[] = new Array(len);
+        const siteCodes: string[] = new Array(len);
+        const customerBillTos: string[] = new Array(len);
+        const itemNos: string[] = new Array(len);
+        const schoolYears: string[] = new Array(len);
+        const bidQtys: (number | null)[] = new Array(len);
+        const bidStarts: Date[] = new Array(len);
+        const bidEnds: Date[] = new Array(len);
+        const erpStatusArr: (string | null)[] = new Array(len);
+        const lyBidQtys: (number | null)[] = new Array(len);
+        const isLostArr: boolean[] = new Array(len);
+        const lyActuals: (number | null)[] = new Array(len);
+        const lyAugArr: (number | null)[] = new Array(len);
+        const lySepArr: (number | null)[] = new Array(len);
+        const lyOctArr: (number | null)[] = new Array(len);
+        const lyNovArr: (number | null)[] = new Array(len);
+        const lyDecArr: (number | null)[] = new Array(len);
+        const lyJanArr: (number | null)[] = new Array(len);
+        const lyFebArr: (number | null)[] = new Array(len);
+        const lyMarArr: (number | null)[] = new Array(len);
+        const lyAprArr: (number | null)[] = new Array(len);
+        const lyMayArr: (number | null)[] = new Array(len);
+        const lyJunArr: (number | null)[] = new Array(len);
+        const lyJulArr: (number | null)[] = new Array(len);
+        const syncedAtArr: Date[] = new Array(len);
+        const updatedAtArr: Date[] = new Array(len);
+
+        for (let j = 0; j < len; j++) {
+          const bid = batch[j]!;
           const key = buildMapKey(
             bid.source_db,
             bid.site_code,
             bid.customer_bill_to,
             bid.item_no
           );
-          const erpKey = `${bid.source_db}|${bid.item_no}`;
-          const lastYearBidQty = lastYearBidsMap.get(key) ?? null;
           const salesData = lastYearSalesMap.get(key);
-          const erpStatus = erpStatusMap.get(erpKey) ?? null;
-          const wasInLastYear = lastYearBidsMap.has(key);
-          const isInCurrentYear = currentYearKeys.has(key);
-          const isLost = wasInLastYear && !isInCurrentYear;
 
-          return {
-            sourceDb: bid.source_db,
-            siteCode: bid.site_code,
-            customerBillTo: bid.customer_bill_to,
-            itemNo: bid.item_no,
-            schoolYear: schoolYearString,
-            bidQty: bid.bid_qty,
-            bidStart: bid.bid_start,
-            bidEnd: bid.bid_end,
-            erpStatus,
-            lastYearBidQty,
-            isLost,
-            lastYearActual: salesData?.totalQty ?? null,
-            lyAugust: salesData?.augQty ?? null,
-            lySeptember: salesData?.sepQty ?? null,
-            lyOctober: salesData?.octQty ?? null,
-            lyNovember: salesData?.novQty ?? null,
-            lyDecember: salesData?.decQty ?? null,
-            lyJanuary: salesData?.janQty ?? null,
-            lyFebruary: salesData?.febQty ?? null,
-            lyMarch: salesData?.marQty ?? null,
-            lyApril: salesData?.aprQty ?? null,
-            lyMay: salesData?.mayQty ?? null,
-            lyJune: salesData?.junQty ?? null,
-            lyJuly: salesData?.julQty ?? null,
-          };
-        });
+          sourceDbs[j] = bid.source_db;
+          siteCodes[j] = bid.site_code;
+          customerBillTos[j] = bid.customer_bill_to;
+          itemNos[j] = bid.item_no;
+          schoolYears[j] = schoolYearString;
+          bidQtys[j] = bid.bid_qty ? Number(bid.bid_qty) : null;
+          bidStarts[j] = bid.bid_start;
+          bidEnds[j] = bid.bid_end;
+          erpStatusArr[j] =
+            erpStatusMap.get(`${bid.source_db}|${bid.item_no}`) ?? null;
+          lyBidQtys[j] = lastYearBidsMap.get(key) ?? null;
+          isLostArr[j] = lastYearBidsMap.has(key) && !currentYearKeys.has(key);
+          lyActuals[j] = salesData?.totalQty ?? null;
+          lyAugArr[j] = salesData?.augQty ?? null;
+          lySepArr[j] = salesData?.sepQty ?? null;
+          lyOctArr[j] = salesData?.octQty ?? null;
+          lyNovArr[j] = salesData?.novQty ?? null;
+          lyDecArr[j] = salesData?.decQty ?? null;
+          lyJanArr[j] = salesData?.janQty ?? null;
+          lyFebArr[j] = salesData?.febQty ?? null;
+          lyMarArr[j] = salesData?.marQty ?? null;
+          lyAprArr[j] = salesData?.aprQty ?? null;
+          lyMayArr[j] = salesData?.mayQty ?? null;
+          lyJunArr[j] = salesData?.junQty ?? null;
+          lyJulArr[j] = salesData?.julQty ?? null;
+          syncedAtArr[j] = now;
+          updatedAtArr[j] = now;
+        }
 
         // Use raw SQL with ON CONFLICT to track inserts vs updates via xmax
         const results = await this.prisma.$queryRaw<Array<{ xmax: string }>>(
@@ -1249,32 +1268,32 @@ export class CustomerBidService implements ICustomerBidService {
               synced_at, updated_at
             )
             SELECT * FROM UNNEST(
-              ${batchData.map((d) => d.sourceDb)}::text[],
-              ${batchData.map((d) => d.siteCode)}::text[],
-              ${batchData.map((d) => d.customerBillTo)}::text[],
-              ${batchData.map((d) => d.itemNo)}::text[],
-              ${batchData.map((d) => d.schoolYear)}::text[],
-              ${batchData.map((d) => (d.bidQty ? Number(d.bidQty) : null))}::decimal[],
-              ${batchData.map((d) => d.bidStart)}::timestamp[],
-              ${batchData.map((d) => d.bidEnd)}::timestamp[],
-              ${batchData.map((d) => d.erpStatus)}::text[],
-              ${batchData.map((d) => (d.lastYearBidQty ? Number(d.lastYearBidQty) : null))}::decimal[],
-              ${batchData.map((d) => d.isLost)}::boolean[],
-              ${batchData.map((d) => (d.lastYearActual ? Number(d.lastYearActual) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyAugust ? Number(d.lyAugust) : null))}::decimal[],
-              ${batchData.map((d) => (d.lySeptember ? Number(d.lySeptember) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyOctober ? Number(d.lyOctober) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyNovember ? Number(d.lyNovember) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyDecember ? Number(d.lyDecember) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyJanuary ? Number(d.lyJanuary) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyFebruary ? Number(d.lyFebruary) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyMarch ? Number(d.lyMarch) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyApril ? Number(d.lyApril) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyMay ? Number(d.lyMay) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyJune ? Number(d.lyJune) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyJuly ? Number(d.lyJuly) : null))}::decimal[],
-              ${batchData.map(() => now)}::timestamp[],
-              ${batchData.map(() => now)}::timestamp[]
+              ${sourceDbs}::text[],
+              ${siteCodes}::text[],
+              ${customerBillTos}::text[],
+              ${itemNos}::text[],
+              ${schoolYears}::text[],
+              ${bidQtys}::decimal[],
+              ${bidStarts}::timestamp[],
+              ${bidEnds}::timestamp[],
+              ${erpStatusArr}::text[],
+              ${lyBidQtys}::decimal[],
+              ${isLostArr}::boolean[],
+              ${lyActuals}::decimal[],
+              ${lyAugArr}::decimal[],
+              ${lySepArr}::decimal[],
+              ${lyOctArr}::decimal[],
+              ${lyNovArr}::decimal[],
+              ${lyDecArr}::decimal[],
+              ${lyJanArr}::decimal[],
+              ${lyFebArr}::decimal[],
+              ${lyMarArr}::decimal[],
+              ${lyAprArr}::decimal[],
+              ${lyMayArr}::decimal[],
+              ${lyJunArr}::decimal[],
+              ${lyJulArr}::decimal[],
+              ${syncedAtArr}::timestamp[],
+              ${updatedAtArr}::timestamp[]
             )
             ON CONFLICT (source_db, site_code, customer_bill_to, item_no, school_year)
             DO UPDATE SET
@@ -1313,67 +1332,82 @@ export class CustomerBidService implements ICustomerBidService {
         }
       }
 
-      // Process LOST bids: bids that existed last year but NOT in current year
-      const lostBids = lastYearBids.filter((lyBid) => {
-        const key = buildMapKey(
-          lyBid.source_db,
-          lyBid.site_code,
-          lyBid.customer_bill_to,
-          lyBid.item_no
-        );
-        return !currentYearKeys.has(key);
-      });
+      // Process LOST bids: keys in last year but NOT in current year
+      const lostBidKeys = lastYearBidKeys.filter(
+        (key) => !currentYearKeys.has(key)
+      );
 
       logger.debug(
         {
           event: "customer-bid.sync.lost-bids",
           syncId,
-          count: lostBids.length,
+          count: lostBidKeys.length,
         },
         "Processing LOST bids"
       );
 
-      for (let i = 0; i < lostBids.length; i += batchSize) {
-        const batch = lostBids.slice(i, i + batchSize);
+      for (let i = 0; i < lostBidKeys.length; i += batchSize) {
+        const batchKeys = lostBidKeys.slice(i, i + batchSize);
         const syncedAt = new Date();
+        const len = batchKeys.length;
 
-        // Build batch data with computed values
-        const batchData = batch.map((bid) => {
-          const key = buildMapKey(
-            bid.source_db,
-            bid.site_code,
-            bid.customer_bill_to,
-            bid.item_no
-          );
-          const erpKey = `${bid.source_db}|${bid.item_no}`;
+        // Build all UNNEST arrays in a single pass
+        const sourceDbs: string[] = new Array(len);
+        const siteCodes: string[] = new Array(len);
+        const customerBillTos: string[] = new Array(len);
+        const itemNos: string[] = new Array(len);
+        const schoolYears: string[] = new Array(len);
+        const erpStatusArr: (string | null)[] = new Array(len);
+        const lyBidQtys: (number | null)[] = new Array(len);
+        const isLostArr: boolean[] = new Array(len);
+        const lyActuals: (number | null)[] = new Array(len);
+        const lyAugArr: (number | null)[] = new Array(len);
+        const lySepArr: (number | null)[] = new Array(len);
+        const lyOctArr: (number | null)[] = new Array(len);
+        const lyNovArr: (number | null)[] = new Array(len);
+        const lyDecArr: (number | null)[] = new Array(len);
+        const lyJanArr: (number | null)[] = new Array(len);
+        const lyFebArr: (number | null)[] = new Array(len);
+        const lyMarArr: (number | null)[] = new Array(len);
+        const lyAprArr: (number | null)[] = new Array(len);
+        const lyMayArr: (number | null)[] = new Array(len);
+        const lyJunArr: (number | null)[] = new Array(len);
+        const lyJulArr: (number | null)[] = new Array(len);
+        const syncedAtArr: Date[] = new Array(len);
+        const updatedAtArr: Date[] = new Array(len);
+
+        for (let j = 0; j < len; j++) {
+          const key = batchKeys[j]!;
+          // Key format from buildMapKey: "sourceDb|siteCode|customerBillTo|itemNo"
+          const [sourceDb, siteCode, customerBillTo, itemNo] = key.split(
+            "|"
+          ) as [string, string, string, string];
           const salesData = lastYearSalesMap.get(key);
-          const erpStatus = erpStatusMap.get(erpKey) ?? null;
 
-          return {
-            sourceDb: bid.source_db,
-            siteCode: bid.site_code,
-            customerBillTo: bid.customer_bill_to,
-            itemNo: bid.item_no,
-            schoolYear: schoolYearString,
-            erpStatus,
-            lastYearBidQty: bid.bid_qty,
-            isLost: true,
-            lastYearActual: salesData?.totalQty ?? null,
-            lyAugust: salesData?.augQty ?? null,
-            lySeptember: salesData?.sepQty ?? null,
-            lyOctober: salesData?.octQty ?? null,
-            lyNovember: salesData?.novQty ?? null,
-            lyDecember: salesData?.decQty ?? null,
-            lyJanuary: salesData?.janQty ?? null,
-            lyFebruary: salesData?.febQty ?? null,
-            lyMarch: salesData?.marQty ?? null,
-            lyApril: salesData?.aprQty ?? null,
-            lyMay: salesData?.mayQty ?? null,
-            lyJune: salesData?.junQty ?? null,
-            lyJuly: salesData?.julQty ?? null,
-            syncedAt,
-          };
-        });
+          sourceDbs[j] = sourceDb;
+          siteCodes[j] = siteCode;
+          customerBillTos[j] = customerBillTo;
+          itemNos[j] = itemNo;
+          schoolYears[j] = schoolYearString;
+          erpStatusArr[j] = erpStatusMap.get(`${sourceDb}|${itemNo}`) ?? null;
+          lyBidQtys[j] = lastYearBidsMap.get(key) ?? null;
+          isLostArr[j] = true;
+          lyActuals[j] = salesData?.totalQty ?? null;
+          lyAugArr[j] = salesData?.augQty ?? null;
+          lySepArr[j] = salesData?.sepQty ?? null;
+          lyOctArr[j] = salesData?.octQty ?? null;
+          lyNovArr[j] = salesData?.novQty ?? null;
+          lyDecArr[j] = salesData?.decQty ?? null;
+          lyJanArr[j] = salesData?.janQty ?? null;
+          lyFebArr[j] = salesData?.febQty ?? null;
+          lyMarArr[j] = salesData?.marQty ?? null;
+          lyAprArr[j] = salesData?.aprQty ?? null;
+          lyMayArr[j] = salesData?.mayQty ?? null;
+          lyJunArr[j] = salesData?.junQty ?? null;
+          lyJulArr[j] = salesData?.julQty ?? null;
+          syncedAtArr[j] = syncedAt;
+          updatedAtArr[j] = syncedAt;
+        }
 
         // Use raw SQL with UNNEST to batch insert and get xmax for insert/update tracking
         const results = await this.prisma.$queryRaw<Array<{ xmax: string }>>(
@@ -1387,29 +1421,29 @@ export class CustomerBidService implements ICustomerBidService {
               synced_at, updated_at
             )
             SELECT * FROM UNNEST(
-              ${batchData.map((d) => d.sourceDb)}::text[],
-              ${batchData.map((d) => d.siteCode)}::text[],
-              ${batchData.map((d) => d.customerBillTo)}::text[],
-              ${batchData.map((d) => d.itemNo)}::text[],
-              ${batchData.map((d) => d.schoolYear)}::text[],
-              ${batchData.map((d) => d.erpStatus)}::text[],
-              ${batchData.map((d) => (d.lastYearBidQty ? Number(d.lastYearBidQty) : null))}::decimal[],
-              ${batchData.map((d) => d.isLost)}::boolean[],
-              ${batchData.map((d) => (d.lastYearActual ? Number(d.lastYearActual) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyAugust ? Number(d.lyAugust) : null))}::decimal[],
-              ${batchData.map((d) => (d.lySeptember ? Number(d.lySeptember) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyOctober ? Number(d.lyOctober) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyNovember ? Number(d.lyNovember) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyDecember ? Number(d.lyDecember) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyJanuary ? Number(d.lyJanuary) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyFebruary ? Number(d.lyFebruary) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyMarch ? Number(d.lyMarch) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyApril ? Number(d.lyApril) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyMay ? Number(d.lyMay) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyJune ? Number(d.lyJune) : null))}::decimal[],
-              ${batchData.map((d) => (d.lyJuly ? Number(d.lyJuly) : null))}::decimal[],
-              ${batchData.map(() => syncedAt)}::timestamp[],
-              ${batchData.map(() => syncedAt)}::timestamp[]
+              ${sourceDbs}::text[],
+              ${siteCodes}::text[],
+              ${customerBillTos}::text[],
+              ${itemNos}::text[],
+              ${schoolYears}::text[],
+              ${erpStatusArr}::text[],
+              ${lyBidQtys}::decimal[],
+              ${isLostArr}::boolean[],
+              ${lyActuals}::decimal[],
+              ${lyAugArr}::decimal[],
+              ${lySepArr}::decimal[],
+              ${lyOctArr}::decimal[],
+              ${lyNovArr}::decimal[],
+              ${lyDecArr}::decimal[],
+              ${lyJanArr}::decimal[],
+              ${lyFebArr}::decimal[],
+              ${lyMarArr}::decimal[],
+              ${lyAprArr}::decimal[],
+              ${lyMayArr}::decimal[],
+              ${lyJunArr}::decimal[],
+              ${lyJulArr}::decimal[],
+              ${syncedAtArr}::timestamp[],
+              ${updatedAtArr}::timestamp[]
             )
             ON CONFLICT (source_db, site_code, customer_bill_to, item_no, school_year)
             DO UPDATE SET
@@ -1447,7 +1481,7 @@ export class CustomerBidService implements ICustomerBidService {
 
       const durationMs = Date.now() - startTime;
 
-      const totalRecords = currentYearBids.length + lostBids.length;
+      const totalRecords = currentYearBids.length + lostBidKeys.length;
 
       // Update sync log with success
       await this.prisma.customerBidSyncLog.update({
@@ -1468,7 +1502,7 @@ export class CustomerBidService implements ICustomerBidService {
           syncId,
           recordsTotal: totalRecords,
           wonBids: currentYearBids.length,
-          lostBids: lostBids.length,
+          lostBids: lostBidKeys.length,
           durationMs,
         },
         "Customer bid sync completed successfully"

@@ -16,6 +16,7 @@ import {
 } from "@/services/IBidExportService";
 import { config } from "@/config/index";
 import { createChildLogger } from "@/telemetry/logger";
+import { getSchoolYearString } from "@/services/helpers/school-year";
 
 const logger = createChildLogger("scheduler");
 
@@ -209,8 +210,26 @@ export class SchedulerService implements ISchedulerService {
   }
 
   /**
-   * Run the scheduled Customer Bid sync with distributed locking
-   * Syncs Current and Next school years
+   * Check if a school year has already been successfully synced.
+   * Used to avoid re-syncing "previous" and "current" school years daily.
+   */
+  private async hasCompletedSync(schoolYearString: string): Promise<boolean> {
+    const completed = await this.prisma.customerBidSyncLog.findFirst({
+      where: {
+        schoolYear: schoolYearString,
+        status: "COMPLETED",
+      },
+      select: { id: true },
+    });
+    return completed !== null;
+  }
+
+  /**
+   * Run the scheduled Customer Bid sync with distributed locking.
+   *
+   * - "previous" and "current" school years: synced once per school year
+   *   (self-healing — retries daily until a COMPLETED sync exists)
+   * - "next" school year: synced every run (daily)
    */
   private async runCustomerBidSync(): Promise<void> {
     const lockAcquired = await this.tryAcquireLock(CUSTOMER_BID_SYNC_LOCK_ID);
@@ -229,23 +248,75 @@ export class SchedulerService implements ISchedulerService {
         "Starting scheduled Customer Bid sync"
       );
 
-      // Sync current school year
-      const currentResult = await this.customerBidService.sync(
-        "current",
-        "scheduled"
-      );
-      logger.info(
-        {
-          event: "scheduler.customerbid.current.complete",
-          syncId: currentResult.syncId,
-          schoolYear: currentResult.schoolYear,
-          recordsTotal: currentResult.recordsTotal,
-          durationMs: currentResult.durationMs,
-        },
-        "Scheduled Customer Bid sync (current) completed"
-      );
+      // Sync "previous" if never successfully synced (once per school year)
+      const prevSchoolYear = getSchoolYearString("previous");
+      if (!(await this.hasCompletedSync(prevSchoolYear))) {
+        logger.info(
+          {
+            event: "scheduler.customerbid.previous.needed",
+            schoolYear: prevSchoolYear,
+          },
+          "Previous school year has no completed sync — syncing now"
+        );
+        const prevResult = await this.customerBidService.sync(
+          "previous",
+          "scheduled"
+        );
+        logger.info(
+          {
+            event: "scheduler.customerbid.previous.complete",
+            syncId: prevResult.syncId,
+            schoolYear: prevResult.schoolYear,
+            recordsTotal: prevResult.recordsTotal,
+            durationMs: prevResult.durationMs,
+          },
+          "Scheduled Customer Bid sync (previous) completed"
+        );
+      } else {
+        logger.info(
+          {
+            event: "scheduler.customerbid.previous.skipped",
+            schoolYear: prevSchoolYear,
+          },
+          "Previous school year already synced — skipping"
+        );
+      }
 
-      // Sync next school year
+      // Sync "current" if never successfully synced (once per school year)
+      const currSchoolYear = getSchoolYearString("current");
+      if (!(await this.hasCompletedSync(currSchoolYear))) {
+        logger.info(
+          {
+            event: "scheduler.customerbid.current.needed",
+            schoolYear: currSchoolYear,
+          },
+          "Current school year has no completed sync — syncing now"
+        );
+        const currentResult = await this.customerBidService.sync(
+          "current",
+          "scheduled"
+        );
+        logger.info(
+          {
+            event: "scheduler.customerbid.current.complete",
+            syncId: currentResult.syncId,
+            schoolYear: currentResult.schoolYear,
+            recordsTotal: currentResult.recordsTotal,
+            durationMs: currentResult.durationMs,
+          },
+          "Scheduled Customer Bid sync (current) completed"
+        );
+      } else {
+        logger.info(
+          {
+            event: "scheduler.customerbid.current.skipped",
+            schoolYear: currSchoolYear,
+          },
+          "Current school year already synced — skipping"
+        );
+      }
+
+      // Always sync "next" school year (daily)
       const nextResult = await this.customerBidService.sync(
         "next",
         "scheduled"
@@ -263,7 +334,7 @@ export class SchedulerService implements ISchedulerService {
 
       logger.info(
         { event: "scheduler.customerbid.complete" },
-        "Scheduled Customer Bid sync completed (both school years)"
+        "Scheduled Customer Bid sync completed"
       );
     } catch (error) {
       logger.error(

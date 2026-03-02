@@ -42,6 +42,8 @@ export interface CustomerBidDto {
   brandName: string | null;
   /** Pack size from Item table */
   packSize: string | null;
+  /** Customer lead time from StockkeepingUnit table */
+  customerLeadTime: number | null;
   erpStatus: string | null;
   bidQuantity: number | null;
 

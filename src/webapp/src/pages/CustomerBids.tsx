@@ -319,6 +319,7 @@ export default function CustomerBids({
     contactName: false,
     contactEmail: false,
     contactPhone: false,
+    customerLeadTime: false,
     ...defaultColumnVisibility,
   });
   const [tableInstance, setTableInstance] =

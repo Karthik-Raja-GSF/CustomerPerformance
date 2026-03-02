@@ -525,6 +525,20 @@ export function createColumns(
       cell: ({ row }) => row.getValue<string | null>("packSize") ?? "-",
     },
     {
+      accessorKey: "customerLeadTime",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          Lead Time
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("customerLeadTime"))}
+        </div>
+      ),
+      enableHiding: true,
+    },
+    {
       accessorKey: "itemDescription",
       header: () => (
         <span className="text-muted-foreground font-medium">
