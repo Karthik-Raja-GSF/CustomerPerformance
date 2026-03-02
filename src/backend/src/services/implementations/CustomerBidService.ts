@@ -874,10 +874,38 @@ export class CustomerBidService implements ICustomerBidService {
 
     // Check if there's already a sync in progress (within last 2 hours)
     const staleThresholdMs = 2 * 60 * 60 * 1000;
+    const staleThreshold = new Date(Date.now() - staleThresholdMs);
+
+    // Mark any stale IN_PROGRESS syncs (older than threshold) as FAILED
+    const staleResult = await this.prisma.customerBidSyncLog.updateMany({
+      where: {
+        status: "IN_PROGRESS",
+        startedAt: { lt: staleThreshold },
+      },
+      data: {
+        status: "FAILED",
+        completedAt: new Date(),
+        errorMessage:
+          "Sync was automatically marked as failed: process appears to have crashed or timed out (exceeded 2-hour threshold)",
+      },
+    });
+
+    if (staleResult.count > 0) {
+      logger.warn(
+        {
+          event: "customer-bid.sync.stale-cleanup",
+          syncId,
+          staleCount: staleResult.count,
+        },
+        `Marked ${staleResult.count} stale IN_PROGRESS sync(s) as FAILED`
+      );
+    }
+
+    // Check if there's a recent (non-stale) sync still in progress
     const inProgress = await this.prisma.customerBidSyncLog.findFirst({
       where: {
         status: "IN_PROGRESS",
-        startedAt: { gte: new Date(Date.now() - staleThresholdMs) },
+        startedAt: { gte: staleThreshold },
       },
     });
 

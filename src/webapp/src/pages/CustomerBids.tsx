@@ -788,15 +788,15 @@ export default function CustomerBids({
     <div className="flex flex-1 flex-col gap-6 p-8 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="shrink-0 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
-        <p className="text-muted-foreground">
-          {pageDescription}
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
           {dateRange && (
-            <span className="ml-2">
-              ({dateRange.startDate} to {dateRange.endDate})
-            </span>
+            <Badge variant="secondary" className="text-base px-3 py-1">
+              {dateRange.startDate} to {dateRange.endDate}
+            </Badge>
           )}
-        </p>
+        </div>
+        <p className="text-muted-foreground">{pageDescription}</p>
       </div>
 
       {/* School Year Tabs + Toolbar */}

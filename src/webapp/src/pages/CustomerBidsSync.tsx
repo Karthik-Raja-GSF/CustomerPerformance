@@ -78,17 +78,45 @@ function StatusBadge({ status }: { status: SyncStatus }) {
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
 }
 
-const schoolYearOptions: { value: SchoolYear | "all"; label: string }[] = [
-  { value: "all", label: "All School Years" },
-  { value: "next", label: "Next School Year" },
-  { value: "current", label: "Current School Year" },
-  { value: "previous", label: "Previous School Year" },
+function getSchoolYearString(schoolYear: SchoolYear): string {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  // School year starts in August (month 7)
+  const schoolYearStartYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+
+  let startYear: number;
+  switch (schoolYear) {
+    case "previous":
+      startYear = schoolYearStartYear - 1;
+      break;
+    case "current":
+      startYear = schoolYearStartYear;
+      break;
+    case "next":
+    default:
+      startYear = schoolYearStartYear + 1;
+      break;
+  }
+  return `${startYear}-${startYear + 1}`;
+}
+
+const schoolYearOptions: { value: SchoolYear; label: string }[] = [
+  { value: "next", label: `Next School Year (${getSchoolYearString("next")})` },
+  {
+    value: "current",
+    label: `Current School Year (${getSchoolYearString("current")})`,
+  },
+  {
+    value: "previous",
+    label: `Previous School Year (${getSchoolYearString("previous")})`,
+  },
 ];
 
 export default function CustomerBidsSync() {
   const [history, setHistory] = useState<SyncLog[]>([]);
   const [latestStatus, setLatestStatus] = useState<SyncLog | null>(null);
-  const [selectedYear, setSelectedYear] = useState<SchoolYear | "all">("all");
+  const [selectedYear, setSelectedYear] = useState<SchoolYear>("next");
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -138,19 +166,10 @@ export default function CustomerBidsSync() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      if (selectedYear === "all") {
-        // Sync all three school years sequentially
-        const years: SchoolYear[] = ["next", "current", "previous"];
-        for (const year of years) {
-          await triggerSync(year);
-        }
-        toast.success("Sync started for all school years");
-      } else {
-        const result = await triggerSync(selectedYear);
-        toast.success(
-          `Sync started for ${result.schoolYear}. ID: ${result.syncId.slice(0, 8)}...`
-        );
-      }
+      const result = await triggerSync(selectedYear);
+      toast.success(
+        `Sync started for ${result.schoolYear}. ID: ${result.syncId.slice(0, 8)}...`
+      );
       fetchData();
     } catch (error) {
       toast.error(
@@ -174,9 +193,7 @@ export default function CustomerBidsSync() {
         <div className="flex items-center gap-3">
           <Select
             value={selectedYear}
-            onValueChange={(value) =>
-              setSelectedYear(value as SchoolYear | "all")
-            }
+            onValueChange={(value) => setSelectedYear(value as SchoolYear)}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select school year" />
@@ -289,6 +306,7 @@ export default function CustomerBidsSync() {
                       <TableHead>Records</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead>Triggered By</TableHead>
+                      <TableHead>Error</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -303,6 +321,18 @@ export default function CustomerBidsSync() {
                         <TableCell>{formatDuration(log.durationMs)}</TableCell>
                         <TableCell className="capitalize">
                           {log.triggeredBy}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-xs truncate"
+                          title={log.errorMessage ?? undefined}
+                        >
+                          {log.errorMessage ? (
+                            <span className="text-destructive text-sm">
+                              {log.errorMessage}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
