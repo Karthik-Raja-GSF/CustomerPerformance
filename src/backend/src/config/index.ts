@@ -116,6 +116,7 @@ export const config = {
           Feature.BACK_TO_SCHOOL,
           Feature.MONTHLY_FORECAST,
           Feature.CONFIRMED_BID_ITEMS,
+          Feature.EO_RISK_REVIEW,
         ],
       },
       {

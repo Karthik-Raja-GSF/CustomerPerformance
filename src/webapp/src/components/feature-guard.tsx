@@ -12,6 +12,7 @@ const featureRouteMap: Record<string, string> = {
   [Feature.PROMPT_BUILDER]: "/settings",
   [Feature.STOCKIQ_SYNC]: "/stockiq-sync",
   [Feature.CUSTOMER_BIDS_SYNC]: "/customer-bids-sync",
+  [Feature.EO_RISK_REVIEW]: "/eo/risk-review",
 };
 
 interface FeatureGuardProps {

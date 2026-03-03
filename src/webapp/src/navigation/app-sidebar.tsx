@@ -1,5 +1,10 @@
 import * as React from "react";
-import { Settings2, GraduationCap, TrendingUp } from "lucide-react";
+import {
+  Settings2,
+  GraduationCap,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
 import { StarqIcon } from "@/components/icons/starq-icon";
 import { Feature } from "@/config/features";
 import { usePermissions } from "@/contexts/permissions-context";
@@ -44,6 +49,18 @@ const data = {
           title: "Confirmed Bid Items",
           url: "/demand-planning/confirmed-bid-items",
           feature: Feature.CONFIRMED_BID_ITEMS,
+        },
+      ],
+    },
+    {
+      title: "E&O",
+      url: "/eo/risk-review",
+      icon: AlertTriangle,
+      items: [
+        {
+          title: "Risk Review",
+          url: "/eo/risk-review",
+          feature: Feature.EO_RISK_REVIEW,
         },
       ],
     },

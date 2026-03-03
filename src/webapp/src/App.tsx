@@ -11,6 +11,7 @@ import CustomerBids from "@/pages/CustomerBids";
 import MonthlyForecast from "@/pages/MonthlyForecast";
 import ConfirmedBidItems from "@/pages/ConfirmedBidItems";
 import BidExportHistory from "@/pages/BidExportHistory";
+import EoRiskReview from "@/pages/EoRiskReview";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import ForceChangePassword from "@/pages/ForceChangePassword";
@@ -27,6 +28,7 @@ export const routes = [
     title: "Confirmed Bid Items",
   },
   { path: "/bid-export-history", title: "Bid Items Export History" },
+  { path: "/eo/risk-review", title: "Risk Review" },
   { path: "/settings", title: "Settings - Prompts" },
 ];
 
@@ -113,6 +115,14 @@ function App() {
             element={
               <FeatureGuard feature={Feature.BID_EXPORT}>
                 <BidExportHistory />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/eo/risk-review"
+            element={
+              <FeatureGuard feature={Feature.EO_RISK_REVIEW}>
+                <EoRiskReview />
               </FeatureGuard>
             }
           />

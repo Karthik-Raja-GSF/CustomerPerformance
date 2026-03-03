@@ -50,6 +50,11 @@ import {
 import { BidExportService } from "@/services/implementations/BidExportService";
 import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
 import { RbacService } from "@/services/implementations/RbacService";
+import {
+  IEoRiskReviewService,
+  EO_RISK_REVIEW_SERVICE_TOKEN,
+} from "@/services/IEoRiskReviewService";
+import { EoRiskReviewService } from "@/services/implementations/EoRiskReviewService";
 
 /**
  * DI Container Configuration
@@ -118,6 +123,11 @@ export function setupContainer(prisma: PrismaClient): void {
   // Register BidExportService for export queue management
   container.register<IBidExportService>(BID_EXPORT_SERVICE_TOKEN, {
     useClass: BidExportService,
+  });
+
+  // Register EoRiskReviewService for E&O risk item identification
+  container.register<IEoRiskReviewService>(EO_RISK_REVIEW_SERVICE_TOKEN, {
+    useClass: EoRiskReviewService,
   });
 
   // Register SchedulerService for in-app scheduled tasks

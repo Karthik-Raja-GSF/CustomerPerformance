@@ -13,6 +13,7 @@ export const Feature = {
   PROMPT_BUILDER: "prompt-builder",
   STOCKIQ_SYNC: "stockiq-sync",
   CUSTOMER_BIDS_SYNC: "customer-bids-sync",
+  EO_RISK_REVIEW: "eo-risk-review",
 } as const;
 
 export type Feature = (typeof Feature)[keyof typeof Feature];

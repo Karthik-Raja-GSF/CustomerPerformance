@@ -25,6 +25,7 @@ import stockiqRouter from "./routes/stockiq";
 import customerBidsRouter from "./routes/customer-bids";
 import bidExportsRouter from "./routes/bid-exports";
 import authRouter from "./routes/auth";
+import eoRiskReviewRouter from "./routes/eo-risk-review";
 
 const serverLogger = createChildLogger("server");
 
@@ -103,6 +104,7 @@ class Server {
     apiRouter.use("/stockiq", stockiqRouter);
     apiRouter.use("/customer-bids", customerBidsRouter);
     apiRouter.use("/bid-exports", bidExportsRouter);
+    apiRouter.use("/eo-risk-review", eoRiskReviewRouter);
 
     // Mount at root (existing public ALB, container health check)
     this.app.use("/", apiRouter);
