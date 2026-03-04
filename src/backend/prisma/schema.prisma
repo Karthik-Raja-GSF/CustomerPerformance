@@ -315,6 +315,7 @@ model ItemLedgerEntry {
   truePostingDateTime   DateTime? @map("true_posting_date_time")
 
   @@id([sourceDb, entryNo])
+  @@index([documentType, postingDate], map: "idx_ile_doc_type_posting_date")
   @@map("item_ledger_entry")
   @@schema("dw2_nav")
 }
