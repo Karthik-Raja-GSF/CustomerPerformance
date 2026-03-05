@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { usePermissions } from "@/contexts/permissions-context";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -62,7 +63,7 @@ import { createColumns, canConfirmBid } from "@/pages/customer-bids/columns";
 import {
   exportToCSV,
   exportToSIQCSV,
-  customerBidExportColumns,
+  buildFilteredExportColumns,
 } from "@/utils/export-csv";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
 import { BatchMenuMonthsPopover } from "@/components/batch-menu-months-popover";
@@ -241,6 +242,11 @@ export default function CustomerBids({
   showExportedFilter = false,
   showQueueExport = false,
 }: CustomerBidsProps) {
+  const { roles } = usePermissions();
+  const isSalesRole =
+    roles.some((r) => r.enumKey === "SALES") &&
+    !roles.some((r) => r.enumKey === "ADMIN" || r.enumKey === "DEMAND_PLANNER");
+
   const [searchParams, setSearchParams] = useSearchParams();
   const isInitialMount = useRef(true);
   const isUrlSyncInitMount = useRef(true);
@@ -790,6 +796,7 @@ export default function CustomerBids({
         onDequeue:
           showQueueExport || showExportedFilter ? dequeueHandler : undefined,
         dequeueLabel,
+        isSalesRole,
       }),
     [
       handleCellUpdate,
@@ -806,14 +813,15 @@ export default function CustomerBids({
       handleToggleQueue,
       dequeueHandler,
       dequeueLabel,
+      isSalesRole,
     ]
   );
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8 min-h-0 overflow-hidden">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="shrink-0 space-y-1">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
           {dateRange && (
             <Badge variant="secondary" className="text-base px-3 py-1">
@@ -825,7 +833,7 @@ export default function CustomerBids({
       </div>
 
       {/* School Year Tabs + Toolbar */}
-      <div className="shrink-0 flex items-center gap-3">
+      <div className="shrink-0 flex items-center gap-2 flex-wrap">
         <Tabs
           value={filters.schoolYear || "next"}
           onValueChange={(value) => {
@@ -934,11 +942,11 @@ export default function CustomerBids({
                 (b) =>
                   b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
               );
-              exportToCSV(
+              const filteredColumns = buildFilteredExportColumns(
                 exportable,
-                customerBidExportColumns,
-                "customer-bids"
+                getMenuMonths
               );
+              exportToCSV(exportable, filteredColumns, "customer-bids");
               const skipped = bids.length - exportable.length;
               if (skipped > 0) {
                 toast.success(
@@ -1065,7 +1073,7 @@ export default function CustomerBids({
             size="sm"
             disabled={bids.length === 0 || isLoading}
             onClick={() => {
-              exportToSIQCSV(bids, "customer-bids-siq");
+              exportToSIQCSV(bids, "customer-bids-siq", getMenuMonths);
               toast.success("SIQ CSV exported successfully");
             }}
           >

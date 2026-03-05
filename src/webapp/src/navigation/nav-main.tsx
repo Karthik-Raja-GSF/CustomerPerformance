@@ -1,12 +1,18 @@
-import { ChevronRight, type LucideIcon } from "lucide-react"
-import { type ComponentType } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { ChevronRight, type LucideIcon } from "lucide-react";
+import { type ComponentType } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/shadcn/components/collapsible"
+} from "@/shadcn/components/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shadcn/components/dropdown-menu";
 import {
   SidebarGroup,
   SidebarMenu,
@@ -15,23 +21,25 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@/shadcn/components/sidebar"
+  useSidebar,
+} from "@/shadcn/components/sidebar";
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string
-    url: string
-    icon?: LucideIcon | ComponentType<{ className?: string }>
-    isActive?: boolean
+    title: string;
+    url: string;
+    icon?: LucideIcon | ComponentType<{ className?: string }>;
+    isActive?: boolean;
     items?: {
-      title: string
-      url: string
-    }[]
-  }[]
+      title: string;
+      url: string;
+    }[];
+  }[];
 }) {
-  const location = useLocation()
+  const location = useLocation();
+  const { state } = useSidebar();
 
   return (
     <SidebarGroup>
@@ -39,9 +47,52 @@ export function NavMain({
         {items.map((item) => {
           const isActive = item.items
             ? item.items.some((subItem) => location.pathname === subItem.url)
-            : location.pathname === item.url
+            : location.pathname === item.url;
 
-          return item.items ? (
+          if (!item.items) {
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.title}
+                  isActive={isActive}
+                >
+                  <Link to={item.url}>
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          }
+
+          if (state === "collapsed") {
+            return (
+              <SidebarMenuItem key={item.title}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton tooltip={item.title} isActive={isActive}>
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="right"
+                    align="start"
+                    sideOffset={4}
+                  >
+                    {item.items.map((subItem) => (
+                      <DropdownMenuItem key={subItem.title} asChild>
+                        <Link to={subItem.url}>{subItem.title}</Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            );
+          }
+
+          return (
             <Collapsible
               key={item.title}
               asChild
@@ -60,7 +111,10 @@ export function NavMain({
                   <SidebarMenuSub>
                     {item.items.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild isActive={location.pathname === subItem.url}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={location.pathname === subItem.url}
+                        >
                           <Link to={subItem.url}>
                             <span>{subItem.title}</span>
                           </Link>
@@ -71,18 +125,9 @@ export function NavMain({
                 </CollapsibleContent>
               </SidebarMenuItem>
             </Collapsible>
-          ) : (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                <Link to={item.url}>
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )
+          );
         })}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }

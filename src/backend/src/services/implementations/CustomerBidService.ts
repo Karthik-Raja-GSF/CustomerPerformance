@@ -21,6 +21,8 @@ import {
   CustomerBidSyncInProgressError,
 } from "@/utils/errors/customer-bid-errors";
 import { createChildLogger } from "@/telemetry/logger";
+import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
+import { Role } from "@/contracts/rbac/role";
 import { buildCompositeKeyWhere } from "@/services/helpers/bid-keys";
 import {
   ESTIMATE_FIELDS,
@@ -106,7 +108,10 @@ interface BaseBidRow {
  */
 @injectable()
 export class CustomerBidService implements ICustomerBidService {
-  constructor(@inject("PrismaClient") private readonly prisma: PrismaClient) {}
+  constructor(
+    @inject("PrismaClient") private readonly prisma: PrismaClient,
+    @inject(RBAC_SERVICE_TOKEN) private readonly rbacService: IRbacService
+  ) {}
 
   /**
    * Get paginated customer bid records
@@ -349,7 +354,8 @@ export class CustomerBidService implements ICustomerBidService {
   async updateBid(
     key: CustomerBidKeyDto,
     data: UpdateCustomerBidDto,
-    userEmail: string
+    userEmail: string,
+    userGroups: string[] = []
   ): Promise<CustomerBidDto> {
     logger.debug(
       { event: "customer-bid.update", key, data },
@@ -365,11 +371,30 @@ export class CustomerBidService implements ICustomerBidService {
       });
 
       if (existing?.confirmedAt) {
-        // Reject yearAround changes on confirmed bids
+        // Reject yearAround changes on confirmed bids (all roles)
         if (data.yearAround !== undefined) {
           throw new CustomerBidQueryError(
             "Cannot update Year Around on a confirmed bid"
           );
+        }
+
+        // Reject estimate changes on confirmed bids for SALES-only users
+        const userRoles = this.rbacService.resolveRoles(userGroups);
+        const isSalesOnly =
+          userRoles.some((r) => r.enumKey === Role.SALES) &&
+          !userRoles.some(
+            (r) => r.enumKey === Role.ADMIN || r.enumKey === Role.DEMAND_PLANNER
+          );
+
+        if (isSalesOnly) {
+          const hasEstimateChange = ESTIMATE_FIELDS.some(
+            (field) => data[field as keyof UpdateCustomerBidDto] !== undefined
+          );
+          if (hasEstimateChange) {
+            throw new CustomerBidQueryError(
+              "Cannot update estimates on a confirmed bid"
+            );
+          }
         }
       }
 

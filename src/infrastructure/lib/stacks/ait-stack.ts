@@ -24,6 +24,7 @@ import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
 import { WafConstruct } from "../constructs/waf-construct";
 import { FrontendEcsConstruct } from "../constructs/frontend-ecs-construct";
+import { PrivateHostedZoneConstruct } from "../constructs/private-hosted-zone-construct";
 import { defaultWafConfigs } from "../config/waf-config";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 
@@ -105,6 +106,24 @@ export class AitStack extends cdk.Stack {
       config: config.vpc,
       naming,
     });
+
+    // ===================
+    // Private Hosted Zone
+    // ===================
+    let privateHostedZone: route53.IPrivateHostedZone | undefined;
+    if (config.privateDomain) {
+      const phzConstruct = new PrivateHostedZoneConstruct(
+        this,
+        "PrivateHostedZone",
+        {
+          envName: config.envName,
+          zoneName: config.privateDomain,
+          vpc: vpcConstruct.vpc,
+          naming,
+        }
+      );
+      privateHostedZone = phzConstruct.hostedZone;
+    }
 
     // ===================
     // VPC Peering (imported - manually created)
@@ -305,7 +324,9 @@ export class AitStack extends cdk.Stack {
         vpc: vpcConstruct.vpc,
         cluster: backendConstruct.cluster,
         ecrRepository: ecrConstruct.webappRepository,
-        // No privateHostedZone or domainName — DNS managed by other team
+        privateHostedZone,
+        domainName: config.privateDomain,
+        certificateArn: config.privateCertificateArn,
         config: config.frontendEcs,
         naming,
         peerVpcCidr: config.vpcPeering?.peerVpcCidr,

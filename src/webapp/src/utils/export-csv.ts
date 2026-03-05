@@ -1,5 +1,11 @@
 import * as XLSX from "xlsx";
 import type { CustomerBidDto } from "@/types/customer-bids";
+import {
+  ESTIMATE_MONTHS,
+  LY_MONTHS,
+  YEAR_AROUND_ESTIMATE_MONTHS,
+  type MonthKey,
+} from "@/utils/menu-months";
 
 export interface ExportColumn {
   key: string;
@@ -96,7 +102,11 @@ const SIQ_ESTIMATE_MONTHS = [
  * - Quantity: estimate value
  * - Note: customerName
  */
-export function exportToSIQCSV(data: CustomerBidDto[], filename: string): void {
+export function exportToSIQCSV(
+  data: CustomerBidDto[],
+  filename: string,
+  getMenuMonths?: (bid: CustomerBidDto) => Record<MonthKey, boolean>
+): void {
   const nextYear = new Date().getFullYear() + 1;
   const siqRows: SIQRow[] = [];
 
@@ -108,8 +118,29 @@ export function exportToSIQCSV(data: CustomerBidDto[], filename: string): void {
       Note: row.customerName || "",
     };
 
-    // Iterate through all 12 estimate months
+    // When getMenuMonths is provided, build the set of allowed estimate keys for this row
+    let allowedEstimateKeys: Set<string> | null = null;
+    if (getMenuMonths) {
+      allowedEstimateKeys = new Set<string>();
+      if (row.yearAround) {
+        for (const yaKey of YEAR_AROUND_ESTIMATE_MONTHS) {
+          const month = ESTIMATE_MONTHS.find((m) => m.menuKey === yaKey);
+          if (month) allowedEstimateKeys.add(month.estimateKey);
+        }
+      } else {
+        const months = getMenuMonths(row);
+        for (const m of ESTIMATE_MONTHS) {
+          if (months[m.menuKey]) {
+            allowedEstimateKeys.add(m.estimateKey);
+          }
+        }
+      }
+    }
+
     for (const monthConfig of SIQ_ESTIMATE_MONTHS) {
+      if (allowedEstimateKeys && !allowedEstimateKeys.has(monthConfig.key)) {
+        continue;
+      }
       const estimateValue = row[monthConfig.key];
       if (estimateValue != null && estimateValue > 0) {
         siqRows.push({
@@ -133,6 +164,53 @@ export function exportToSIQCSV(data: CustomerBidDto[], filename: string): void {
  * Column configuration for Customer Bids export
  * Exports ALL fields regardless of table column visibility
  */
+/**
+ * Build a filtered export column list that only includes estimate and LY columns
+ * for months selected in menu months across the given bids.
+ * Non-month columns are always included.
+ */
+export function buildFilteredExportColumns(
+  bids: CustomerBidDto[],
+  getMenuMonths: (bid: CustomerBidDto) => Record<MonthKey, boolean>
+): ExportColumn[] {
+  // Compute the union of all selected menu months across all bids
+  const selectedMonths = new Set<MonthKey>();
+  for (const bid of bids) {
+    if (bid.yearAround) {
+      for (const key of YEAR_AROUND_ESTIMATE_MONTHS) {
+        selectedMonths.add(key);
+      }
+    } else {
+      const months = getMenuMonths(bid);
+      for (const [key, selected] of Object.entries(months)) {
+        if (selected) selectedMonths.add(key as MonthKey);
+      }
+    }
+  }
+
+  // Build sets of allowed estimate and LY keys
+  const allowedEstimateKeys = new Set<string>();
+  const allowedLyKeys = new Set<string>();
+  for (const m of ESTIMATE_MONTHS) {
+    if (selectedMonths.has(m.menuKey)) allowedEstimateKeys.add(m.estimateKey);
+  }
+  for (const m of LY_MONTHS) {
+    if (selectedMonths.has(m.menuKey)) allowedLyKeys.add(m.lyKey);
+  }
+
+  // All possible month keys (for identifying which columns to filter)
+  const allEstimateKeys = new Set<string>(
+    ESTIMATE_MONTHS.map((m) => m.estimateKey)
+  );
+  const allLyKeys = new Set<string>(LY_MONTHS.map((m) => m.lyKey));
+
+  return customerBidExportColumns.filter((col) => {
+    if (allEstimateKeys.has(col.key)) return allowedEstimateKeys.has(col.key);
+    if (allLyKeys.has(col.key)) return allowedLyKeys.has(col.key);
+    return true;
+  });
+}
+
 export const customerBidExportColumns: ExportColumn[] = [
   // Customer info
   { key: "sourceDb", header: "Source" },

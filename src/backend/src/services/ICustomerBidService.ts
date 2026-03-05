@@ -43,7 +43,8 @@ export interface ICustomerBidService {
   updateBid(
     key: CustomerBidKeyDto,
     data: UpdateCustomerBidDto,
-    userEmail: string
+    userEmail: string,
+    userGroups: string[]
   ): Promise<CustomerBidDto>;
 
   /**

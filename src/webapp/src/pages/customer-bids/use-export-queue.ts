@@ -14,6 +14,7 @@ import {
   getQueueSummary,
 } from "@/apis/bid-exports";
 import { exportToSIQCSV } from "@/utils/export-csv";
+import { deriveMenuMonthsFromEstimates } from "@/utils/menu-months";
 import type { CustomerBidDto, CustomerBidFilters } from "@/types/customer-bids";
 import type { QueueSummary } from "@/types/bid-export";
 
@@ -176,7 +177,9 @@ export function useExportQueue({
         );
         return;
       }
-      exportToSIQCSV(result.data, "customer-bids-siq");
+      exportToSIQCSV(result.data, "customer-bids-siq", (bid) =>
+        deriveMenuMonthsFromEstimates(bid)
+      );
       toast.success(
         `Exported ${result.totalExported} item${result.totalExported !== 1 ? "s" : ""}`
       );

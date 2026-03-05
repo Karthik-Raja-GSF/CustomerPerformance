@@ -183,7 +183,7 @@ export default function CustomerBidsSync() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex items-center justify-between shrink-0 flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Customer Bids Sync</h1>
           <p className="text-muted-foreground">
@@ -296,7 +296,7 @@ export default function CustomerBidsSync() {
             </p>
           ) : (
             <ScrollArea className="h-full">
-              <div className="px-6 pb-6">
+              <div className="px-6 pb-6 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -308,10 +308,12 @@ router.patch(
       );
 
       const userEmail = req.user?.email || "unknown";
+      const userGroups = req.user?.groups || [];
       const result = await customerBidService.updateBid(
         pathParsed.data,
         bodyParsed.data,
-        userEmail
+        userEmail,
+        userGroups
       );
 
       res.json({

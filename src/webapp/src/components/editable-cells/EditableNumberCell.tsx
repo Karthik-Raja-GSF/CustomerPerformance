@@ -6,12 +6,15 @@ interface EditableNumberCellProps {
   value: number | null;
   onSave: (value: number | null) => Promise<void>;
   disabled?: boolean;
+  /** Shown in muted text when value is null (e.g. LY estimate) */
+  placeholder?: string;
 }
 
 export function EditableNumberCell({
   value,
   onSave,
   disabled = false,
+  placeholder,
 }: EditableNumberCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,7 +106,8 @@ export function EditableNumberCell({
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
-        className="h-7 w-20 text-right text-sm"
+        className="h-7 w-20 text-right text-base"
+        placeholder={placeholder}
         step="any"
       />
     );
@@ -119,11 +123,17 @@ export function EditableNumberCell({
           setIsEditing(true);
         }
       }}
-      className={`text-right cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ${
-        disabled ? "cursor-not-allowed opacity-50" : ""
+      className={`h-7 w-20 text-right text-base rounded-md border border-input bg-transparent px-2 flex items-center justify-end focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ${
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
       }`}
     >
-      {value !== null ? value.toLocaleString() : "-"}
+      {value !== null ? (
+        value.toLocaleString()
+      ) : placeholder ? (
+        <span className="text-muted-foreground">{placeholder}</span>
+      ) : (
+        "-"
+      )}
     </div>
   );
 }

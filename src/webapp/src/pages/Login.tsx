@@ -18,6 +18,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Handle SSO logout redirect chain
   // After Cognito logout, we land here with sso_logout=1, then redirect to Azure AD logout
@@ -91,7 +92,57 @@ export default function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Microsoft SSO - Primary action */}
+          <Button
+            type="button"
+            className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 text-base"
+            disabled={isLoading}
+            onClick={() => federatedSignIn()}
+          >
+            <svg
+              className="mr-2 h-6 w-6"
+              viewBox="0 0 21 21"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+              <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+              <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+              <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+            </svg>
+            Sign in with Microsoft
+          </Button>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span
+                className="w-full border-t"
+                style={{ borderColor: "#e5e7eb" }}
+              />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span
+                className="px-2"
+                style={{ backgroundColor: "#fff", color: "#6b7280" }}
+              >
+                Or sign in with email
+              </span>
+            </div>
+          </div>
+
+          {/* Email/Password - Secondary (two-step) */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!showPassword) {
+                setShowPassword(true);
+              } else {
+                void handleSubmit(e);
+              }
+            }}
+            className="space-y-4"
+          >
             {error && (
               <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
                 {error}
@@ -109,73 +160,55 @@ export default function Login() {
                   setEmail(e.target.value);
                 }}
                 required
-                disabled={isLoading}
+                disabled={isLoading || showPassword}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                }}
-                required
-                disabled={isLoading}
-              />
-            </div>
+            {showPassword && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                  }}
+                  required
+                  autoFocus
+                  disabled={isLoading}
+                />
+              </div>
+            )}
 
             <Button
               type="submit"
-              className="w-full"
-              disabled={isLoading}
-              style={{ backgroundColor: "#539D4C", borderColor: "#539D4C" }}
-            >
-              {isLoading ? "Signing in..." : "Sign In"}
-            </Button>
-
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span
-                  className="w-full border-t"
-                  style={{ borderColor: "#e5e7eb" }}
-                />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span
-                  className="px-2"
-                  style={{ backgroundColor: "#fff", color: "#6b7280" }}
-                >
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            {/* Microsoft Sign-In Button */}
-            <Button
-              type="button"
               variant="outline"
               className="w-full"
               disabled={isLoading}
-              onClick={() => federatedSignIn()}
             >
-              <svg
-                className="mr-2 h-4 w-4"
-                viewBox="0 0 21 21"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-                <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-                <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-                <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-              </svg>
-              Sign in with Microsoft
+              {isLoading
+                ? "Signing in..."
+                : showPassword
+                  ? "Sign In"
+                  : "Continue"}
             </Button>
+
+            {showPassword && (
+              <button
+                type="button"
+                className="w-full text-xs text-center"
+                style={{ color: "#6b7280" }}
+                onClick={() => {
+                  setShowPassword(false);
+                  setPassword("");
+                  setError(null);
+                }}
+              >
+                ← Use a different email
+              </button>
+            )}
           </form>
         </div>
       </div>

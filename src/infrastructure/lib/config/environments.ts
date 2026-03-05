@@ -102,7 +102,8 @@ export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
   baseDomain: string; // 'tratin.com'
-  privateDomain?: string; // Private hosted zone domain (deprecated — DNS managed by other team)
+  privateDomain?: string; // Private hosted zone domain (e.g., 'ait-stg.goldstarfoods.com')
+  privateCertificateArn?: string; // ACM certificate ARN for private ALB HTTPS
   aurora: AuroraConfig;
   ecs: EcsConfig;
   vpc: VpcConfig;
@@ -121,6 +122,7 @@ export const environments: Record<string, EnvironmentConfig> = {
     envName: "dev",
     domainPrefix: "dev", // dev.tratin.com, dev-be.tratin.com
     baseDomain: "tratin.com",
+    privateDomain: "ait-stg.goldstarfoods.com",
     privateFrontendUrl: "https://aitdev.goldstarfoods.com",
     backendPublicAlb: true,
     publicFrontend: true,

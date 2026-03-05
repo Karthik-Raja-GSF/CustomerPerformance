@@ -264,12 +264,12 @@ export default function EoRiskReview() {
   );
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8 min-h-0 overflow-hidden">
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8 min-h-0 overflow-hidden">
       {/* Criteria info section */}
       <CriteriaInfo itemsUnderReview={totalItemsAtRisk} />
 
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-3">
+      <div className="shrink-0 flex items-center gap-2 flex-wrap">
         <div className="flex-1" />
 
         {/* Filter Sheet */}

@@ -367,6 +367,8 @@ export interface ColumnsConfig {
   onDequeue?: (bid: CustomerBidDto) => Promise<void>;
   /** Column header label when onDequeue is provided (defaults to "Dequeue") */
   dequeueLabel?: string;
+  /** Whether current user has SALES-only role (cannot edit estimates on confirmed bids) */
+  isSalesRole?: boolean;
 }
 
 export function createColumns(
@@ -383,6 +385,7 @@ export function createColumns(
     onToggleQueue,
     onDequeue,
     dequeueLabel = "Dequeue",
+    isSalesRole = false,
   } = config;
 
   const cols: ColumnDef<CustomerBidDto>[] = [
@@ -814,7 +817,22 @@ export function createColumns(
                   estimateOct: row.original.lyOctober,
                 });
               } else {
-                await onCellUpdate(row.original, { yearAround: false });
+                // Uncheck Year Around: clear all estimates too
+                await onCellUpdate(row.original, {
+                  yearAround: false,
+                  estimateJan: null,
+                  estimateFeb: null,
+                  estimateMar: null,
+                  estimateApr: null,
+                  estimateMay: null,
+                  estimateJun: null,
+                  estimateJul: null,
+                  estimateAug: null,
+                  estimateSep: null,
+                  estimateOct: null,
+                  estimateNov: null,
+                  estimateDec: null,
+                });
               }
             }}
           />
@@ -890,6 +908,7 @@ export function createColumns(
         </div>
       ),
       cell: ({ row }) => {
+        const isLockedForSales = !!row.original.confirmedAt && isSalesRole;
         const menuMonths = getMenuMonths(row.original);
         const visibleMonths = getVisibleEstimateMonths(
           row.original,
@@ -904,6 +923,15 @@ export function createColumns(
           <div className="flex gap-2 justify-center">
             {visibleMonths.map((month) => {
               const estimateKey = month.estimateKey;
+              const lyMonth = LY_MONTHS.find(
+                (ly) => ly.menuKey === month.menuKey
+              );
+              const lyValue =
+                lyMonth != null
+                  ? (row.original[lyMonth.lyKey as keyof CustomerBidDto] as
+                      | number
+                      | null)
+                  : null;
               return (
                 <div
                   key={month.menuKey}
@@ -914,6 +942,10 @@ export function createColumns(
                   </span>
                   <EditableNumberCell
                     value={row.original[estimateKey]}
+                    disabled={isLockedForSales}
+                    placeholder={
+                      lyValue != null ? lyValue.toLocaleString() : undefined
+                    }
                     onSave={async (value) => {
                       await onCellUpdate(row.original, {
                         [estimateKey]: value,
