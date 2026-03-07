@@ -74,7 +74,7 @@ interface BaseBidRow {
   lyMay: Prisma.Decimal | null;
   lyJune: Prisma.Decimal | null;
   lyJuly: Prisma.Decimal | null;
-  isLost: boolean | null;
+  isNew: boolean | null;
   lastUpdatedAt: Date | null;
   lastUpdatedBy: string | null;
   confirmedAt: Date | null;
@@ -207,7 +207,7 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_may AS "lyMay",
             cbd.ly_june AS "lyJune",
             cbd.ly_july AS "lyJuly",
-            cbd.is_lost AS "isLost",
+            cbd.is_new AS "isNew",
             cbd.last_updated_at AS "lastUpdatedAt",
             cbd.last_updated_by AS "lastUpdatedBy",
             cbd.confirmed_at AS "confirmedAt",
@@ -284,7 +284,7 @@ export class CustomerBidService implements ICustomerBidService {
         lyMay: row.lyMay ? Number(row.lyMay) : null,
         lyJune: row.lyJune ? Number(row.lyJune) : null,
         lyJuly: row.lyJuly ? Number(row.lyJuly) : null,
-        isLost: row.isLost ?? false,
+        isNew: row.isNew ?? false,
         lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
         lastUpdatedBy: row.lastUpdatedBy ?? null,
         confirmedAt: row.confirmedAt?.toISOString() ?? null,
@@ -720,7 +720,7 @@ export class CustomerBidService implements ICustomerBidService {
     lyMay: Prisma.Decimal | null;
     lyJune: Prisma.Decimal | null;
     lyJuly: Prisma.Decimal | null;
-    isLost: boolean;
+    isNew: boolean;
     lastUpdatedAt: Date | null;
     lastUpdatedBy: string | null;
     confirmedAt: Date | null;
@@ -774,7 +774,7 @@ export class CustomerBidService implements ICustomerBidService {
       lyMay: decimalToNumber(record.lyMay),
       lyJune: decimalToNumber(record.lyJune),
       lyJuly: decimalToNumber(record.lyJuly),
-      isLost: record.isLost,
+      isNew: record.isNew,
       lastUpdatedAt: record.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: record.lastUpdatedBy ?? null,
       confirmedAt: record.confirmedAt?.toISOString() ?? null,

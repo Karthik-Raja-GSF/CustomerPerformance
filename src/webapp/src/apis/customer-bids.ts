@@ -42,8 +42,8 @@ export async function getCustomerBids(
   if (filters?.itemCode) params.set("itemCode", filters.itemCode);
   if (filters?.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
-  if (filters?.isLost !== undefined)
-    params.set("isLost", filters.isLost.toString());
+  if (filters?.isNew !== undefined)
+    params.set("isNew", filters.isNew.toString());
   if (filters?.confirmed !== undefined)
     params.set("confirmed", filters.confirmed.toString());
   if (filters?.exported !== undefined)

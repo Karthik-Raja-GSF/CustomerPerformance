@@ -13,7 +13,7 @@ export interface BidFilterParams {
   erpStatus?: string;
   sourceDb?: string;
   coOpCode?: string;
-  isLost?: boolean;
+  isNew?: boolean;
   confirmed?: boolean;
   exported?: boolean;
   excludeItemPrefixes?: string[];
@@ -67,14 +67,8 @@ export function buildBidFilterConditions(
     conditions.push(Prisma.sql`c.co_op_code = ${filters.coOpCode}`);
   }
 
-  if (filters.isLost !== undefined) {
-    conditions.push(Prisma.sql`cbd.is_lost = ${filters.isLost}`);
-  }
-  // Filter out rows with NULL bid dates unless explicitly viewing lost bids
-  if (filters.isLost !== true) {
-    conditions.push(
-      Prisma.sql`cbd.bid_start IS NOT NULL AND cbd.bid_end IS NOT NULL`
-    );
+  if (filters.isNew !== undefined) {
+    conditions.push(Prisma.sql`cbd.is_new = ${filters.isNew}`);
   }
 
   if (filters.confirmed !== undefined) {

@@ -29,7 +29,7 @@ const querySchema = z.object({
   salesRep: z.string().optional(),
   itemCode: z.string().optional(),
   erpStatus: z.string().optional(),
-  isLost: z
+  isNew: z
     .enum(["true", "false"])
     .transform((v) => v === "true")
     .optional(),
@@ -199,13 +199,13 @@ function handleCustomerBidError(
  * - salesRep: Filter by sales rep code
  * - itemCode: Filter by item code
  * - erpStatus: Filter by ERP status (partial match, case-insensitive)
- * - isLost: Filter by lost status (true = items in previous year but not current)
+ * - isNew: Filter by new status (true = items in current year but not previous)
  * - confirmed: Filter by user confirmation status
  * - sourceDb: Filter by source database
  *
  * Response includes:
  * - dateRange: The date range used for querying based on schoolYear
- * - Pre-calculated fields: lastYearBidQty, lastYearActual, lyAugust-lyJuly (all 12 months), isLost
+ * - Pre-calculated fields: lastYearBidQty, lastYearActual, lyAugust-lyJuly (all 12 months), isNew
  * - User-editable fields: confirmed, augustDemand, septemberDemand, octoberDemand
  */
 router.get(

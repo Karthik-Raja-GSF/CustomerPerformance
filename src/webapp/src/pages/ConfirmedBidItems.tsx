@@ -16,7 +16,7 @@ export default function ConfirmedBidItems() {
       showExportedFilter={true}
       showQueueExport={true}
       defaultColumnVisibility={{
-        isLost: false,
+        isNew: false,
         bidStartDate: false,
         bidEndDate: false,
         lastYearBidQty: false,

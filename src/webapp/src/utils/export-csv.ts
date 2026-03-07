@@ -229,7 +229,7 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "erpStatus", header: "ERP Status" },
   // Bid info
   {
-    key: "isLost",
+    key: "isNew",
     header: "Renewed/New",
     format: (v) => (v ? "New" : "Renewed"),
   },

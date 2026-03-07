@@ -76,8 +76,8 @@ export interface CustomerBidDto {
   lyJune: number | null;
   /** Last year July sales amount */
   lyJuly: number | null;
-  /** True if item was in previous year but NOT in current year */
-  isLost: boolean;
+  /** True if item is in current year but NOT in previous year (new bid) */
+  isNew: boolean;
 
   // Last updated tracking
   /** ISO8601 UTC timestamp when last edited, or null if never edited */
@@ -174,8 +174,8 @@ export interface CustomerBidFilters {
   coOpCode?: string;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
-  /** Filter by renewed/new status (isLost) */
-  isLost?: boolean;
+  /** Filter by renewed/new status */
+  isNew?: boolean;
   /** Filter by confirmation status - defaults to false (show unconfirmed) */
   confirmed?: boolean;
   /** Filter by export status - true=exported only, false=not-exported only */

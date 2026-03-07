@@ -82,8 +82,8 @@ function getSchoolYearString(schoolYear: SchoolYear): string {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth(); // 0-indexed
-  // School year starts in August (month 7)
-  const schoolYearStartYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+  // School year starts in July (month 6)
+  const schoolYearStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
 
   let startYear: number;
   switch (schoolYear) {

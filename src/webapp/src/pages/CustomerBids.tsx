@@ -84,9 +84,9 @@ function getSchoolYearString(schoolYear: SchoolYear): string {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth(); // 0-indexed
 
-  // School year starts in August (month 7)
-  // If we're in Jan-Jul, current school year started previous calendar year
-  const schoolYearStartYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+  // School year starts in July (month 6)
+  // If we're in Jan-Jun, current school year started previous calendar year
+  const schoolYearStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
 
   let startYear: number;
   switch (schoolYear) {
@@ -126,10 +126,10 @@ function parseFiltersFromURL(
         ? false
         : undefined;
 
-  // Parse isLost param
-  const isLostParam = searchParams.get("isLost");
-  const isLost =
-    isLostParam === "true" ? true : isLostParam === "false" ? false : undefined;
+  // Parse isNew param
+  const isNewParam = searchParams.get("isNew");
+  const isNew =
+    isNewParam === "true" ? true : isNewParam === "false" ? false : undefined;
 
   // Parse exported param
   const exportedParam = searchParams.get("exported");
@@ -158,7 +158,7 @@ function parseFiltersFromURL(
     itemCode: searchParams.get("itemCode") || undefined,
     erpStatus: searchParams.get("erpStatus") || undefined,
     coOpCode: searchParams.get("coOpCode") || undefined,
-    isLost,
+    isNew,
     confirmed: confirmed ?? defaultConfirmed,
     exported: exported ?? defaultExported,
     queued: queued ?? defaultQueued,
@@ -189,8 +189,8 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.itemCode) params.set("itemCode", filters.itemCode);
   if (filters.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters.coOpCode) params.set("coOpCode", filters.coOpCode);
-  if (filters.isLost !== undefined) {
-    params.set("isLost", filters.isLost.toString());
+  if (filters.isNew !== undefined) {
+    params.set("isNew", filters.isNew.toString());
   }
   // Always include confirmed in URL (false is default, true means showing confirmed only)
   if (filters.confirmed !== undefined) {
@@ -290,8 +290,8 @@ export default function CustomerBids({
         ? false
         : defaultConfirmed;
   });
-  const [isLostFilter, setIsLostFilter] = useState<string>(() => {
-    const param = searchParams.get("isLost");
+  const [isNewFilter, setIsNewFilter] = useState<string>(() => {
+    const param = searchParams.get("isNew");
     if (param === "true") return "new";
     if (param === "false") return "renewed";
     return "all";
@@ -475,10 +475,10 @@ export default function CustomerBids({
       itemCode: filterInputs.itemCode || undefined,
       erpStatus: filterInputs.erpStatus || undefined,
       coOpCode: filterInputs.coOpCode || undefined,
-      isLost:
-        isLostFilter === "renewed"
+      isNew:
+        isNewFilter === "renewed"
           ? false
-          : isLostFilter === "new"
+          : isNewFilter === "new"
             ? true
             : undefined,
       confirmed: confirmedFilter,
@@ -498,7 +498,7 @@ export default function CustomerBids({
     setConfirmedFilter(defaultConfirmed);
     setExportedFilter(defaultExported);
     setQueuedFilter(defaultQueued);
-    setIsLostFilter("all");
+    setIsNewFilter("all");
     setShowPendingQueue(false);
     setFilters((prev) => ({
       page: 1,
@@ -531,7 +531,7 @@ export default function CustomerBids({
       filterInputs.erpStatus ||
       filterInputs.coOpCode ||
       excludePrefixesChanged ||
-      isLostFilter !== "all" ||
+      isNewFilter !== "all" ||
       (showConfirmedFilter && confirmedFilter)
   );
 
@@ -544,7 +544,7 @@ export default function CustomerBids({
     filterInputs.erpStatus,
     filterInputs.coOpCode,
     excludePrefixesChanged,
-    isLostFilter !== "all",
+    isNewFilter !== "all",
     showConfirmedFilter && confirmedFilter,
   ].filter(Boolean).length;
 
@@ -873,8 +873,8 @@ export default function CustomerBids({
           showConfirmedFilter={showConfirmedFilter}
           confirmedFilter={confirmedFilter}
           onConfirmedFilterChange={setConfirmedFilter}
-          isLostFilter={isLostFilter}
-          onIsLostFilterChange={setIsLostFilter}
+          isNewFilter={isNewFilter}
+          onIsNewFilterChange={setIsNewFilter}
           showExportedFilter={showExportedFilter}
           showPendingQueue={showPendingQueue}
           onShowPendingQueueChange={setShowPendingQueue}
@@ -916,7 +916,7 @@ export default function CustomerBids({
                     setTimeout(() => setColumnsDropdownOpen(true), 0);
                   }}
                 >
-                  {column.id === "isLost"
+                  {column.id === "isNew"
                     ? "Renewed/New"
                     : column.id.replace(/([A-Z])/g, " $1").trim()}
                 </DropdownMenuCheckboxItem>

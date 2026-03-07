@@ -65,7 +65,7 @@ interface QueuedBidRow {
   lyMay: Prisma.Decimal | null;
   lyJune: Prisma.Decimal | null;
   lyJuly: Prisma.Decimal | null;
-  isLost: boolean | null;
+  isNew: boolean | null;
   lastUpdatedAt: Date | null;
   lastUpdatedBy: string | null;
   confirmedAt: Date | null;
@@ -759,7 +759,7 @@ export class BidExportService implements IBidExportService {
           cbd.ly_may AS "lyMay",
           cbd.ly_june AS "lyJune",
           cbd.ly_july AS "lyJuly",
-          cbd.is_lost AS "isLost",
+          cbd.is_new AS "isNew",
           cbd.last_updated_at AS "lastUpdatedAt",
           cbd.last_updated_by AS "lastUpdatedBy",
           cbd.confirmed_at AS "confirmedAt",
@@ -847,8 +847,7 @@ export class BidExportService implements IBidExportService {
       erpStatus: filters.erpStatus ? String(filters.erpStatus) : undefined,
       sourceDb: filters.sourceDb ? String(filters.sourceDb) : undefined,
       coOpCode: filters.coOpCode ? String(filters.coOpCode) : undefined,
-      isLost:
-        filters.isLost !== undefined ? Boolean(filters.isLost) : undefined,
+      isNew: filters.isNew !== undefined ? Boolean(filters.isNew) : undefined,
       confirmed:
         filters.confirmed !== undefined
           ? Boolean(filters.confirmed)
@@ -918,7 +917,7 @@ export class BidExportService implements IBidExportService {
       lyMay: decimalToNumber(row.lyMay),
       lyJune: decimalToNumber(row.lyJune),
       lyJuly: decimalToNumber(row.lyJuly),
-      isLost: row.isLost ?? false,
+      isNew: row.isNew ?? false,
       lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: row.lastUpdatedBy ?? null,
       confirmedAt: row.confirmedAt?.toISOString() ?? null,

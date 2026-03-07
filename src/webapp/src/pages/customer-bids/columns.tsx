@@ -464,23 +464,23 @@ export function createColumns(
       ),
       cell: ({ row }) => row.getValue<string | null>("salesRep") ?? "-",
     },
-    // isLost - Badge display (RENEWED/NEW)
+    // isNew - Badge display (RENEWED/NEW)
     {
-      accessorKey: "isLost",
+      accessorKey: "isNew",
       header: () => (
         <span className="text-muted-foreground font-medium">Renewed/New</span>
       ),
       cell: ({ row }) => {
-        const isLost = row.getValue<boolean>("isLost");
+        const isNew = row.getValue<boolean>("isNew");
         return (
           <Badge
             className={
-              isLost
+              isNew
                 ? "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300"
                 : "border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
             }
           >
-            {isLost ? "NEW" : "RENEWED"}
+            {isNew ? "NEW" : "RENEWED"}
           </Badge>
         );
       },

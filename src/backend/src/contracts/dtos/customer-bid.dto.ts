@@ -76,8 +76,8 @@ export interface CustomerBidDto {
   lyJune: number | null;
   /** Last year July sales amount */
   lyJuly: number | null;
-  /** True if item was in previous year but NOT in current year */
-  isLost: boolean;
+  /** True if item is in current year but NOT in previous year (new bid) */
+  isNew: boolean;
 
   // Last updated tracking
   /** ISO8601 UTC timestamp when last edited, or null if never edited */
@@ -151,7 +151,7 @@ export interface CustomerBidQueryDto {
   erpStatus?: string;
   coOpCode?: string;
   sourceDb?: string;
-  isLost?: boolean;
+  isNew?: boolean;
   confirmed?: boolean;
   exported?: boolean;
   /** Filter by queue status - true=queued only, false=not-queued only */

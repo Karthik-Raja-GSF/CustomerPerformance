@@ -62,9 +62,9 @@ interface FilterSheetProps {
   showConfirmedFilter: boolean;
   confirmedFilter: boolean;
   onConfirmedFilterChange: (val: boolean) => void;
-  // Lost filter
-  isLostFilter: string;
-  onIsLostFilterChange: (val: string) => void;
+  // New/Renewed filter
+  isNewFilter: string;
+  onIsNewFilterChange: (val: string) => void;
   // Export status filters (optional section)
   showExportedFilter: boolean;
   showPendingQueue: boolean;
@@ -89,8 +89,8 @@ export function FilterSheet({
   showConfirmedFilter,
   confirmedFilter,
   onConfirmedFilterChange,
-  isLostFilter,
-  onIsLostFilterChange,
+  isNewFilter,
+  onIsNewFilterChange,
   showExportedFilter,
   showPendingQueue,
   onShowPendingQueueChange,
@@ -291,7 +291,7 @@ export function FilterSheet({
             <Label className="text-sm font-medium text-foreground">
               Renewed/New
             </Label>
-            <Select value={isLostFilter} onValueChange={onIsLostFilterChange}>
+            <Select value={isNewFilter} onValueChange={onIsNewFilterChange}>
               <SelectTrigger className="h-11">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
