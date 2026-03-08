@@ -14,10 +14,10 @@ import {
 } from "@/services/IBedrockService";
 import { BedrockService } from "@/services/implementations/BedrockService";
 import {
-  IMcpClientService,
-  MCP_CLIENT_SERVICE_TOKEN,
-} from "@/services/IMcpClientService";
-import { McpClientService } from "@/services/implementations/McpClientService";
+  IAssistantQueryService,
+  ASSISTANT_QUERY_SERVICE_TOKEN,
+} from "@/services/IAssistantQueryService";
+import { AssistantQueryService } from "@/services/implementations/AssistantQueryService";
 import {
   IAssistantService,
   ASSISTANT_SERVICE_TOKEN,
@@ -94,10 +94,10 @@ export function setupContainer(prisma: PrismaClient): void {
     useClass: BedrockService,
   });
 
-  // Register McpClientService as singleton for PostgreSQL MCP access
-  container.registerSingleton<IMcpClientService>(
-    MCP_CLIENT_SERVICE_TOKEN,
-    McpClientService
+  // Register AssistantQueryService as singleton for LLM-generated SQL execution
+  container.registerSingleton<IAssistantQueryService>(
+    ASSISTANT_QUERY_SERVICE_TOKEN,
+    AssistantQueryService
   );
 
   // Register AssistantService for AI assistant functionality

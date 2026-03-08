@@ -47,6 +47,14 @@ export const LLM_MODELS = [
     value: "global.anthropic.claude-opus-4-5-20251101-v1:0",
     label: "Claude Opus 4.5 (Enterprise)",
   },
+  {
+    value: "global.anthropic.claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6 (Premium)",
+  },
+  {
+    value: "global.anthropic.claude-opus-4-6-v1",
+    label: "Claude Opus 4.6 (Enterprise)",
+  },
 ] as const;
 
 export interface TokenUsage {

@@ -42,7 +42,7 @@ export const config = {
   bedrock: {
     region: process.env.AWS_BEDROCK_REGION || "us-east-1",
   },
-  mcp: {
+  assistantQuery: {
     postgresConnectionString: databaseUrl,
   },
   // Telemetry is configured via OTEL_* env vars (ADOT SDK reads them directly)

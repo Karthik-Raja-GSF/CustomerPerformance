@@ -12,6 +12,8 @@ const MODEL_SHORT_NAMES: Record<string, string> = {
   "us.amazon.nova-premier-v1:0": "Nova Premier",
   "global.anthropic.claude-sonnet-4-5-20250929-v1:0": "Sonnet 4.5",
   "global.anthropic.claude-opus-4-5-20251101-v1:0": "Opus 4.5",
+  "global.anthropic.claude-sonnet-4-6": "Sonnet 4.6",
+  "global.anthropic.claude-opus-4-6-v1": "Opus 4.6",
 };
 
 function getModelShortName(modelId: string): string {

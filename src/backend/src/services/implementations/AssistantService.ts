@@ -14,9 +14,9 @@ import {
   PROMPT_SERVICE_TOKEN,
 } from "@/services/IPromptService";
 import {
-  IMcpClientService,
-  MCP_CLIENT_SERVICE_TOKEN,
-} from "@/services/IMcpClientService";
+  IAssistantQueryService,
+  ASSISTANT_QUERY_SERVICE_TOKEN,
+} from "@/services/IAssistantQueryService";
 import {
   ChatRequestDto,
   ChatResponseDto,
@@ -38,28 +38,28 @@ const logger = createChildLogger("assistant-service");
 export class AssistantService implements IAssistantService {
   private baseSystemPrompt: string;
   private sqlGenerationPromptTemplate: string;
-  private mcpInitialized = false;
+  private queryServiceInitialized = false;
 
   private bedrockService: IBedrockService;
   private promptService: IPromptService;
-  private mcpClient: IMcpClientService;
+  private queryService: IAssistantQueryService;
 
   constructor(
     @inject(BEDROCK_SERVICE_TOKEN) bedrockService: IBedrockService,
     @inject(PROMPT_SERVICE_TOKEN) promptService: IPromptService,
-    @inject(MCP_CLIENT_SERVICE_TOKEN) mcpClient: IMcpClientService
+    @inject(ASSISTANT_QUERY_SERVICE_TOKEN) queryService: IAssistantQueryService
   ) {
     this.bedrockService = bedrockService;
     this.promptService = promptService;
-    this.mcpClient = mcpClient;
+    this.queryService = queryService;
     this.baseSystemPrompt = this.loadBaseSystemPrompt();
     this.sqlGenerationPromptTemplate = this.loadSqlGenerationPrompt();
   }
 
-  private async ensureMcpInitialized(): Promise<void> {
-    if (!this.mcpInitialized) {
-      await this.mcpClient.initialize();
-      this.mcpInitialized = true;
+  private async ensureQueryServiceInitialized(): Promise<void> {
+    if (!this.queryServiceInitialized) {
+      await this.queryService.initialize();
+      this.queryServiceInitialized = true;
     }
   }
 
@@ -95,9 +95,9 @@ export class AssistantService implements IAssistantService {
   }
 
   private isSelectQuery(sql: string): boolean {
-    const normalized = sql.trim().toUpperCase();
+    const normalized = sql.replace(/;\s*$/, "").trim().toUpperCase();
     return (
-      normalized.startsWith("SELECT") &&
+      (normalized.startsWith("SELECT") || normalized.startsWith("WITH")) &&
       !normalized.includes("INSERT") &&
       !normalized.includes("UPDATE") &&
       !normalized.includes("DELETE") &&
@@ -223,7 +223,7 @@ ${queryResults}
 
     // Step 3: Try to initialize MCP and query database
     try {
-      await this.ensureMcpInitialized();
+      await this.ensureQueryServiceInitialized();
 
       // Step 3a: Ask LLM to generate SQL
       const sqlPrompt = this.buildSqlGenerationPrompt(
@@ -265,7 +265,7 @@ ${queryResults}
         } else {
           // Step 3c: Execute the generated SQL
           try {
-            const results = await this.mcpClient.executeQuery(sql);
+            const results = await this.queryService.executeQuery(sql);
             rawResult = results; // Capture raw results before truncation
             if (Array.isArray(results) && results.length > 0) {
               sqlStatus = "success";
@@ -292,10 +292,10 @@ ${queryResults}
       // Log MCP errors but continue without database data
       logger.error(
         {
-          event: "mcp.error",
+          event: "query_service.error",
           error: error instanceof Error ? error.message : "Unknown error",
         },
-        "MCP error (continuing without data)"
+        "Query service error (continuing without data)"
       );
       sqlStatus = "failed";
     }
@@ -372,7 +372,7 @@ ${queryResults}
 
     // Step 3: Try to initialize MCP and query database
     try {
-      await this.ensureMcpInitialized();
+      await this.ensureQueryServiceInitialized();
 
       // Step 3a: Ask LLM to generate SQL (non-streaming for SQL generation)
       const sqlPrompt = this.buildSqlGenerationPrompt(
@@ -414,7 +414,7 @@ ${queryResults}
         } else {
           // Step 3c: Execute the generated SQL
           try {
-            const results = await this.mcpClient.executeQuery(sql);
+            const results = await this.queryService.executeQuery(sql);
             rawResult = results; // Capture raw results before truncation
             if (Array.isArray(results) && results.length > 0) {
               sqlStatus = "success";
@@ -441,10 +441,10 @@ ${queryResults}
       // Log MCP errors but continue without database data
       logger.error(
         {
-          event: "mcp.error",
+          event: "query_service.error",
           error: error instanceof Error ? error.message : "Unknown error",
         },
-        "MCP error (continuing without data)"
+        "Query service error (continuing without data)"
       );
       sqlStatus = "failed";
     }

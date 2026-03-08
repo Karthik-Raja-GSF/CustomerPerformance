@@ -1,6 +1,8 @@
-export const MCP_CLIENT_SERVICE_TOKEN = Symbol.for('McpClientService');
+export const ASSISTANT_QUERY_SERVICE_TOKEN = Symbol.for(
+  "AssistantQueryService"
+);
 
-export interface IMcpClientService {
+export interface IAssistantQueryService {
   initialize(): Promise<void>;
   executeQuery(sql: string): Promise<unknown>;
   getSchemaInfo(): Promise<string>;

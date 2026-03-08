@@ -17,7 +17,7 @@ import {
   NoActivePromptError,
   UnsupportedModelError,
   BedrockInvocationError,
-  McpConnectionError,
+  AssistantQueryError,
 } from "@/utils/errors/assistant-errors";
 import {
   ChatLogNotFoundError,
@@ -70,7 +70,7 @@ function handleAssistantError(
     return;
   }
 
-  if (error instanceof McpConnectionError) {
+  if (error instanceof AssistantQueryError) {
     res.status(error.statusCode).json({
       status: "error",
       message: error.message,

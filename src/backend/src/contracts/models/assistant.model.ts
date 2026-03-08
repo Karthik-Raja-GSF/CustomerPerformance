@@ -35,6 +35,16 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     tier: "enterprise",
     description: "Highest quality for critical tasks",
   },
+  "global.anthropic.claude-sonnet-4-6": {
+    name: "Claude Sonnet 4.6",
+    tier: "premium",
+    description: "Latest high quality model for complex reasoning",
+  },
+  "global.anthropic.claude-opus-4-6-v1": {
+    name: "Claude Opus 4.6",
+    tier: "enterprise",
+    description: "Latest highest quality model for critical tasks",
+  },
 };
 
 export type SupportedModelId = keyof typeof SUPPORTED_MODELS;

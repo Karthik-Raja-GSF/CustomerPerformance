@@ -1,10 +1,10 @@
 import { injectable, inject } from "tsyringe";
 import { PrismaClient, Prisma } from "@prisma/client";
-import { IMcpClientService } from "@/services/IMcpClientService";
-import { McpConnectionError } from "@/utils/errors/assistant-errors";
+import { IAssistantQueryService } from "@/services/IAssistantQueryService";
+import { AssistantQueryError } from "@/utils/errors/assistant-errors";
 
 @injectable()
-export class McpClientService implements IMcpClientService {
+export class AssistantQueryService implements IAssistantQueryService {
   private initialized = false;
   private prisma: PrismaClient;
 
@@ -75,25 +75,27 @@ export class McpClientService implements IMcpClientService {
       if (regex.test(sql)) return false;
     }
 
-    // Block semicolons to prevent multi-statement injection
-    if (sql.includes(";")) return false;
+    // Strip trailing semicolons (LLMs routinely add them) but block internal ones
+    const trimmed = sql.replace(/;\s*$/, "");
+    if (trimmed.includes(";")) return false;
 
     return true;
   }
 
   async executeQuery(sql: string): Promise<unknown> {
-    if (!this.isSafeSelectQuery(sql)) {
-      throw new McpConnectionError(
+    const cleanSql = sql.replace(/;\s*$/, "");
+    if (!this.isSafeSelectQuery(cleanSql)) {
+      throw new AssistantQueryError(
         "Query rejected: only SELECT queries are allowed"
       );
     }
 
     try {
-      const result = await this.prisma.$queryRawUnsafe(sql);
+      const result = await this.prisma.$queryRawUnsafe(cleanSql);
       // Convert BigInt and Decimal to Number for JSON serialization
       return this.serializeNonJsonTypes(result);
     } catch (error) {
-      throw new McpConnectionError(
+      throw new AssistantQueryError(
         `Failed to execute query: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
@@ -140,7 +142,7 @@ export class McpClientService implements IMcpClientService {
 
       return JSON.stringify(schemaInfo, null, 2);
     } catch (error) {
-      throw new McpConnectionError(
+      throw new AssistantQueryError(
         `Failed to get schema info: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
