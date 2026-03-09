@@ -6,6 +6,7 @@ import {
   YEAR_AROUND_ESTIMATE_MONTHS,
   type MonthKey,
 } from "@/utils/menu-months";
+import type { VisibilityState } from "@/pages/customer-bids/data-table";
 
 export interface ExportColumn {
   key: string;
@@ -14,6 +15,21 @@ export interface ExportColumn {
   /** Compute value from the full row (for derived/calculated columns) */
   computeValue?: (row: Record<string, unknown>) => unknown;
 }
+
+/**
+ * Maps table column IDs to the export column keys they control.
+ * Composite table columns (e.g. "estimates") map to multiple export keys.
+ * Simple columns map to themselves (identity mapping) and are handled by default.
+ */
+const TABLE_COLUMN_TO_EXPORT_KEYS: Record<string, string[]> = {
+  estimates: ESTIMATE_MONTHS.map((m) => m.estimateKey),
+  lyMonths: LY_MONTHS.map((m) => m.lyKey),
+  menuMonths: [], // virtual UI-only column, no export counterpart
+  confirmed: ["confirmedAt"],
+  lastUpdated: ["lastUpdatedAt", "lastUpdatedBy"],
+  conversionRate: ["conversionRate"],
+  isNew: ["isNew"],
+};
 
 /**
  * SIQ row format for demand export
@@ -161,19 +177,80 @@ export function exportToSIQCSV(
 }
 
 /**
- * Column configuration for Customer Bids export
- * Exports ALL fields regardless of table column visibility
+ * Build the set of export column keys that should be excluded given the
+ * current table column visibility state.
+ *
+ * Columns not explicitly set in the visibility map default to **visible**
+ * (TanStack convention).  An export key is only disallowed when BOTH
+ * its individual column AND every composite column that covers it are hidden.
+ * This lets the composite "LY Months" column keep LY export keys visible
+ * even though the individual lyAugust…lyJuly toggles are off by default.
  */
+function getAllowedExportKeys(
+  columnVisibility: VisibilityState
+): Set<string> | null {
+  // Reverse lookup: export key → composite table column IDs that include it
+  const exportKeyToComposites = new Map<string, string[]>();
+  for (const [tableColId, exportKeys] of Object.entries(
+    TABLE_COLUMN_TO_EXPORT_KEYS
+  )) {
+    for (const ek of exportKeys) {
+      const list = exportKeyToComposites.get(ek) ?? [];
+      list.push(tableColId);
+      exportKeyToComposites.set(ek, list);
+    }
+  }
+
+  const disallowedKeys = new Set<string>();
+
+  for (const [tableColId, visible] of Object.entries(columnVisibility)) {
+    if (visible !== false) continue;
+
+    const mappedKeys = TABLE_COLUMN_TO_EXPORT_KEYS[tableColId];
+    if (mappedKeys) {
+      // Composite column hidden — hide its keys only if no other
+      // visible composite also covers them
+      for (const k of mappedKeys) {
+        const composites = exportKeyToComposites.get(k) ?? [];
+        const anyCompositeVisible = composites.some(
+          (c) => columnVisibility[c] !== false
+        );
+        if (!anyCompositeVisible) disallowedKeys.add(k);
+      }
+    } else {
+      // Simple 1:1 column — but if a visible composite covers this key,
+      // keep it in the export
+      const composites = exportKeyToComposites.get(tableColId);
+      if (composites) {
+        const anyCompositeVisible = composites.some(
+          (c) => columnVisibility[c] !== false
+        );
+        if (!anyCompositeVisible) disallowedKeys.add(tableColId);
+      } else {
+        disallowedKeys.add(tableColId);
+      }
+    }
+  }
+
+  return disallowedKeys.size > 0 ? disallowedKeys : null;
+}
+
 /**
- * Build a filtered export column list that only includes estimate and LY columns
- * for months selected in menu months across the given bids.
- * Non-month columns are always included.
+ * Build a filtered export column list that:
+ * 1. Respects table column visibility (hidden columns are excluded)
+ * 2. Only includes estimate and LY columns for months selected in menu months
  */
 export function buildFilteredExportColumns(
   bids: CustomerBidDto[],
-  getMenuMonths: (bid: CustomerBidDto) => Record<MonthKey, boolean>
+  getMenuMonths: (bid: CustomerBidDto) => Record<MonthKey, boolean>,
+  columnVisibility?: VisibilityState
 ): ExportColumn[] {
-  // Compute the union of all selected menu months across all bids
+  // --- Step 1: column visibility filter ---
+  const disallowedKeys = columnVisibility
+    ? getAllowedExportKeys(columnVisibility)
+    : null;
+
+  // --- Step 2: menu-month filter for estimate & LY columns ---
   const selectedMonths = new Set<MonthKey>();
   for (const bid of bids) {
     if (bid.yearAround) {
@@ -188,7 +265,6 @@ export function buildFilteredExportColumns(
     }
   }
 
-  // Build sets of allowed estimate and LY keys
   const allowedEstimateKeys = new Set<string>();
   const allowedLyKeys = new Set<string>();
   for (const m of ESTIMATE_MONTHS) {
@@ -198,13 +274,16 @@ export function buildFilteredExportColumns(
     if (selectedMonths.has(m.menuKey)) allowedLyKeys.add(m.lyKey);
   }
 
-  // All possible month keys (for identifying which columns to filter)
   const allEstimateKeys = new Set<string>(
     ESTIMATE_MONTHS.map((m) => m.estimateKey)
   );
   const allLyKeys = new Set<string>(LY_MONTHS.map((m) => m.lyKey));
 
   return customerBidExportColumns.filter((col) => {
+    // Check column visibility first
+    if (disallowedKeys?.has(col.key)) return false;
+
+    // Then apply menu-month filtering for estimate/LY columns
     if (allEstimateKeys.has(col.key)) return allowedEstimateKeys.has(col.key);
     if (allLyKeys.has(col.key)) return allowedLyKeys.has(col.key);
     return true;
@@ -226,6 +305,8 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "itemCode", header: "Item Code" },
   { key: "itemDescription", header: "Item Description" },
   { key: "brandName", header: "Brand Name" },
+  { key: "packSize", header: "Pack Size" },
+  { key: "customerLeadTime", header: "Lead Time" },
   { key: "erpStatus", header: "ERP Status" },
   // Bid info
   {

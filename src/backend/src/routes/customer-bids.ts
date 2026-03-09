@@ -22,7 +22,7 @@ const router: IRouter = Router();
  */
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
   siteCode: z.string().optional(),
   customerBillTo: z.string().optional(),
   customerName: z.string().optional(),
@@ -191,7 +191,7 @@ function handleCustomerBidError(
  *
  * Query Parameters:
  * - page: Page number (default: 1)
- * - limit: Records per page (default: 50, max: 200)
+ * - limit: Records per page (default: 50, max: 500)
  * - schoolYear: School year filter - "previous", "current", or "next" (default: "next")
  * - siteCode: Filter by site/location code (matches customer location_code)
  * - customerBillTo: Filter by customer number (partial match, case-insensitive)

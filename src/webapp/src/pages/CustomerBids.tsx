@@ -944,7 +944,8 @@ export default function CustomerBids({
               );
               const filteredColumns = buildFilteredExportColumns(
                 exportable,
-                getMenuMonths
+                getMenuMonths,
+                columnVisibility
               );
               exportToCSV(exportable, filteredColumns, "customer-bids");
               const skipped = bids.length - exportable.length;

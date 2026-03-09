@@ -120,7 +120,7 @@ export class CustomerBidService implements ICustomerBidService {
     query: CustomerBidQueryDto
   ): Promise<CustomerBidListResponseDto> {
     const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 50, 200);
+    const limit = Math.min(query.limit ?? 50, 500);
     const offset = (page - 1) * limit;
     const schoolYear = query.schoolYear ?? "next";
 
