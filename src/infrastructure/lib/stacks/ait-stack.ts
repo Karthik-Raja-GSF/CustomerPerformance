@@ -24,7 +24,7 @@ import { DashboardConstruct } from "../constructs/dashboard-construct";
 import { Route53DelegationConstruct } from "../constructs/route53-delegation-construct";
 import { WafConstruct } from "../constructs/waf-construct";
 import { FrontendEcsConstruct } from "../constructs/frontend-ecs-construct";
-import { PrivateHostedZoneConstruct } from "../constructs/private-hosted-zone-construct";
+import { NlbStaticIpConstruct } from "../constructs/nlb-static-ip-construct";
 import { defaultWafConfigs } from "../config/waf-config";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 
@@ -106,24 +106,6 @@ export class AitStack extends cdk.Stack {
       config: config.vpc,
       naming,
     });
-
-    // ===================
-    // Private Hosted Zone
-    // ===================
-    let privateHostedZone: route53.IPrivateHostedZone | undefined;
-    if (config.privateDomain) {
-      const phzConstruct = new PrivateHostedZoneConstruct(
-        this,
-        "PrivateHostedZone",
-        {
-          envName: config.envName,
-          zoneName: config.privateDomain,
-          vpc: vpcConstruct.vpc,
-          naming,
-        }
-      );
-      privateHostedZone = phzConstruct.hostedZone;
-    }
 
     // ===================
     // VPC Peering (imported - manually created)
@@ -324,8 +306,6 @@ export class AitStack extends cdk.Stack {
         vpc: vpcConstruct.vpc,
         cluster: backendConstruct.cluster,
         ecrRepository: ecrConstruct.webappRepository,
-        privateHostedZone,
-        domainName: config.privateDomain,
         certificateArn: config.privateCertificateArn,
         config: config.frontendEcs,
         naming,
@@ -382,6 +362,24 @@ export class AitStack extends cdk.Stack {
           ec2.Port.tcp(8887),
           "Allow shared frontend ALB to reach backend"
         );
+    }
+
+    // ===================
+    // NLB with Static IPs (in front of internal ALB)
+    // ===================
+    if (config.nlb?.enabled && frontendEcsConstruct) {
+      const nlbConstruct = new NlbStaticIpConstruct(this, "NlbStaticIp", {
+        vpc: vpcConstruct.vpc,
+        alb: frontendEcsConstruct.loadBalancer,
+        albListener: frontendEcsConstruct.httpListener,
+        naming,
+        staticIps: config.nlb.staticIps,
+      });
+
+      new cdk.CfnOutput(this, "NlbDnsName", {
+        value: nlbConstruct.nlb.loadBalancerDnsName,
+        description: "NLB DNS Name (static IPs for internal ALB)",
+      });
     }
 
     // ===================

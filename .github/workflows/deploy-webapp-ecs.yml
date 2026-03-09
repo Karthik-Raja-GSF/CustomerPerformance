@@ -67,7 +67,7 @@ jobs:
             --build-arg VITE_COGNITO_REGION="${{ vars.VITE_COGNITO_REGION }}" \
             --build-arg VITE_COGNITO_DOMAIN="${{ vars.VITE_COGNITO_DOMAIN }}" \
             --build-arg VITE_COGNITO_AZURE_AD_IDP_NAME="${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME }}" \
-            --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL }}" \
+            --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL_ECS }}" \
             -t webapp-image:$IMAGE_TAG \
             .
 

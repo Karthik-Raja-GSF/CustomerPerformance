@@ -4,8 +4,6 @@ import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
-import * as route53 from "aws-cdk-lib/aws-route53";
-import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 import { EcsConfig } from "../config/environments";
@@ -21,8 +19,6 @@ export interface FrontendEcsConstructProps {
   vpc: ec2.IVpc;
   cluster: ecs.ICluster;
   ecrRepository: ecr.IRepository;
-  privateHostedZone?: route53.IPrivateHostedZone;
-  domainName?: string;
   certificateArn?: string;
   config: EcsConfig;
   naming: NamingConfig;
@@ -42,8 +38,6 @@ export class FrontendEcsConstruct extends Construct {
       vpc,
       cluster,
       ecrRepository,
-      privateHostedZone,
-      domainName,
       certificateArn,
       config,
       naming,
@@ -245,17 +239,6 @@ export class FrontendEcsConstruct extends Construct {
     // Register service with target group
     if (config.desiredCount > 0) {
       this.service.attachToApplicationTargetGroup(targetGroup);
-    }
-
-    // Route53 A Record in Private Hosted Zone (only when PHZ is provided)
-    if (privateHostedZone && domainName) {
-      new route53.ARecord(this, "PrivateAliasRecord", {
-        zone: privateHostedZone,
-        recordName: domainName,
-        target: route53.RecordTarget.fromAlias(
-          new route53Targets.LoadBalancerTarget(this.loadBalancer)
-        ),
-      });
     }
 
     // Auto Scaling

@@ -98,11 +98,15 @@ export interface RbacConfig {
   groupEarlyAdopter: string;
 }
 
+export interface NlbConfig {
+  enabled: boolean;
+  staticIps?: string[]; // Optional static private IPs (one per AZ, must be within private subnet CIDRs)
+}
+
 export interface EnvironmentConfig {
   envName: string;
   domainPrefix: string; // 'dev', 'prod', 'staging', '' (empty for root)
   baseDomain: string; // 'tratin.com'
-  privateDomain?: string; // Private hosted zone domain (e.g., 'ait-stg.goldstarfoods.com')
   privateCertificateArn?: string; // ACM certificate ARN for private ALB HTTPS
   aurora: AuroraConfig;
   ecs: EcsConfig;
@@ -115,6 +119,7 @@ export interface EnvironmentConfig {
   privateFrontendUrl?: string; // Private frontend URL managed by other team (e.g., 'https://aitdev.goldstarfoods.com')
   backendPublicAlb?: boolean; // Create public-facing backend ALB (default: true)
   publicFrontend?: boolean; // Create CloudFront + S3 frontend (default: true)
+  nlb?: NlbConfig; // Internal NLB with static IPs in front of internal ALB
 }
 
 export const environments: Record<string, EnvironmentConfig> = {
@@ -122,7 +127,6 @@ export const environments: Record<string, EnvironmentConfig> = {
     envName: "dev",
     domainPrefix: "dev", // dev.tratin.com, dev-be.tratin.com
     baseDomain: "tratin.com",
-    privateDomain: "ait-stg.goldstarfoods.com",
     privateFrontendUrl: "https://aitdev.goldstarfoods.com",
     backendPublicAlb: true,
     publicFrontend: true,
@@ -193,6 +197,10 @@ export const environments: Record<string, EnvironmentConfig> = {
       cpu: 256, // 0.25 vCPU (nginx is lightweight)
       memory: 512, // 512 MB
       desiredCount: 1, // Start at 0 — no image in ECR yet. CI/CD will push image and update.
+    },
+    nlb: {
+      enabled: true,
+      staticIps: ["10.201.2.10", "10.201.3.10"], // Pinned in private subnets (10.201.2.0/24, 10.201.3.0/24)
     },
   },
 
@@ -284,6 +292,10 @@ export const environments: Record<string, EnvironmentConfig> = {
         scaleInCooldown: 300, // 5 minutes
         scaleOutCooldown: 60, // 1 minute
       },
+    },
+    nlb: {
+      enabled: true,
+      staticIps: ["10.202.2.10", "10.202.3.10"], // Pinned in private subnets (10.202.2.0/24, 10.202.3.0/24)
     },
   },
 };

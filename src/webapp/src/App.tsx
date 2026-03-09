@@ -75,7 +75,7 @@ function App() {
             element={
               <FeatureGuard feature={Feature.BACK_TO_SCHOOL}>
                 <CustomerBids
-                  defaultExcludeItemPrefixes="6,8"
+                  defaultExcludeItemPrefixes="5,6,8"
                   defaultColumnVisibility={{
                     lyAugust: false,
                     lySeptember: false,
