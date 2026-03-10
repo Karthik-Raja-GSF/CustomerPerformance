@@ -47,8 +47,8 @@ export function PermissionsProvider({
         setIsLoading(true);
         const access = await fetchUserAccess();
         if (!cancelled) {
-          setRoles(access.roles);
-          setFeatures(access.features);
+          setRoles(access.roles ?? []);
+          setFeatures(access.features ?? []);
         }
       } catch (error) {
         console.error("Failed to fetch user access:", error);
