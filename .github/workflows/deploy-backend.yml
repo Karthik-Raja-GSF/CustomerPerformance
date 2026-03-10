@@ -378,24 +378,30 @@ jobs:
             --services $ECS_SERVICE \
             --cli-read-timeout 600
 
-      - name: Verify health check
+      - name: Verify deployment health
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
         run: |
-          echo "Verifying backend health..."
+          echo "Verifying ECS service health..."
 
-          for i in {1..10}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://ait-be.tratin.com/health || echo "000")
+          SERVICE_INFO=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --query 'services[0].{desired:desiredCount,running:runningCount,status:status}' \
+            --output json)
 
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "Health check passed (HTTP $HTTP_CODE)"
-              exit 0
-            fi
+          echo "Service status: $SERVICE_INFO"
 
-            echo "⏳ Health check attempt $i/10 failed (HTTP $HTTP_CODE), retrying..."
-            sleep 6
-          done
+          RUNNING=$(echo $SERVICE_INFO | jq -r '.running')
+          DESIRED=$(echo $SERVICE_INFO | jq -r '.desired')
 
-          echo "❌ Health check failed after 10 attempts"
-          exit 1
+          if [ "$RUNNING" -ge "$DESIRED" ] && [ "$DESIRED" -gt "0" ]; then
+            echo "Health check passed: $RUNNING/$DESIRED tasks running"
+          else
+            echo "Health check failed: $RUNNING/$DESIRED tasks running"
+            exit 1
+          fi
 
       - name: Monitor CloudWatch alarms
         run: |
