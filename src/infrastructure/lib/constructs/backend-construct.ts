@@ -161,6 +161,10 @@ export class BackendConstruct extends Construct {
     const container = taskDefinition.addContainer("backend", {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, "latest"),
       containerName,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: "backend",
+        logGroup,
+      }),
       environment: {
         PORT: "8887",
         NODE_ENV: "production",

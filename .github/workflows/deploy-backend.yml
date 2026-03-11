@@ -70,8 +70,8 @@ jobs:
       - name: Typecheck
         run: pnpm --filter backend typecheck
 
-  build-and-save-artifact:
-    name: Build, Save Artifact & Push to Dev ECR
+  build-and-save:
+    name: Build & Save Artifact
     needs: [setup, validate]
     runs-on: ubuntu-latest
 
@@ -113,13 +113,25 @@ jobs:
           retention-days: 7
           compression-level: 0
 
-      - name: Load image from artifact
+  push-dev-ecr:
+    name: Push to Dev ECR
+    needs: [setup, build-and-save]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image-${{ github.sha }}
+
+      - name: Load Docker image
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Loading image for dev deployment..."
+          echo "Loading image from artifact..."
           gunzip < backend-image.tar.gz | docker load
           docker image inspect backend-image:$IMAGE_TAG
+          echo "Image loaded: backend-image:$IMAGE_TAG"
 
       - name: Configure AWS credentials (dev)
         uses: aws-actions/configure-aws-credentials@v4
@@ -148,9 +160,118 @@ jobs:
 
           echo "Image pushed to dev ECR"
 
-  load-artifact-and-push-prod:
-    name: Load Artifact & Push to Prod ECR
-    needs: [setup, build-and-save-artifact, deploy-dev]
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [setup, push-dev-ecr]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Deploying to dev ECS with image tag: $IMAGE_TAG"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Wait for deployment
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --cli-read-timeout 300
+
+      - name: Verify deployment health
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
+        run: |
+          echo "Verifying ECS service health..."
+
+          SERVICE_INFO=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --query 'services[0].{desired:desiredCount,running:runningCount,status:status}' \
+            --output json)
+
+          echo "Service status: $SERVICE_INFO"
+
+          RUNNING=$(echo $SERVICE_INFO | jq -r '.running')
+          DESIRED=$(echo $SERVICE_INFO | jq -r '.desired')
+
+          if [ "$RUNNING" -ge "$DESIRED" ] && [ "$DESIRED" -gt "0" ]; then
+            echo "Health check passed: $RUNNING/$DESIRED tasks running"
+          else
+            echo "Health check failed: $RUNNING/$DESIRED tasks running"
+            exit 1
+          fi
+
+      - name: Monitor CloudWatch alarms
+        run: |
+          echo "Checking CloudWatch alarms for 5 minutes..."
+
+          ALARM_NAMES=$(aws cloudwatch describe-alarms \
+            --alarm-name-prefix "ait-dev-ue1-cw-alarm" \
+            --query 'MetricAlarms[].AlarmName' \
+            --output text)
+
+          if [ -z "$ALARM_NAMES" ]; then
+            echo "No CloudWatch alarms found"
+            exit 0
+          fi
+
+          echo "Monitoring alarms: $ALARM_NAMES"
+
+          for i in {1..10}; do
+            ALARM_STATES=$(aws cloudwatch describe-alarms \
+              --alarm-names $ALARM_NAMES \
+              --query 'MetricAlarms[?StateValue==`ALARM`].AlarmName' \
+              --output text)
+
+            if [ -n "$ALARM_STATES" ]; then
+              echo "Alarms in ALARM state: $ALARM_STATES"
+              exit 1
+            fi
+
+            echo "All alarms OK (check $i/10)"
+            sleep 30
+          done
+
+          echo "CloudWatch monitoring complete - no alarms triggered"
+
+      - name: Deployment summary
+        if: success()
+        env:
+          BACKEND_URL: https://ait-dev-be.tratin.com
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "## Dev Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** dev" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+
+  push-prod-ecr:
+    name: Push to Prod ECR
+    needs: [setup, build-and-save, deploy-dev]
     runs-on: ubuntu-latest
     environment: production-ecr
 
@@ -166,14 +287,14 @@ jobs:
       - name: Validate artifact exists
         run: |
           if [ ! -f backend-image.tar.gz ]; then
-            echo "❌ Artifact not found for SHA: ${{ github.sha }}"
+            echo "Artifact not found for SHA: ${{ github.sha }}"
             echo "Please ensure dev build completed successfully"
             exit 1
           fi
 
           # Check tar is valid
           if ! tar -tzf backend-image.tar.gz > /dev/null 2>&1; then
-            echo "❌ Corrupted artifact"
+            echo "Corrupted artifact"
             exit 1
           fi
 
@@ -203,72 +324,22 @@ jobs:
       - name: Tag and push to prod ECR
         env:
           PROD_ECR: ${{ steps.login-prod-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ needs.setup.outputs.prod_ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "Tagging image for prod ECR..."
-          docker tag backend-image:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
-          docker tag backend-image:$IMAGE_TAG $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
+          docker tag backend-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag backend-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:latest
 
           echo "Pushing image to prod ECR with tags: $IMAGE_TAG, latest"
-          docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:$IMAGE_TAG
-          docker push $PROD_ECR/ait-prd-gbl-ecr-backend-01:latest
+          docker push $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $PROD_ECR/$ECR_REPOSITORY:latest
 
           echo "Image pushed to prod ECR"
 
-  deploy-dev:
-    name: Deploy to Dev
-    needs: [setup, build-and-save-artifact]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Configure AWS credentials (dev)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy to ECS
-        env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
-          IMAGE_TAG: ${{ needs.build-and-save-artifact.outputs.image_tag }}
-        run: |
-          echo "Deploying to dev ECS with image tag: $IMAGE_TAG"
-
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --force-new-deployment \
-            --no-cli-pager
-
-      - name: Wait for deployment
-        env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
-        run: |
-          echo "Waiting for ECS service to stabilize..."
-
-          aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_SERVICE \
-            --cli-read-timeout 300
-
-      - name: Deployment summary
-        if: success()
-        env:
-          BACKEND_URL: https://ait-dev-be.tratin.com
-          IMAGE_TAG: ${{ needs.build-and-save-artifact.outputs.image_tag }}
-        run: |
-          echo "## Dev Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** dev" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
-          echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
-
   deploy-prod:
     name: Deploy to Prod
-    needs: [setup, load-artifact-and-push-prod]
+    needs: [setup, push-prod-ecr]
     runs-on: ubuntu-latest
     environment: production
 
@@ -280,83 +351,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get current task definition
-        id: current-task
-        env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
-        run: |
-          TASK_DEF_ARN=$(aws ecs describe-services \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --query 'services[0].taskDefinition' \
-            --output text)
-
-          echo "current_task_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
-          echo "Current task definition: $TASK_DEF_ARN"
-
-      - name: Run database migrations
-        env:
-          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
-          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
-          ECR_REPOSITORY: ${{ needs.setup.outputs.prod_ecr_repository }}
-          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
-        run: |
-          echo "Running database migrations..."
-
-          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-
-          SUBNETS=$(aws ecs describe-services \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' \
-            --output json)
-
-          SECURITY_GROUPS=$(aws ecs describe-services \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' \
-            --output json)
-
-          TASK_ARN=$(aws ecs run-task \
-            --cluster $ECS_CLUSTER \
-            --task-definition ${{ steps.current-task.outputs.current_task_arn }} \
-            --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=$SUBNETS,securityGroups=$SECURITY_GROUPS,assignPublicIp=DISABLED}" \
-            --overrides '{
-              "containerOverrides": [
-                {
-                  "name": "ait-prd-ue1-ecs-container-01",
-                  "command": ["sh", "-c", "export DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-ait_procurement} && npx prisma migrate deploy"]
-                }
-              ]
-            }' \
-            --query 'tasks[0].taskArn' \
-            --output text)
-
-          echo "Migration task ARN: $TASK_ARN"
-          echo "Waiting for migrations to complete..."
-          aws ecs wait tasks-stopped --cluster $ECS_CLUSTER --tasks $TASK_ARN
-
-          EXIT_CODE=$(aws ecs describe-tasks \
-            --cluster $ECS_CLUSTER \
-            --tasks $TASK_ARN \
-            --query 'tasks[0].containers[0].exitCode' \
-            --output text)
-
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "❌ Migration failed with exit code: $EXIT_CODE"
-            exit 1
-          fi
-
-          echo "Migrations completed successfully"
-
       - name: Deploy to ECS
         env:
           ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
           ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
-          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.push-prod-ecr.outputs.image_tag }}
         run: |
           echo "Deploying to prod ECS with image tag: $IMAGE_TAG"
 
@@ -426,7 +425,7 @@ jobs:
               --output text)
 
             if [ -n "$ALARM_STATES" ]; then
-              echo "❌ Alarms in ALARM state: $ALARM_STATES"
+              echo "Alarms in ALARM state: $ALARM_STATES"
               exit 1
             fi
 
@@ -439,13 +438,12 @@ jobs:
       - name: Deployment summary
         if: success()
         env:
-          BACKEND_URL: https://ait-be.tratin.com
-          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.push-prod-ecr.outputs.image_tag }}
         run: |
-          echo "## Prod Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "## Prod Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** prod" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Private URL:** https://ait.goldstarfoods.com" >> $GITHUB_STEP_SUMMARY
           echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
 
   rollback:
@@ -467,7 +465,7 @@ jobs:
           ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
           ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
         run: |
-          echo "⚠️ Deployment failed, initiating rollback..."
+          echo "Deployment failed, initiating rollback..."
 
           PREVIOUS_TASK_DEF=$(aws ecs describe-services \
             --cluster $ECS_CLUSTER \
@@ -476,7 +474,7 @@ jobs:
             --output text || echo "none")
 
           if [ "$PREVIOUS_TASK_DEF" = "none" ] || [ -z "$PREVIOUS_TASK_DEF" ]; then
-            echo "❌ No previous task definition found for rollback"
+            echo "No previous task definition found for rollback"
             exit 1
           fi
 

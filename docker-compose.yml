@@ -49,17 +49,17 @@ services:
 
   # OTEL Collector Contrib for local telemetry testing
   # Uses Contrib for transform processor support (flattens logs for CloudWatch queries)
-  otel_collector:
-    image: otel/opentelemetry-collector-contrib:0.140.0
-    container_name: otel-collector
-    restart: unless-stopped
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./src/infrastructure/lib/config/otel-collector-config.local.yaml:/etc/otel-collector-config.yaml:ro
-    ports:
-      - "4317:4317" # OTLP gRPC
-      - "4318:4318" # OTLP HTTP
-      - "13133:13133" # Health check
+  # otel_collector:
+  #   image: otel/opentelemetry-collector-contrib:0.140.0
+  #   container_name: otel-collector
+  #   restart: unless-stopped
+  #   command: ["--config=/etc/otel-collector-config.yaml"]
+  #   volumes:
+  #     - ./src/infrastructure/lib/config/otel-collector-config.local.yaml:/etc/otel-collector-config.yaml:ro
+  #   ports:
+  #     - "4317:4317" # OTLP gRPC
+  #     - "4318:4318" # OTLP HTTP
+  #     - "13133:13133" # Health check
 
   # Frontend (nginx serving built React SPA)
   # Only starts with: docker compose --profile frontend up
@@ -74,9 +74,9 @@ services:
         VITE_COGNITO_REGION: ${VITE_COGNITO_REGION:-us-east-1}
         VITE_COGNITO_DOMAIN: ${VITE_COGNITO_DOMAIN:-ait-dev.auth.us-east-1.amazoncognito.com}
         VITE_COGNITO_AZURE_AD_IDP_NAME: ${VITE_COGNITO_AZURE_AD_IDP_NAME:-ait-dev-gbl-cog-idp-ad-01}
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://ait-dev-be.tratin.com}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL_ECS:-http://localhost:8887/api}
     ports:
-      - "8080:80"
+      - "3030:80"
     restart: unless-stopped
     healthcheck:
       test:
