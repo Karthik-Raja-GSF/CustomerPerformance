@@ -51,6 +51,11 @@
     "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },
+  "pnpm": {
+    "overrides": {
+      "@types/pg": "^8.16.0"
+    }
+  },
   "devDependencies": {
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",

@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false # Never cancel to avoid orphaned artifacts
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
   AWS_REGION: us-east-1
 
 jobs:
