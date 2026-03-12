@@ -240,6 +240,41 @@ router.get(
 );
 
 /**
+ * GET /customer-bids/stats
+ * Get aggregate statistics for customer bids matching the given filters.
+ * Accepts the same query parameters as the list endpoint (pagination ignored).
+ */
+router.get(
+  "/stats",
+  authenticate,
+  requireFeature(Feature.BACK_TO_SCHOOL),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = querySchema.safeParse(req.query);
+
+      if (!parsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid query parameters: ${parsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      const customerBidService = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await customerBidService.getStats(parsed.data);
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (error) {
+      handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
  * GET /customer-bids/filter-options
  * Get distinct filter option values for autocomplete suggestions
  */

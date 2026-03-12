@@ -257,6 +257,28 @@ export interface SyncResultDto {
 /**
  * Sync log entry DTO
  */
+// ============================================
+// Statistics DTOs
+// ============================================
+
+/**
+ * Per-location statistics for customer bids
+ */
+export interface LocationStatsDto {
+  siteCode: string;
+  total: number;
+  confirmed: number;
+}
+
+/**
+ * Aggregate statistics for customer bids matching the current filters
+ */
+export interface CustomerBidStatsDto {
+  totalItems: number;
+  confirmedItems: number;
+  byLocation: LocationStatsDto[];
+}
+
 export interface SyncLogDto {
   id: string;
   status: string;

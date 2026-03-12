@@ -11,6 +11,7 @@ import {
   BulkUpdateResultDto,
   BulkUpdatePreviewResultDto,
   CustomerBidFilterOptionsDto,
+  CustomerBidStatsDto,
   SyncResultDto,
   SyncLogDto,
   SchoolYear,
@@ -1086,6 +1087,79 @@ export class CustomerBidService implements ICustomerBidService {
     });
 
     return logs.map((log) => this.toSyncLogDto(log));
+  }
+
+  /**
+   * Get aggregate statistics for customer bids matching the given filters.
+   * Returns total/confirmed counts overall and per location.
+   */
+  async getStats(query: CustomerBidQueryDto): Promise<CustomerBidStatsDto> {
+    const schoolYear = query.schoolYear ?? "next";
+    const schoolYearString = getSchoolYearString(schoolYear);
+
+    try {
+      const whereConditions = buildBidFilterConditions(query);
+
+      if (query.queued !== undefined) {
+        const queuedSubquery = Prisma.sql`
+          SELECT 1 FROM ait.customer_bid_export_item bei
+          WHERE bei.source_db = cbd.source_db
+            AND bei.site_code = cbd.site_code
+            AND bei.customer_bill_to = cbd.customer_bill_to
+            AND bei.item_no = cbd.item_no
+            AND bei.school_year = cbd.school_year
+            AND bei.status = 'QUEUED'
+        `;
+        if (query.queued) {
+          whereConditions.push(Prisma.sql`EXISTS (${queuedSubquery})`);
+        } else {
+          whereConditions.push(Prisma.sql`NOT EXISTS (${queuedSubquery})`);
+        }
+      }
+
+      const additionalWhere =
+        whereConditions.length > 0
+          ? Prisma.sql`AND ${Prisma.join(whereConditions, " AND ")}`
+          : Prisma.empty;
+
+      const rows = await this.prisma.$queryRaw<
+        { siteCode: string; total: number; confirmed: number }[]
+      >(Prisma.sql`
+        SELECT
+          cbd.site_code AS "siteCode",
+          COUNT(*)::int AS "total",
+          COUNT(cbd.confirmed_at)::int AS "confirmed"
+        FROM ait.customer_bid_data cbd
+        INNER JOIN dw2_nav.customer c
+          ON cbd.customer_bill_to = c.no_
+          AND cbd.source_db = c.source_db
+        WHERE cbd.school_year = ${schoolYearString}
+          ${additionalWhere}
+        GROUP BY cbd.site_code
+        ORDER BY cbd.site_code
+      `);
+
+      let totalItems = 0;
+      let confirmedItems = 0;
+      for (const row of rows) {
+        totalItems += row.total;
+        confirmedItems += row.confirmed;
+      }
+
+      return {
+        totalItems,
+        confirmedItems,
+        byLocation: rows,
+      };
+    } catch (error) {
+      logger.error(
+        { event: "customer-bid.stats.error", error },
+        "Failed to fetch customer bid stats"
+      );
+      throw new CustomerBidDatabaseError(
+        "Failed to retrieve customer bid statistics"
+      );
+    }
   }
 
   /**

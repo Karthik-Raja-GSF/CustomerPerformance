@@ -8,6 +8,7 @@ import {
   BulkUpdatePreviewResultDto,
   CustomerBidDto,
   CustomerBidFilterOptionsDto,
+  CustomerBidStatsDto,
   SyncResultDto,
   SyncLogDto,
   SchoolYear,
@@ -114,6 +115,14 @@ export interface ICustomerBidService {
    * @returns Promise resolving to array of sync log entries
    */
   getSyncHistory(limit?: number): Promise<SyncLogDto[]>;
+
+  /**
+   * Get aggregate statistics for customer bids matching the given filters
+   *
+   * @param query - Query parameters for filtering (pagination ignored)
+   * @returns Promise resolving to stats with totals and per-location breakdown
+   */
+  getStats(query: CustomerBidQueryDto): Promise<CustomerBidStatsDto>;
 
   /**
    * Get distinct filter option values for autocomplete suggestions

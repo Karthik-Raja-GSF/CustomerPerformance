@@ -11,6 +11,7 @@ import type {
   CustomerBidFilters,
   CustomerBidFilterOptions,
   CustomerBidListResponse,
+  CustomerBidStatsDto,
   UpdateCustomerBidDto,
   BulkUpdateCustomerBidDto,
   BulkUpdateResultDto,
@@ -63,6 +64,38 @@ export async function getCustomerBids(
   // but the actual structure is { status, ...CustomerBidListResponse }
   // so we extract the needed fields
   return response as unknown as CustomerBidListResponse;
+}
+
+/**
+ * Fetch aggregate statistics for customer bids matching the given filters.
+ * Same filters as getCustomerBids, but pagination is ignored.
+ */
+export async function getCustomerBidStats(
+  filters?: CustomerBidFilters
+): Promise<CustomerBidStatsDto> {
+  const params = new URLSearchParams();
+
+  if (filters?.schoolYear) params.set("schoolYear", filters.schoolYear);
+  if (filters?.siteCode) params.set("siteCode", filters.siteCode);
+  if (filters?.customerBillTo)
+    params.set("customerBillTo", filters.customerBillTo);
+  if (filters?.customerName) params.set("customerName", filters.customerName);
+  if (filters?.salesRep) params.set("salesRep", filters.salesRep);
+  if (filters?.itemCode) params.set("itemCode", filters.itemCode);
+  if (filters?.erpStatus) params.set("erpStatus", filters.erpStatus);
+  if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
+  if (filters?.isNew !== undefined)
+    params.set("isNew", filters.isNew.toString());
+  // Note: confirmed, exported, queued filters are intentionally excluded —
+  // stats should always reflect the full dataset for the given filters.
+  if (filters?.excludeItemPrefixes)
+    params.set("excludeItemPrefixes", filters.excludeItemPrefixes);
+
+  const queryString = params.toString();
+  const url = `/customer-bids/stats${queryString ? `?${queryString}` : ""}`;
+
+  const response = await apiClient.get<ApiResponse<CustomerBidStatsDto>>(url);
+  return response.data;
 }
 
 /**

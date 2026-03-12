@@ -74,7 +74,6 @@ import {
   type FilterInputs,
 } from "@/pages/customer-bids/filter-sheet";
 import type { Table } from "@tanstack/react-table";
-
 /**
  * Calculate school year string from SchoolYear enum
  * e.g., "next" → "2026-2027" (assuming current date is in 2025-2026 school year)
@@ -224,6 +223,8 @@ interface CustomerBidsProps {
   showExportedFilter?: boolean;
   showQueueExport?: boolean;
   defaultExcludeItemPrefixes?: string;
+  /** Optional content rendered between the page header and the toolbar */
+  headerSlot?: React.ReactNode;
 }
 
 export default function CustomerBids({
@@ -241,6 +242,7 @@ export default function CustomerBids({
   showConfirmedFilter = true,
   showExportedFilter = false,
   showQueueExport = false,
+  headerSlot,
 }: CustomerBidsProps) {
   const { roles } = usePermissions();
   const isSalesRole =
@@ -831,6 +833,8 @@ export default function CustomerBids({
         </div>
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
+
+      {headerSlot}
 
       {/* School Year Tabs + Toolbar */}
       <div className="shrink-0 flex items-center gap-2 flex-wrap">

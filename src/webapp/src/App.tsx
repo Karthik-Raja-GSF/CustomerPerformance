@@ -7,7 +7,7 @@ import Settings from "@/pages/Settings";
 import Prompts from "@/pages/settings/Prompts";
 import StockiqSync from "@/pages/StockiqSync";
 import CustomerBidsSync from "@/pages/CustomerBidsSync";
-import CustomerBids from "@/pages/CustomerBids";
+import BackToSchool from "@/pages/BackToSchool";
 import MonthlyForecast from "@/pages/MonthlyForecast";
 import ConfirmedBidItems from "@/pages/ConfirmedBidItems";
 import BidExportHistory from "@/pages/BidExportHistory";
@@ -74,23 +74,7 @@ function App() {
             path="/back-to-school"
             element={
               <FeatureGuard feature={Feature.BACK_TO_SCHOOL}>
-                <CustomerBids
-                  defaultExcludeItemPrefixes="5,6,8"
-                  defaultColumnVisibility={{
-                    lyAugust: false,
-                    lySeptember: false,
-                    lyOctober: false,
-                    lyNovember: false,
-                    lyDecember: false,
-                    lyJanuary: false,
-                    lyFebruary: false,
-                    lyMarch: false,
-                    lyApril: false,
-                    lyMay: false,
-                    lyJune: false,
-                    lyJuly: false,
-                  }}
-                />
+                <BackToSchool />
               </FeatureGuard>
             }
           />

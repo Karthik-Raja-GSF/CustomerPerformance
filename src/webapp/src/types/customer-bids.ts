@@ -226,6 +226,24 @@ export interface BulkUpdateResultDto {
 }
 
 /**
+ * Per-location statistics
+ */
+export interface LocationStatsDto {
+  siteCode: string;
+  total: number;
+  confirmed: number;
+}
+
+/**
+ * Aggregate statistics for customer bids matching the current filters
+ */
+export interface CustomerBidStatsDto {
+  totalItems: number;
+  confirmedItems: number;
+  byLocation: LocationStatsDto[];
+}
+
+/**
  * API response for customer bids list
  */
 export interface CustomerBidListResponse {
