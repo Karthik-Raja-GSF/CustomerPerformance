@@ -11,6 +11,9 @@ concurrency:
   group: webapp-ecs-deploy-${{ github.sha }}
   cancel-in-progress: false # Never cancel to avoid orphaned artifacts
 
+permissions:
+  issues: write
+
 env:
   NODE_VERSION: "24"
   AWS_REGION: us-east-1
@@ -275,15 +278,17 @@ jobs:
     name: Promote to Production
     needs: [setup, deploy-dev]
     runs-on: ubuntu-latest
-    environment: production-approval
 
     steps:
-      - name: Deployment info
-        run: |
-          echo "## Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Approved by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+      - name: Approval gate
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: bakhrom-cc
+          minimum-approvals: 1
+          issue-title: "Deploy ${{ github.workflow }} to production"
+          issue-body: "Commit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\n\nPlease comment **approved** or **denied**."
+          exclude-workflow-initiator-as-approver: false
 
   build-prod-and-save:
     name: Build Prod & Save Artifact
