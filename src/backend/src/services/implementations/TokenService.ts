@@ -31,11 +31,24 @@ export class TokenService implements ITokenService {
       );
     }
 
-    this.cognitoVerifier = CognitoJwtVerifier.create({
-      userPoolId,
-      tokenUse: "id",
-      clientId,
-    });
+    const svcUserPoolId = process.env.AWS_COGNITO_SVC_USER_POOL_ID;
+    const svcClientId = process.env.AWS_COGNITO_SVC_CLIENT_ID;
+
+    const pools: {
+      userPoolId: string;
+      tokenUse: "id";
+      clientId: string;
+    }[] = [{ userPoolId, tokenUse: "id", clientId }];
+
+    if (svcUserPoolId && svcClientId) {
+      pools.push({
+        userPoolId: svcUserPoolId,
+        tokenUse: "id",
+        clientId: svcClientId,
+      });
+    }
+
+    this.cognitoVerifier = CognitoJwtVerifier.create(pools);
   }
 
   /**
@@ -135,10 +148,8 @@ export class TokenService implements ITokenService {
       ? (cognitoPayload["cognito:groups"] as string[])
       : [];
 
-    if (!userId || !email) {
-      throw new InvalidTokenError(
-        "Cognito token missing required claims (sub, email)"
-      );
+    if (!userId) {
+      throw new InvalidTokenError("Cognito token missing required claim (sub)");
     }
 
     return {

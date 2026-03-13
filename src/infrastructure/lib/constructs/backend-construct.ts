@@ -32,6 +32,8 @@ export interface BackendConstructProps {
   siqSecret: secretsmanager.ISecret;
   cognitoUserPoolId: string;
   cognitoClientId: string;
+  serviceAccountUserPoolId?: string;
+  serviceAccountClientId?: string;
   domainName: string;
   frontendUrl: string;
   hostedZone?: route53.IHostedZone; // Optional for cross-account
@@ -172,6 +174,12 @@ export class BackendConstruct extends Construct {
         AWS_REGION: cdk.Aws.REGION,
         AWS_COGNITO_USER_POOL_ID: cognitoUserPoolId,
         AWS_COGNITO_CLIENT_ID: cognitoClientId,
+        ...(props.serviceAccountUserPoolId && props.serviceAccountClientId
+          ? {
+              AWS_COGNITO_SVC_USER_POOL_ID: props.serviceAccountUserPoolId,
+              AWS_COGNITO_SVC_CLIENT_ID: props.serviceAccountClientId,
+            }
+          : {}),
         // OpenTelemetry config - sends to ADOT Collector sidecar
         OTEL_SERVICE_NAME: otelServiceName,
         OTEL_SERVICE_VERSION: "1.0.0",

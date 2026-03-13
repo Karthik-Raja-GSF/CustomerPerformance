@@ -39,6 +39,10 @@ export const config = {
     clientId: process.env.AWS_COGNITO_CLIENT_ID || "",
     region: process.env.AWS_REGION || "us-east-1",
   },
+  cognitoServiceAccounts: {
+    userPoolId: process.env.AWS_COGNITO_SVC_USER_POOL_ID || "",
+    clientId: process.env.AWS_COGNITO_SVC_CLIENT_ID || "",
+  },
   bedrock: {
     region: process.env.AWS_BEDROCK_REGION || "us-east-1",
   },

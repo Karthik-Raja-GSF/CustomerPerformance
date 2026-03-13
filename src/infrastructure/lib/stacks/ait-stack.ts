@@ -13,6 +13,7 @@ import { addStandardTags } from "../config/tags";
 import { VpcConstruct } from "../constructs/vpc-construct";
 import { DatabaseConstruct } from "../constructs/database-construct";
 import { AuthConstruct } from "../constructs/auth-construct";
+import { ServiceAccountAuthConstruct } from "../constructs/service-account-auth-construct";
 import { EcrConstruct } from "../constructs/ecr-construct";
 import { FrontendConstruct } from "../constructs/frontend-construct";
 import { BackendConstruct } from "../constructs/backend-construct";
@@ -191,6 +192,18 @@ export class AitStack extends cdk.Stack {
     });
 
     // ===================
+    // Service Account Auth (Cognito - M2M)
+    // ===================
+    const svcAuthConstruct = new ServiceAccountAuthConstruct(
+      this,
+      "ServiceAccountAuth",
+      {
+        envName: config.envName,
+        naming,
+      }
+    );
+
+    // ===================
     // ECR Repository
     // ===================
     const ecrConstruct = new EcrConstruct(this, "Ecr", {
@@ -259,6 +272,8 @@ export class AitStack extends cdk.Stack {
       siqSecret: secretsConstruct.siqSecret,
       cognitoUserPoolId: authConstruct.userPool.userPoolId,
       cognitoClientId: authConstruct.userPoolClient.userPoolClientId,
+      serviceAccountUserPoolId: svcAuthConstruct.userPool.userPoolId,
+      serviceAccountClientId: svcAuthConstruct.userPoolClient.userPoolClientId,
       domainName: domains.backend,
       frontendUrl: corsOrigins.join(","),
       hostedZone,
@@ -465,6 +480,16 @@ export class AitStack extends cdk.Stack {
     new cdk.CfnOutput(this, "CognitoClientId", {
       value: authConstruct.userPoolClient.userPoolClientId,
       description: "Cognito Client ID",
+    });
+
+    new cdk.CfnOutput(this, "CognitoSvcUserPoolId", {
+      value: svcAuthConstruct.userPool.userPoolId,
+      description: "Cognito Service Account User Pool ID (M2M)",
+    });
+
+    new cdk.CfnOutput(this, "CognitoSvcClientId", {
+      value: svcAuthConstruct.userPoolClient.userPoolClientId,
+      description: "Cognito Service Account Client ID (M2M)",
     });
 
     new cdk.CfnOutput(this, "CognitoDomain", {
