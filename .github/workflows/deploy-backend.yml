@@ -269,9 +269,23 @@ jobs:
           echo "**URL:** $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
           echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
 
+  promote-prod:
+    name: Promote to Production
+    needs: [setup, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: production-approval
+
+    steps:
+      - name: Deployment info
+        run: |
+          echo "## Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
   push-prod-ecr:
     name: Push to Prod ECR
-    needs: [setup, build-and-save, deploy-dev]
+    needs: [setup, build-and-save, promote-prod]
     runs-on: ubuntu-latest
     environment: production-ecr
 

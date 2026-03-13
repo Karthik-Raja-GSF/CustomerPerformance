@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: webapp-ecs-deploy-${{ github.sha }}
-  cancel-in-progress: false
+  cancel-in-progress: false # Never cancel to avoid orphaned artifacts
 
 env:
   NODE_VERSION: "24"
@@ -43,10 +43,35 @@ jobs:
 
           echo "Resource names configured"
 
-  build-and-push-dev:
-    name: Build & Push to Dev ECR
+  validate:
+    name: Validate & Typecheck
     needs: setup
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter webapp typecheck
+
+  build-dev-and-save:
+    name: Build Dev & Save Artifact
+    needs: [setup, validate]
+    runs-on: ubuntu-latest
+
     outputs:
       image_tag: ${{ github.sha }}
 
@@ -68,27 +93,48 @@ jobs:
             --build-arg VITE_COGNITO_DOMAIN="${{ vars.VITE_COGNITO_DOMAIN }}" \
             --build-arg VITE_COGNITO_AZURE_AD_IDP_NAME="${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME }}" \
             --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL_ECS }}" \
-            -t webapp-image:$IMAGE_TAG \
+            -t webapp-dev-image:$IMAGE_TAG \
             .
 
-          echo "Image built: webapp-image:$IMAGE_TAG"
+          echo "Image built: webapp-dev-image:$IMAGE_TAG"
 
       - name: Save Docker image to artifact
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker save webapp-image:$IMAGE_TAG | gzip > webapp-image.tar.gz
+          echo "Saving image to tar.gz..."
+          docker save webapp-dev-image:$IMAGE_TAG | gzip > webapp-dev-image.tar.gz
 
-          SIZE=$(ls -lh webapp-image.tar.gz | awk '{print $5}')
-          echo "Image saved: webapp-image.tar.gz (size: $SIZE)"
+          SIZE=$(ls -lh webapp-dev-image.tar.gz | awk '{print $5}')
+          echo "Image saved: webapp-dev-image.tar.gz (size: $SIZE)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webapp-image-${{ github.sha }}
-          path: webapp-image.tar.gz
+          name: webapp-dev-image-${{ github.sha }}
+          path: webapp-dev-image.tar.gz
           retention-days: 7
           compression-level: 0
+
+  push-dev-ecr:
+    name: Push to Dev ECR
+    needs: [setup, build-dev-and-save]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp-dev-image-${{ github.sha }}
+
+      - name: Load Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Loading image from artifact..."
+          gunzip < webapp-dev-image.tar.gz | docker load
+          docker image inspect webapp-dev-image:$IMAGE_TAG
+          echo "Image loaded: webapp-dev-image:$IMAGE_TAG"
 
       - name: Configure AWS credentials (dev)
         uses: aws-actions/configure-aws-credentials@v4
@@ -107,17 +153,19 @@ jobs:
           ECR_REPOSITORY: ${{ needs.setup.outputs.dev_ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker tag webapp-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker tag webapp-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "Tagging image for dev ECR..."
+          docker tag webapp-dev-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag webapp-dev-image:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
+          echo "Pushing image with tags: $IMAGE_TAG, latest"
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
           echo "Image pushed to dev ECR"
 
   deploy-dev:
-    name: Deploy to Dev ECS
-    needs: [setup, build-and-push-dev]
+    name: Deploy to Dev
+    needs: [setup, push-dev-ecr]
     runs-on: ubuntu-latest
 
     steps:
@@ -132,7 +180,7 @@ jobs:
         env:
           ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
           ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
-          IMAGE_TAG: ${{ needs.build-and-push-dev.outputs.image_tag }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "Deploying webapp to dev ECS with image tag: $IMAGE_TAG"
 
@@ -154,22 +202,93 @@ jobs:
             --services $ECS_SERVICE \
             --cli-read-timeout 300
 
+      - name: Verify deployment health
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.dev_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.dev_ecs_service }}
+        run: |
+          echo "Verifying ECS service health..."
+
+          SERVICE_INFO=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --query 'services[0].{desired:desiredCount,running:runningCount,status:status}' \
+            --output json)
+
+          echo "Service status: $SERVICE_INFO"
+
+          RUNNING=$(echo $SERVICE_INFO | jq -r '.running')
+          DESIRED=$(echo $SERVICE_INFO | jq -r '.desired')
+
+          if [ "$RUNNING" -ge "$DESIRED" ] && [ "$DESIRED" -gt "0" ]; then
+            echo "Health check passed: $RUNNING/$DESIRED tasks running"
+          else
+            echo "Health check failed: $RUNNING/$DESIRED tasks running"
+            exit 1
+          fi
+
+      - name: Monitor CloudWatch alarms
+        run: |
+          echo "Checking CloudWatch alarms for 5 minutes..."
+
+          ALARM_NAMES=$(aws cloudwatch describe-alarms \
+            --alarm-name-prefix "ait-dev-ue1-cw-alarm" \
+            --query 'MetricAlarms[].AlarmName' \
+            --output text)
+
+          if [ -z "$ALARM_NAMES" ]; then
+            echo "No CloudWatch alarms found"
+            exit 0
+          fi
+
+          echo "Monitoring alarms: $ALARM_NAMES"
+
+          for i in {1..10}; do
+            ALARM_STATES=$(aws cloudwatch describe-alarms \
+              --alarm-names $ALARM_NAMES \
+              --query 'MetricAlarms[?StateValue==`ALARM`].AlarmName' \
+              --output text)
+
+            if [ -n "$ALARM_STATES" ]; then
+              echo "Alarms in ALARM state: $ALARM_STATES"
+              exit 1
+            fi
+
+            echo "All alarms OK (check $i/10)"
+            sleep 30
+          done
+
+          echo "CloudWatch monitoring complete - no alarms triggered"
+
       - name: Deployment summary
         if: success()
         env:
-          IMAGE_TAG: ${{ needs.build-and-push-dev.outputs.image_tag }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "## Dev Frontend ECS Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** dev" >> $GITHUB_STEP_SUMMARY
-          echo "**Private URL:** https://aitdev.goldstarfoods.com" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://aitdev.goldstarfoods.com" >> $GITHUB_STEP_SUMMARY
           echo "**Image SHA:** $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
 
-  load-artifact-and-push-prod:
-    name: Load Artifact & Push to Prod ECR
-    needs: [setup, build-and-push-dev, deploy-dev]
+  promote-prod:
+    name: Promote to Production
+    needs: [setup, deploy-dev]
     runs-on: ubuntu-latest
-    environment: production-ecr
+    environment: production-approval
+
+    steps:
+      - name: Deployment info
+        run: |
+          echo "## Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+  build-prod-and-save:
+    name: Build Prod & Save Artifact
+    needs: [setup, promote-prod]
+    runs-on: ubuntu-latest
 
     outputs:
       image_tag: ${{ github.sha }}
@@ -177,11 +296,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download dev artifact (for reference only)
-        uses: actions/download-artifact@v4
-        with:
-          name: webapp-image-${{ github.sha }}
 
       - name: Build Docker image (Prod)
         env:
@@ -197,10 +311,69 @@ jobs:
             --build-arg VITE_COGNITO_DOMAIN="${{ vars.VITE_COGNITO_DOMAIN_PROD }}" \
             --build-arg VITE_COGNITO_AZURE_AD_IDP_NAME="${{ vars.VITE_COGNITO_AZURE_AD_IDP_NAME_PROD }}" \
             --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL_PROD }}" \
-            -t webapp-image:$IMAGE_TAG \
+            -t webapp-prod-image:$IMAGE_TAG \
             .
 
-          echo "Image built: webapp-image:$IMAGE_TAG"
+          echo "Image built: webapp-prod-image:$IMAGE_TAG"
+
+      - name: Save Docker image to artifact
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Saving image to tar.gz..."
+          docker save webapp-prod-image:$IMAGE_TAG | gzip > webapp-prod-image.tar.gz
+
+          SIZE=$(ls -lh webapp-prod-image.tar.gz | awk '{print $5}')
+          echo "Image saved: webapp-prod-image.tar.gz (size: $SIZE)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-prod-image-${{ github.sha }}
+          path: webapp-prod-image.tar.gz
+          retention-days: 7
+          compression-level: 0
+
+  push-prod-ecr:
+    name: Push to Prod ECR
+    needs: [setup, build-prod-and-save]
+    runs-on: ubuntu-latest
+    environment: production-ecr
+
+    outputs:
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp-prod-image-${{ github.sha }}
+
+      - name: Validate artifact exists
+        run: |
+          if [ ! -f webapp-prod-image.tar.gz ]; then
+            echo "Artifact not found for SHA: ${{ github.sha }}"
+            echo "Please ensure prod build completed successfully"
+            exit 1
+          fi
+
+          # Check tar is valid
+          if ! tar -tzf webapp-prod-image.tar.gz > /dev/null 2>&1; then
+            echo "Corrupted artifact"
+            exit 1
+          fi
+
+          SIZE=$(ls -lh webapp-prod-image.tar.gz | awk '{print $5}')
+          echo "Artifact validated (size: $SIZE)"
+
+      - name: Load Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Loading image from artifact..."
+          gunzip < webapp-prod-image.tar.gz | docker load
+          docker image inspect webapp-prod-image:$IMAGE_TAG
+          echo "Image loaded: webapp-prod-image:$IMAGE_TAG"
 
       - name: Configure AWS credentials (prod)
         uses: aws-actions/configure-aws-credentials@v4
@@ -219,17 +392,19 @@ jobs:
           ECR_REPOSITORY: ${{ needs.setup.outputs.prod_ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker tag webapp-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
-          docker tag webapp-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:latest
+          echo "Tagging image for prod ECR..."
+          docker tag webapp-prod-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag webapp-prod-image:$IMAGE_TAG $PROD_ECR/$ECR_REPOSITORY:latest
 
+          echo "Pushing image to prod ECR with tags: $IMAGE_TAG, latest"
           docker push $PROD_ECR/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $PROD_ECR/$ECR_REPOSITORY:latest
 
           echo "Image pushed to prod ECR"
 
   deploy-prod:
-    name: Deploy to Prod ECS
-    needs: [setup, load-artifact-and-push-prod]
+    name: Deploy to Prod
+    needs: [setup, push-prod-ecr]
     runs-on: ubuntu-latest
     environment: production
 
@@ -245,7 +420,7 @@ jobs:
         env:
           ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
           ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
-          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.push-prod-ecr.outputs.image_tag }}
         run: |
           echo "Deploying webapp to prod ECS with image tag: $IMAGE_TAG"
 
@@ -267,10 +442,68 @@ jobs:
             --services $ECS_SERVICE \
             --cli-read-timeout 600
 
+      - name: Verify deployment health
+        env:
+          ECS_CLUSTER: ${{ needs.setup.outputs.prod_ecs_cluster }}
+          ECS_SERVICE: ${{ needs.setup.outputs.prod_ecs_service }}
+        run: |
+          echo "Verifying ECS service health..."
+
+          SERVICE_INFO=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --query 'services[0].{desired:desiredCount,running:runningCount,status:status}' \
+            --output json)
+
+          echo "Service status: $SERVICE_INFO"
+
+          RUNNING=$(echo $SERVICE_INFO | jq -r '.running')
+          DESIRED=$(echo $SERVICE_INFO | jq -r '.desired')
+
+          if [ "$RUNNING" -ge "$DESIRED" ] && [ "$DESIRED" -gt "0" ]; then
+            echo "Health check passed: $RUNNING/$DESIRED tasks running"
+          else
+            echo "Health check failed: $RUNNING/$DESIRED tasks running"
+            exit 1
+          fi
+
+      - name: Monitor CloudWatch alarms
+        run: |
+          echo "Checking CloudWatch alarms for 5 minutes..."
+
+          ALARM_NAMES=$(aws cloudwatch describe-alarms \
+            --alarm-name-prefix "ait-prd-ue1-cw-alarm" \
+            --query 'MetricAlarms[].AlarmName' \
+            --output text)
+
+          if [ -z "$ALARM_NAMES" ]; then
+            echo "No CloudWatch alarms found"
+            exit 0
+          fi
+
+          echo "Monitoring alarms: $ALARM_NAMES"
+
+          for i in {1..10}; do
+            ALARM_STATES=$(aws cloudwatch describe-alarms \
+              --alarm-names $ALARM_NAMES \
+              --query 'MetricAlarms[?StateValue==`ALARM`].AlarmName' \
+              --output text)
+
+            if [ -n "$ALARM_STATES" ]; then
+              echo "Alarms in ALARM state: $ALARM_STATES"
+              exit 1
+            fi
+
+            echo "All alarms OK (check $i/10)"
+            sleep 30
+          done
+
+          echo "CloudWatch monitoring complete - no alarms triggered"
+
       - name: Deployment summary
         if: success()
         env:
-          IMAGE_TAG: ${{ needs.load-artifact-and-push-prod.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.push-prod-ecr.outputs.image_tag }}
         run: |
           echo "## Prod Frontend ECS Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -324,3 +557,18 @@ jobs:
             --services $ECS_SERVICE
 
           echo "Rollback complete"
+
+      - name: Create rollback incident issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Frontend Production Deployment Failed - Rollback Initiated`,
+              body: `## Frontend Deployment Failure\n\n**Workflow:** [${context.workflow}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n**Time:** ${new Date().toISOString()}\n\n### Action Required\n- Investigate deployment logs\n- Fix underlying issue\n- Re-run deployment when ready\n\n### Rollback Status\nAutomatic rollback to previous task definition has been initiated.`,
+              labels: ['deployment', 'production', 'incident']
+            });
+
+            console.log(`Created incident issue: ${issue.data.html_url}`);
