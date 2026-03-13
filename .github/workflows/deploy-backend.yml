@@ -283,7 +283,7 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: bakhrom-cc
+          approvers: bakhrom-cc, christianstayton
           minimum-approvals: 1
           issue-title: "Deploy ${{ github.workflow }} to production"
           issue-body: "Commit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\n\nPlease comment **approved** or **denied**."
