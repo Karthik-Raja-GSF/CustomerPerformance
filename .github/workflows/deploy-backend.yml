@@ -12,6 +12,7 @@ concurrency:
   cancel-in-progress: false # Never cancel to avoid orphaned artifacts
 
 permissions:
+  contents: read
   issues: write
 
 env:
