@@ -27,6 +27,8 @@ function filtersFromParams(sp: URLSearchParams): CustomerBidFilters {
 }
 
 const DEFAULT_COLUMN_VISIBILITY = {
+  sourceDb: true,
+  customerBillTo: true,
   lyAugust: false,
   lySeptember: false,
   lyOctober: false,
@@ -40,6 +42,8 @@ const DEFAULT_COLUMN_VISIBILITY = {
   lyJune: false,
   lyJuly: false,
 };
+
+const ALWAYS_VISIBLE_COLUMNS = ["sourceDb", "customerBillTo"];
 
 export default function DemandValidationTool() {
   const [searchParams] = useSearchParams();
@@ -67,6 +71,7 @@ export default function DemandValidationTool() {
     <CustomerBids
       defaultExcludeItemPrefixes="5,6,8"
       defaultColumnVisibility={DEFAULT_COLUMN_VISIBILITY}
+      alwaysVisibleColumns={ALWAYS_VISIBLE_COLUMNS}
       headerSlot={<StatsCards stats={stats} />}
     />
   );

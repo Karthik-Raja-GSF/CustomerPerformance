@@ -223,6 +223,8 @@ interface CustomerBidsProps {
   showExportedFilter?: boolean;
   showQueueExport?: boolean;
   defaultExcludeItemPrefixes?: string;
+  /** Columns that cannot be hidden by the user (always visible in table and export) */
+  alwaysVisibleColumns?: string[];
   /** Optional content rendered between the page header and the toolbar */
   headerSlot?: React.ReactNode;
 }
@@ -242,6 +244,7 @@ export default function CustomerBids({
   showConfirmedFilter = true,
   showExportedFilter = false,
   showQueueExport = false,
+  alwaysVisibleColumns,
   headerSlot,
 }: CustomerBidsProps) {
   const { roles } = usePermissions();
@@ -320,7 +323,12 @@ export default function CustomerBids({
     useState<CustomerBidFilterOptions | null>(null);
 
   // Column visibility state
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+  const alwaysVisibleSet = useMemo(
+    () => new Set(alwaysVisibleColumns ?? []),
+    [alwaysVisibleColumns]
+  );
+
+  const [columnVisibility, setColumnVisibilityRaw] = useState<VisibilityState>({
     sourceDb: false,
     customerBillTo: false,
     coOpCode: false,
@@ -331,6 +339,24 @@ export default function CustomerBids({
     customerLeadTime: false,
     ...defaultColumnVisibility,
   });
+
+  // Wrap setter to enforce always-visible columns
+  const setColumnVisibility = useCallback(
+    (
+      updater: VisibilityState | ((prev: VisibilityState) => VisibilityState)
+    ) => {
+      setColumnVisibilityRaw((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        if (alwaysVisibleSet.size === 0) return next;
+        const enforced = { ...next };
+        for (const col of alwaysVisibleSet) {
+          if (enforced[col] === false) enforced[col] = true;
+        }
+        return enforced;
+      });
+    },
+    [alwaysVisibleSet]
+  );
   const [tableInstance, setTableInstance] =
     useState<Table<CustomerBidDto> | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -906,7 +932,10 @@ export default function CustomerBids({
           >
             {tableInstance
               ?.getAllColumns()
-              .filter((column) => column.getCanHide())
+              .filter(
+                (column) =>
+                  column.getCanHide() && !alwaysVisibleSet.has(column.id)
+              )
               .map((column) => (
                 <DropdownMenuCheckboxItem
                   key={column.id}
