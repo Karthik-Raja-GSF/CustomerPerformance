@@ -91,7 +91,7 @@ export const config = {
         enumKey: Role.SALES,
         displayName: "Sales",
         groupId: process.env.RBAC_GROUP_SALES || "",
-        features: [Feature.BACK_TO_SCHOOL],
+        features: [Feature.DEMAND_VALIDATION_TOOL],
       },
       {
         enumKey: Role.CATMAN,
@@ -117,7 +117,7 @@ export const config = {
         groupId: process.env.RBAC_GROUP_EARLY_ADOPTER || "",
         features: [
           Feature.STARQ,
-          Feature.BACK_TO_SCHOOL,
+          Feature.DEMAND_VALIDATION_TOOL,
           Feature.MONTHLY_FORECAST,
           Feature.CONFIRMED_BID_ITEMS,
           Feature.EO_RISK_REVIEW,

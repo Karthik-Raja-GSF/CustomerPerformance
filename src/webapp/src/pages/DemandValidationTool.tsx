@@ -41,7 +41,7 @@ const DEFAULT_COLUMN_VISIBILITY = {
   lyJuly: false,
 };
 
-export default function BackToSchool() {
+export default function DemandValidationTool() {
   const [searchParams] = useSearchParams();
   const [stats, setStats] = useState<CustomerBidStatsDto | null>(null);
   const abortRef = useRef<AbortController | null>(null);

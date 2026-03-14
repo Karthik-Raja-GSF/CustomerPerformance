@@ -6,7 +6,7 @@
  */
 export const Feature = {
   STARQ: "starq",
-  BACK_TO_SCHOOL: "back-to-school",
+  DEMAND_VALIDATION_TOOL: "demand-validation-tool",
   MONTHLY_FORECAST: "monthly-forecast",
   CONFIRMED_BID_ITEMS: "confirmed-bid-items",
   BID_EXPORT: "bid-export",

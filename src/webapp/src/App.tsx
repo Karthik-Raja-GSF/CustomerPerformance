@@ -7,7 +7,7 @@ import Settings from "@/pages/Settings";
 import Prompts from "@/pages/settings/Prompts";
 import StockiqSync from "@/pages/StockiqSync";
 import CustomerBidsSync from "@/pages/CustomerBidsSync";
-import BackToSchool from "@/pages/BackToSchool";
+import DemandValidationTool from "@/pages/DemandValidationTool";
 import MonthlyForecast from "@/pages/MonthlyForecast";
 import ConfirmedBidItems from "@/pages/ConfirmedBidItems";
 import BidExportHistory from "@/pages/BidExportHistory";
@@ -21,7 +21,10 @@ export const routes = [
   { path: "/", title: "StarQ" },
   { path: "/stockiq-sync", title: "StockIQ Sync" },
   { path: "/customer-bids-sync", title: "Customer Bids Sync" },
-  { path: "/back-to-school", title: "Back to School" },
+  {
+    path: "/sales-insights/demand-validation-tool",
+    title: "Demand Validation Tool",
+  },
   { path: "/demand-planning/monthly-forecast", title: "Monthly Forecast" },
   {
     path: "/demand-planning/confirmed-bid-items",
@@ -71,10 +74,10 @@ function App() {
             }
           />
           <Route
-            path="/back-to-school"
+            path="/sales-insights/demand-validation-tool"
             element={
-              <FeatureGuard feature={Feature.BACK_TO_SCHOOL}>
-                <BackToSchool />
+              <FeatureGuard feature={Feature.DEMAND_VALIDATION_TOOL}>
+                <DemandValidationTool />
               </FeatureGuard>
             }
           />

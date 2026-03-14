@@ -5,7 +5,7 @@ import { Feature } from "@/config/features";
 /** Maps each feature to its primary route — used to find the first accessible page. */
 const featureRouteMap: Record<string, string> = {
   [Feature.STARQ]: "/",
-  [Feature.BACK_TO_SCHOOL]: "/back-to-school",
+  [Feature.DEMAND_VALIDATION_TOOL]: "/sales-insights/demand-validation-tool",
   [Feature.MONTHLY_FORECAST]: "/demand-planning/monthly-forecast",
   [Feature.CONFIRMED_BID_ITEMS]: "/demand-planning/confirmed-bid-items",
   [Feature.BID_EXPORT]: "/bid-export-history",

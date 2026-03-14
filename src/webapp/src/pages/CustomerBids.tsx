@@ -228,7 +228,7 @@ interface CustomerBidsProps {
 }
 
 export default function CustomerBids({
-  pageTitle = "Back to School",
+  pageTitle = "Demand Validation Tool",
   pageDescription = "View and filter customer bid data",
   defaultConfirmed = false,
   defaultExported,

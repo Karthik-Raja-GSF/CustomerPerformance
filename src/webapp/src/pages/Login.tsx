@@ -70,12 +70,22 @@ export default function Login() {
         }}
       >
         {/* Glass overlay with logo */}
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center">
           <img
-            src="https://gsfoodsgroup.com/wp-content/uploads/2020/09/GSFoodsGroup_Logo_White-optimized.png"
-            alt="GS Foods Group"
+            src="/GoldStarFoods_Logo.svg"
+            alt="Gold Star Foods"
             className="h-[28rem] w-auto"
           />
+          <div
+            className="text-6xl tracking-wide mt-4 text-center leading-tight"
+            style={{
+              color: "#fff",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+            }}
+          >
+            <div>GOLD STAR</div>
+            <div>FOODS</div>
+          </div>
         </div>
       </div>
 

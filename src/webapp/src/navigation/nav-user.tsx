@@ -3,6 +3,7 @@ import { ChevronsUpDown, KeyRound, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/auth-context";
+import { isFederatedUser } from "@/services/cognito";
 import {
   Avatar,
   AvatarFallback,
@@ -104,8 +105,12 @@ export function NavUser() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium text-sidebar-foreground">{fullName}</span>
-                  <span className="truncate text-xs text-sidebar-foreground/70">{user.email}</span>
+                  <span className="truncate font-medium text-sidebar-foreground">
+                    {fullName}
+                  </span>
+                  <span className="truncate text-xs text-sidebar-foreground/70">
+                    {user.email}
+                  </span>
                 </div>
                 <ChevronsUpDown className="ml-auto size-4" />
               </SidebarMenuButton>
@@ -134,7 +139,14 @@ export function NavUser() {
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   onSelect={() => {
-                    setIsPasswordDialogOpen(true);
+                    if (isFederatedUser()) {
+                      window.open(
+                        "https://mysignins.microsoft.com/security-info/password/change",
+                        "_blank"
+                      );
+                    } else {
+                      setIsPasswordDialogOpen(true);
+                    }
                   }}
                 >
                   <KeyRound />

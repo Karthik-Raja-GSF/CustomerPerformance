@@ -1,10 +1,5 @@
 import * as React from "react";
-import {
-  Settings2,
-  GraduationCap,
-  TrendingUp,
-  AlertTriangle,
-} from "lucide-react";
+import { Settings2, BarChart3, TrendingUp, AlertTriangle } from "lucide-react";
 import { StarqIcon } from "@/components/icons/starq-icon";
 import { Feature } from "@/config/features";
 import { usePermissions } from "@/contexts/permissions-context";
@@ -28,12 +23,19 @@ const data = {
       url: "/",
       icon: StarqIcon,
       feature: Feature.STARQ,
+      badge: "Beta",
     },
     {
-      title: "Back to School",
-      url: "/back-to-school",
-      icon: GraduationCap,
-      feature: Feature.BACK_TO_SCHOOL,
+      title: "Sales Insights",
+      url: "/sales-insights/demand-validation-tool",
+      icon: BarChart3,
+      items: [
+        {
+          title: "Demand Validation Tool",
+          url: "/sales-insights/demand-validation-tool",
+          feature: Feature.DEMAND_VALIDATION_TOOL,
+        },
+      ],
     },
     {
       title: "Demand Planning",

@@ -67,7 +67,7 @@ export class ServiceAccountAuthConstruct extends Construct {
     // App client with secret (M2M best practice)
     this.userPoolClient = this.userPool.addClient("ServiceAccountClient", {
       userPoolClientName: clientName,
-      generateSecret: true,
+      generateSecret: false,
       authFlows: {
         userPassword: true,
         userSrp: true,

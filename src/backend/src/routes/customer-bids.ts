@@ -211,7 +211,7 @@ function handleCustomerBidError(
 router.get(
   "/",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate query parameters
@@ -247,7 +247,7 @@ router.get(
 router.get(
   "/stats",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = querySchema.safeParse(req.query);
@@ -281,7 +281,7 @@ router.get(
 router.get(
   "/filter-options",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const customerBidService = container.resolve<ICustomerBidService>(
@@ -319,7 +319,7 @@ router.get(
 router.patch(
   "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate path parameters
@@ -374,7 +374,7 @@ router.patch(
 router.post(
   "/bulk-update/preview",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = bulkUpdateSchema.safeParse(req.body);
@@ -417,7 +417,7 @@ router.post(
 router.post(
   "/bulk-update",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request body
@@ -458,7 +458,7 @@ router.post(
 router.post(
   "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/confirm",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const pathParsed = pathParamsSchema.safeParse(req.params);
@@ -498,7 +498,7 @@ router.post(
 router.post(
   "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/unconfirm",
   authenticate,
-  requireFeature(Feature.BACK_TO_SCHOOL),
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const pathParsed = pathParamsSchema.safeParse(req.params);

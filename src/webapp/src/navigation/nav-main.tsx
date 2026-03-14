@@ -32,6 +32,7 @@ export function NavMain({
     url: string;
     icon?: LucideIcon | ComponentType<{ className?: string }>;
     isActive?: boolean;
+    badge?: string;
     items?: {
       title: string;
       url: string;
@@ -60,6 +61,11 @@ export function NavMain({
                   <Link to={item.url}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
+                    {item.badge && (
+                      <span className="flex h-4 items-center rounded-full px-1.5 text-[10px] font-semibold leading-none bg-destructive text-destructive-foreground -mt-2 group-data-[collapsible=icon]:hidden">
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
