@@ -35,6 +35,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/shadcn/components/tabs";
 import {
   getCustomerBids,
+  getCustomerBidStats,
   getCustomerBidFilterOptions,
   updateCustomerBid,
   confirmCustomerBid,
@@ -46,6 +47,7 @@ import type {
   CustomerBidDto,
   CustomerBidFilters,
   CustomerBidFilterOptions,
+  CustomerBidStatsDto,
   PaginationDto,
   SchoolYear,
   DateRangeDto,
@@ -169,9 +171,19 @@ function parseFiltersFromURL(
 }
 
 /**
+ * Page-level defaults that should be omitted from the URL when unchanged.
+ */
+interface FilterDefaults {
+  confirmed?: boolean;
+}
+
+/**
  * Convert filters to URL params (only include non-default values)
  */
-function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
+function filtersToURLParams(
+  filters: CustomerBidFilters,
+  defaults: FilterDefaults = {}
+): URLSearchParams {
   const params = new URLSearchParams();
 
   if (filters.page && filters.page !== 1)
@@ -191,8 +203,11 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.isNew !== undefined) {
     params.set("isNew", filters.isNew.toString());
   }
-  // Always include confirmed in URL (false is default, true means showing confirmed only)
-  if (filters.confirmed !== undefined) {
+  // Only include confirmed/exported/queued when they differ from page defaults
+  if (
+    filters.confirmed !== undefined &&
+    filters.confirmed !== defaults.confirmed
+  ) {
     params.set("confirmed", filters.confirmed.toString());
   }
   if (filters.exported !== undefined) {
@@ -201,6 +216,7 @@ function filtersToURLParams(filters: CustomerBidFilters): URLSearchParams {
   if (filters.queued !== undefined) {
     params.set("queued", filters.queued.toString());
   }
+  // Always include excludeItemPrefixes in URL when active
   if (filters.excludeItemPrefixes) {
     params.set("excludeItemPrefixes", filters.excludeItemPrefixes);
   }
@@ -225,8 +241,11 @@ interface CustomerBidsProps {
   defaultExcludeItemPrefixes?: string;
   /** Columns that cannot be hidden by the user (always visible in table and export) */
   alwaysVisibleColumns?: string[];
-  /** Optional content rendered between the page header and the toolbar */
-  headerSlot?: React.ReactNode;
+  /** Optional content rendered between the page header and the toolbar.
+   *  When a function, receives stats data and is re-rendered on every stats refresh. */
+  headerSlot?:
+    | React.ReactNode
+    | ((stats: CustomerBidStatsDto | null) => React.ReactNode);
 }
 
 export default function CustomerBids({
@@ -253,7 +272,6 @@ export default function CustomerBids({
     !roles.some((r) => r.enumKey === "ADMIN" || r.enumKey === "DEMAND_PLANNER");
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const isInitialMount = useRef(true);
   const isUrlSyncInitMount = useRef(true);
 
   const [bids, setBids] = useState<CustomerBidDto[]>([]);
@@ -261,6 +279,8 @@ export default function CustomerBids({
   const [dateRange, setDateRange] = useState<DateRangeDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<CustomerBidStatsDto | null>(null);
+  const hasStatsSlot = typeof headerSlot === "function";
 
   // Filter state - initialized from URL params
   const [filters, setFilters] = useState<CustomerBidFilters>(() =>
@@ -374,24 +394,43 @@ export default function CustomerBids({
     [filters.schoolYear]
   );
 
-  const fetchData = useCallback(async (currentFilters: CustomerBidFilters) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await getCustomerBids(currentFilters);
-      setBids(response.data);
-      setMenuMonthOverrides(new Map());
-      setPagination(response.pagination);
-      setDateRange(response.dateRange);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to fetch customer bids";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const refreshStats = useCallback(
+    async (currentFilters: CustomerBidFilters) => {
+      if (!hasStatsSlot) return;
+      try {
+        const data = await getCustomerBidStats(currentFilters);
+        setStats(data);
+      } catch {
+        setStats(null);
+      }
+    },
+    [hasStatsSlot]
+  );
+
+  const fetchData = useCallback(
+    async (currentFilters: CustomerBidFilters) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [response] = await Promise.all([
+          getCustomerBids(currentFilters),
+          refreshStats(currentFilters),
+        ]);
+        setBids(response.data);
+        setMenuMonthOverrides(new Map());
+        setPagination(response.pagination);
+        setDateRange(response.dateRange);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to fetch customer bids";
+        setError(message);
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [refreshStats]
+  );
 
   useEffect(() => {
     void fetchData(filters);
@@ -437,27 +476,35 @@ export default function CustomerBids({
     void fetchFilterOptions();
   }, [filterSheetOpen]);
 
-  // Sync filters to URL (skip on initial mount to avoid double navigation)
+  // Defaults to omit from URL when unchanged
+  const filterDefaults = useMemo<FilterDefaults>(
+    () => ({ confirmed: defaultConfirmed }),
+    [defaultConfirmed]
+  );
+
+  // Sync filters to URL (includes initial mount so defaults appear in URL)
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    const newParams = filtersToURLParams(filters);
+    const newParams = filtersToURLParams(filters, filterDefaults);
     setSearchParams(newParams, { replace: true });
-  }, [filters, setSearchParams]);
+  }, [filters, filterDefaults, setSearchParams]);
 
   // Sync URL changes back to filters (for browser back/forward)
   useEffect(() => {
     // Skip initial mount — useState initializer already applied defaults
     if (isUrlSyncInitMount.current) {
       isUrlSyncInitMount.current = false;
-      return;
+      return () => {
+        isUrlSyncInitMount.current = true;
+      };
     }
-    // Don't pass defaultExported/defaultQueued here: missing URL params
-    // should mean "no filter" (All), not fall back to page defaults.
-    // Defaults are only applied on initial mount via useState.
-    const urlFilters = parseFiltersFromURL(searchParams, defaultConfirmed);
+    // Pass all defaults so missing URL params restore page defaults (not "no filter")
+    const urlFilters = parseFiltersFromURL(
+      searchParams,
+      defaultConfirmed,
+      defaultExported,
+      defaultQueued,
+      defaultExcludeItemPrefixes
+    );
     const currentFiltersStr = JSON.stringify({
       ...filters,
       // Normalize undefined to match URL parsing
@@ -488,6 +535,7 @@ export default function CustomerBids({
       setExportedFilter(urlFilters.exported);
       setQueuedFilter(urlFilters.queued);
     }
+    return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Intentionally not including filters to avoid loop
 
@@ -547,8 +595,7 @@ export default function CustomerBids({
     setFilters((prev) => ({ ...prev, page: 1, limit: newSize }));
   };
 
-  const excludePrefixesChanged =
-    filterInputs.excludeItemPrefixes !== (defaultExcludeItemPrefixes || "");
+  const excludePrefixesActive = !!filterInputs.excludeItemPrefixes;
 
   const hasActiveFilters = Boolean(
     filterInputs.siteCode ||
@@ -558,9 +605,11 @@ export default function CustomerBids({
       filterInputs.itemCode ||
       filterInputs.erpStatus ||
       filterInputs.coOpCode ||
-      excludePrefixesChanged ||
+      excludePrefixesActive ||
       isNewFilter !== "all" ||
-      (showConfirmedFilter && confirmedFilter)
+      (showConfirmedFilter && confirmedFilter) ||
+      exportedFilter !== undefined ||
+      queuedFilter !== undefined
   );
 
   const activeFilterCount = [
@@ -571,9 +620,11 @@ export default function CustomerBids({
     filterInputs.itemCode,
     filterInputs.erpStatus,
     filterInputs.coOpCode,
-    excludePrefixesChanged,
+    excludePrefixesActive,
     isNewFilter !== "all",
     showConfirmedFilter && confirmedFilter,
+    exportedFilter !== undefined,
+    queuedFilter !== undefined,
   ].filter(Boolean).length;
 
   // Handle cell updates for editable columns
@@ -651,6 +702,7 @@ export default function CustomerBids({
           )
         );
         toast.success("Bid confirmed");
+        void refreshStats(filters);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to confirm";
@@ -658,7 +710,7 @@ export default function CustomerBids({
         throw err;
       }
     },
-    [filters.schoolYear]
+    [filters.schoolYear, filters, refreshStats]
   );
 
   const handleUnconfirm = useCallback(
@@ -685,6 +737,7 @@ export default function CustomerBids({
           )
         );
         toast.success("Confirmation removed");
+        void refreshStats(filters);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to unconfirm";
@@ -692,7 +745,7 @@ export default function CustomerBids({
         throw err;
       }
     },
-    [filters.schoolYear]
+    [filters.schoolYear, filters, refreshStats]
   );
 
   // Get menu month state for a bid: use override if available, otherwise derive from estimates
@@ -782,6 +835,7 @@ export default function CustomerBids({
           `${result.failed} record${result.failed !== 1 ? "s" : ""} failed`
         );
       }
+      void refreshStats(filters);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to confirm bids";
@@ -789,7 +843,7 @@ export default function CustomerBids({
     } finally {
       setIsConfirmingAll(false);
     }
-  }, [confirmableBids, filters.schoolYear]);
+  }, [confirmableBids, filters.schoolYear, filters, refreshStats]);
 
   // Determine which view mode we're in for column rendering
   const isViewingQueued = queuedFilter === true;
@@ -860,7 +914,7 @@ export default function CustomerBids({
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
 
-      {headerSlot}
+      {typeof headerSlot === "function" ? headerSlot(stats) : headerSlot}
 
       {/* School Year Tabs + Toolbar */}
       <div className="shrink-0 flex items-center gap-2 flex-wrap">

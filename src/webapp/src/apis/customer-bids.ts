@@ -86,8 +86,12 @@ export async function getCustomerBidStats(
   if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
   if (filters?.isNew !== undefined)
     params.set("isNew", filters.isNew.toString());
-  // Note: confirmed, exported, queued filters are intentionally excluded —
-  // stats should always reflect the full dataset for the given filters.
+  if (filters?.confirmed !== undefined)
+    params.set("confirmed", filters.confirmed.toString());
+  if (filters?.exported !== undefined)
+    params.set("exported", filters.exported.toString());
+  if (filters?.queued !== undefined)
+    params.set("queued", filters.queued.toString());
   if (filters?.excludeItemPrefixes)
     params.set("excludeItemPrefixes", filters.excludeItemPrefixes);
 
