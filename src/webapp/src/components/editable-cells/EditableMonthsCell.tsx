@@ -27,6 +27,8 @@ interface EditableMonthsCellProps {
   onSave: (updates: UpdateCustomerBidDto) => Promise<void>;
   /** Callback to update local menu month state in parent (no API call) */
   onMonthsChange: (months: Record<MonthKey, boolean>) => void;
+  /** LY values keyed by estimateKey — used to pre-fill estimates for newly selected months */
+  prefillEstimates?: Partial<Record<string, number | null>>;
 }
 
 export function EditableMonthsCell({
@@ -35,6 +37,7 @@ export function EditableMonthsCell({
   disabled = false,
   onSave,
   onMonthsChange,
+  prefillEstimates = {},
 }: EditableMonthsCellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -91,6 +94,17 @@ export function EditableMonthsCell({
         if (monthValues[em.menuKey] && !localMonths[em.menuKey]) {
           (updates as Record<string, unknown>)[em.estimateKey] = null;
           hasApiUpdates = true;
+        }
+      }
+
+      // For months toggled ON (were OFF, now ON), prefill with LY value
+      for (const em of ESTIMATE_MONTHS) {
+        if (!monthValues[em.menuKey] && localMonths[em.menuKey]) {
+          const lyValue = prefillEstimates[em.estimateKey];
+          if (lyValue != null) {
+            (updates as Record<string, unknown>)[em.estimateKey] = lyValue;
+            hasApiUpdates = true;
+          }
         }
       }
 

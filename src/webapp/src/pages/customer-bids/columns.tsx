@@ -862,11 +862,25 @@ export function createColumns(
       cell: ({ row }) => {
         const isConfirmed = !!row.original.confirmedAt;
         const menuMonths = getMenuMonths(row.original);
+
+        // Build prefill map: estimateKey → LY value
+        const prefillEstimates: Record<string, number | null> = {};
+        for (const em of ESTIMATE_MONTHS) {
+          const lyMonth = LY_MONTHS.find((ly) => ly.menuKey === em.menuKey);
+          if (lyMonth) {
+            prefillEstimates[em.estimateKey] =
+              (row.original[lyMonth.lyKey as keyof CustomerBidDto] as
+                | number
+                | null) ?? null;
+          }
+        }
+
         return (
           <EditableMonthsCell
             monthValues={menuMonths}
             yearAround={row.original.yearAround}
             disabled={isConfirmed}
+            prefillEstimates={prefillEstimates}
             onSave={async (updates) => {
               await onCellUpdate(row.original, updates);
             }}
