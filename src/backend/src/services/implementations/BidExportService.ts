@@ -53,6 +53,7 @@ interface QueuedBidRow {
   erpStatus: string | null;
   lastYearBidQty: Prisma.Decimal | null;
   lastYearActual: Prisma.Decimal | null;
+  ytdUsage: Prisma.Decimal | null;
   lyAugust: Prisma.Decimal | null;
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
@@ -747,6 +748,7 @@ export class BidExportService implements IBidExportService {
           cbd.erp_status AS "erpStatus",
           cbd.last_year_bid_qty AS "lastYearBidQty",
           cbd.last_year_actual AS "lastYearActual",
+          cbd.ytd_usage AS "ytdUsage",
           cbd.ly_august AS "lyAugust",
           cbd.ly_september AS "lySeptember",
           cbd.ly_october AS "lyOctober",
@@ -905,6 +907,7 @@ export class BidExportService implements IBidExportService {
       bidQuantity: decimalToNumber(row.bidQty),
       lastYearBidQty: decimalToNumber(row.lastYearBidQty),
       lastYearActual: decimalToNumber(row.lastYearActual),
+      ytdUsage: decimalToNumber(row.ytdUsage),
       lyAugust: decimalToNumber(row.lyAugust),
       lySeptember: decimalToNumber(row.lySeptember),
       lyOctober: decimalToNumber(row.lyOctober),

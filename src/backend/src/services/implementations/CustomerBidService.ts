@@ -63,6 +63,7 @@ interface BaseBidRow {
   // From customer_bid_data table (LEFT JOIN)
   lastYearBidQty: Prisma.Decimal | null;
   lastYearActual: Prisma.Decimal | null;
+  ytdUsage: Prisma.Decimal | null;
   lyAugust: Prisma.Decimal | null;
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
@@ -196,6 +197,7 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.erp_status AS "erpStatus",
             cbd.last_year_bid_qty AS "lastYearBidQty",
             cbd.last_year_actual AS "lastYearActual",
+            cbd.ytd_usage AS "ytdUsage",
             cbd.ly_august AS "lyAugust",
             cbd.ly_september AS "lySeptember",
             cbd.ly_october AS "lyOctober",
@@ -273,6 +275,7 @@ export class CustomerBidService implements ICustomerBidService {
         bidQuantity: row.bidQty ? Number(row.bidQty) : null,
         lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
         lastYearActual: row.lastYearActual ? Number(row.lastYearActual) : null,
+        ytdUsage: row.ytdUsage ? Number(row.ytdUsage) : null,
         lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
         lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
         lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
@@ -709,6 +712,7 @@ export class CustomerBidService implements ICustomerBidService {
     itemNo: string;
     lastYearBidQty: Prisma.Decimal | null;
     lastYearActual: Prisma.Decimal | null;
+    ytdUsage: Prisma.Decimal | null;
     lyAugust: Prisma.Decimal | null;
     lySeptember: Prisma.Decimal | null;
     lyOctober: Prisma.Decimal | null;
@@ -763,6 +767,7 @@ export class CustomerBidService implements ICustomerBidService {
       bidQuantity: null,
       lastYearBidQty: decimalToNumber(record.lastYearBidQty),
       lastYearActual: decimalToNumber(record.lastYearActual),
+      ytdUsage: decimalToNumber(record.ytdUsage),
       lyAugust: decimalToNumber(record.lyAugust),
       lySeptember: decimalToNumber(record.lySeptember),
       lyOctober: decimalToNumber(record.lyOctober),

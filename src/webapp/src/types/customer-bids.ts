@@ -52,6 +52,8 @@ export interface CustomerBidDto {
   lastYearBidQty: number | null;
   /** Last year school year total sales amount */
   lastYearActual: number | null;
+  /** Year-to-date usage total for the current school year */
+  ytdUsage: number | null;
   /** Last year August sales amount */
   lyAugust: number | null;
   /** Last year September sales amount */
