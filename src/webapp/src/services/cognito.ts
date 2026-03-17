@@ -131,8 +131,17 @@ function sanitize(value: unknown): string {
 function parseGroups(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value.map(String);
-  const str = String(value).trim();
+
+  let str = String(value).trim();
   if (!str) return [];
+
+  // Azure AD may wrap groups in brackets: "[uuid1, uuid2]"
+  if (str.startsWith("[") && str.endsWith("]")) {
+    str = str.slice(1, -1).trim();
+  }
+
+  if (!str) return [];
+
   return str
     .split(",")
     .map((g) => g.trim())

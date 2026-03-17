@@ -13,7 +13,6 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
 
 env:
   NODE_VERSION: "24"
@@ -279,17 +278,11 @@ jobs:
     name: Promote to Production
     needs: [setup, deploy-dev]
     runs-on: ubuntu-latest
+    environment: production-approval
 
     steps:
-      - name: Approval gate
-        uses: trstringer/manual-approval@v1
-        with:
-          secret: ${{ github.TOKEN }}
-          approvers: bakhrom-cc, christianstayton
-          minimum-approvals: 1
-          issue-title: "Deploy ${{ github.workflow }} to production"
-          issue-body: "Commit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\n\nPlease comment **approved** or **denied**."
-          exclude-workflow-initiator-as-approver: false
+      - name: Approval confirmed
+        run: echo "Production deployment approved for ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 
   build-prod-and-save:
     name: Build Prod & Save Artifact
