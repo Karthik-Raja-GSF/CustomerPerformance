@@ -30,6 +30,7 @@ export interface BackendConstructProps {
   ecrRepository: ecr.IRepository;
   databaseSecret: secretsmanager.ISecret;
   siqSecret: secretsmanager.ISecret;
+  jiraSecret: secretsmanager.ISecret;
   cognitoUserPoolId: string;
   cognitoClientId: string;
   serviceAccountUserPoolId?: string;
@@ -59,6 +60,7 @@ export class BackendConstruct extends Construct {
       ecrRepository,
       databaseSecret,
       siqSecret,
+      jiraSecret,
       cognitoUserPoolId,
       cognitoClientId,
       domainName,
@@ -211,6 +213,14 @@ export class BackendConstruct extends Construct {
         // StockIQ API credentials
         STOCKIQ_USERNAME: ecs.Secret.fromSecretsManager(siqSecret, "username"),
         STOCKIQ_PASSWORD: ecs.Secret.fromSecretsManager(siqSecret, "password"),
+        // Jira API credentials (issue reporting)
+        JIRA_EMAIL: ecs.Secret.fromSecretsManager(jiraSecret, "email"),
+        JIRA_API_TOKEN: ecs.Secret.fromSecretsManager(jiraSecret, "apiToken"),
+        JIRA_BASE_URL: ecs.Secret.fromSecretsManager(jiraSecret, "baseUrl"),
+        JIRA_PROJECT_KEY: ecs.Secret.fromSecretsManager(
+          jiraSecret,
+          "projectKey"
+        ),
       },
       healthCheck: {
         command: [
@@ -298,6 +308,7 @@ export class BackendConstruct extends Construct {
     // Grant read access to the database secret (explicit grant for proper IAM policy)
     databaseSecret.grantRead(taskDefinition.executionRole!);
     siqSecret.grantRead(taskDefinition.executionRole!);
+    jiraSecret.grantRead(taskDefinition.executionRole!);
 
     // Security Group for ECS Service (always created — shared ALB wiring adds rules externally)
     const serviceSecurityGroup = new ec2.SecurityGroup(

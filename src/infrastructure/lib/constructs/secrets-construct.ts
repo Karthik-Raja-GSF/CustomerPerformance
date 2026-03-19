@@ -20,6 +20,7 @@ export interface SecretsConstructProps {
 export class SecretsConstruct extends Construct {
   public readonly dw2Secret: secretsmanager.Secret;
   public readonly siqSecret: secretsmanager.Secret;
+  public readonly jiraSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: SecretsConstructProps) {
     super(scope, id);
@@ -66,5 +67,25 @@ export class SecretsConstruct extends Construct {
     });
 
     addStandardTags(this.siqSecret, naming.env, siqSecretName);
+
+    // Jira API secret (email + API token for issue reporting)
+    // Credentials are placeholders - update manually after deployment
+    const jiraSecretName = n.name(ResourceTypes.SECRETS_MANAGER, "jira", "01");
+    this.jiraSecret = new secretsmanager.Secret(this, "JiraSecret", {
+      secretName: jiraSecretName,
+      description: `${envName.toUpperCase()} - Jira API credentials (issue reporting)`,
+      secretObjectValue: {
+        email: cdk.SecretValue.unsafePlainText("PLACEHOLDER_UPDATE_MANUALLY"),
+        apiToken: cdk.SecretValue.unsafePlainText(
+          "PLACEHOLDER_UPDATE_MANUALLY"
+        ),
+        baseUrl: cdk.SecretValue.unsafePlainText(
+          "https://gsfoodsgroup.atlassian.net"
+        ),
+        projectKey: cdk.SecretValue.unsafePlainText("ATV"),
+      },
+    });
+
+    addStandardTags(this.jiraSecret, naming.env, jiraSecretName);
   }
 }

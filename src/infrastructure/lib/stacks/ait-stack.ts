@@ -270,6 +270,7 @@ export class AitStack extends cdk.Stack {
       ecrRepository: ecrConstruct.repository,
       databaseSecret: databaseConstruct.secret,
       siqSecret: secretsConstruct.siqSecret,
+      jiraSecret: secretsConstruct.jiraSecret,
       cognitoUserPoolId: authConstruct.userPool.userPoolId,
       cognitoClientId: authConstruct.userPoolClient.userPoolClientId,
       serviceAccountUserPoolId: svcAuthConstruct.userPool.userPoolId,
@@ -556,6 +557,11 @@ export class AitStack extends cdk.Stack {
     new cdk.CfnOutput(this, "SiqSecretArn", {
       value: secretsConstruct.siqSecret.secretArn,
       description: "Stock IQ API Credentials Secret ARN",
+    });
+
+    new cdk.CfnOutput(this, "JiraSecretArn", {
+      value: secretsConstruct.jiraSecret.secretArn,
+      description: "Jira API Credentials Secret ARN",
     });
 
     // DMS Outputs
