@@ -55,6 +55,8 @@ import {
   EO_RISK_REVIEW_SERVICE_TOKEN,
 } from "@/services/IEoRiskReviewService";
 import { EoRiskReviewService } from "@/services/implementations/EoRiskReviewService";
+import { IJiraService, JIRA_SERVICE_TOKEN } from "@/services/IJiraService";
+import { JiraService } from "@/services/implementations/JiraService";
 
 /**
  * DI Container Configuration
@@ -128,6 +130,11 @@ export function setupContainer(prisma: PrismaClient): void {
   // Register EoRiskReviewService for E&O risk item identification
   container.register<IEoRiskReviewService>(EO_RISK_REVIEW_SERVICE_TOKEN, {
     useClass: EoRiskReviewService,
+  });
+
+  // Register JiraService for Jira API integration (issue reporting)
+  container.register<IJiraService>(JIRA_SERVICE_TOKEN, {
+    useClass: JiraService,
   });
 
   // Register SchedulerService for in-app scheduled tasks

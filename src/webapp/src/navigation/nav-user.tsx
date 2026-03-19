@@ -40,6 +40,7 @@ export function NavUser() {
   const { isMobile } = useSidebar();
   const { user, logout, changePassword } = useAuth();
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

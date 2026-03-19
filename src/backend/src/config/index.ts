@@ -81,6 +81,15 @@ export const config = {
     // Push method (API/FTP) is TBD — leave disabled until decided
     processCronExpression: process.env.BID_EXPORT_PROCESS_CRON || "",
   },
+  // Jira API Configuration
+  // Credentials are injected from AWS Secrets Manager at runtime
+  jira: {
+    baseUrl: process.env.JIRA_BASE_URL || "",
+    projectKey: process.env.JIRA_PROJECT_KEY || "",
+    email: process.env.JIRA_EMAIL || "",
+    apiToken: process.env.JIRA_API_TOKEN || "",
+    timeoutMs: parseInt(process.env.JIRA_TIMEOUT_MS || "15000", 10),
+  },
   // RBAC Configuration
   // When enabled=false (default), all authorization is bypassed — all users get full access.
   // Set RBAC_ENABLED=true and configure RBAC_GROUP_* env vars to enforce feature-based access.
