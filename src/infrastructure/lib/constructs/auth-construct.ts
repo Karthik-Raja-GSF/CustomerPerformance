@@ -113,6 +113,8 @@ export class AuthConstruct extends Construct {
         {
           userPool: this.userPool,
           name: idpAdName,
+          // SAML SLO only works in prod (Azure AD SLO URL points to prod Cognito domain)
+          idpSignout: isProd,
           metadata: cognito.UserPoolIdentityProviderSamlMetadata.url(
             props.azureAdMetadataUrl
           ),
@@ -240,21 +242,15 @@ export class AuthConstruct extends Construct {
         logoutUrls: [
           frontendUrl,
           `${frontendUrl}/login`,
-          `${frontendUrl}/login?sso_logout=1`,
           // Additional frontend URLs
           ...(props.additionalFrontendUrls || []).flatMap((url) => [
             url,
             `${url}/login`,
-            `${url}/login?sso_logout=1`,
           ]),
           // Only include localhost for non-production
           ...(isProd
             ? []
-            : [
-                "http://localhost:3030",
-                "http://localhost:3030/login",
-                "http://localhost:3030/login?sso_logout=1",
-              ]),
+            : ["http://localhost:3030", "http://localhost:3030/login"]),
         ],
       },
       preventUserExistenceErrors: true,
