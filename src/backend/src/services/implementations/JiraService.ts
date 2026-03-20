@@ -1,6 +1,6 @@
 import { injectable } from "tsyringe";
 import { config } from "@/config/index";
-import type { IJiraService } from "@/services/IJiraService";
+import type { IJiraService, AttachmentFile } from "@/services/IJiraService";
 import type {
   CreateIssueReportDto,
   IssueReportResultDto,
@@ -100,6 +100,85 @@ export class JiraService implements IJiraService {
         "Jira request error"
       );
       throw new JiraApiError(`Jira request failed: ${message}`);
+    }
+  }
+
+  /**
+   * Attach files to an existing Jira issue (best-effort)
+   */
+  async attachFiles(issueKey: string, files: AttachmentFile[]): Promise<void> {
+    if (files.length === 0) return;
+
+    this.validateConfig();
+
+    const { baseUrl, email, apiToken, timeoutMs } = config.jira;
+    const authHeader =
+      "Basic " + Buffer.from(`${email}:${apiToken}`).toString("base64");
+
+    for (const file of files) {
+      const formData = new FormData();
+      const blob = new Blob([file.buffer], { type: file.mimetype });
+      formData.append("file", blob, file.originalname);
+
+      logger.info(
+        {
+          event: "jira.attach.start",
+          issueKey,
+          filename: file.originalname,
+          size: file.size,
+        },
+        `Attaching ${file.originalname} to ${issueKey}`
+      );
+
+      try {
+        const response = await fetch(
+          `${baseUrl}/rest/api/3/issue/${issueKey}/attachments`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: authHeader,
+              "X-Atlassian-Token": "no-check",
+            },
+            body: formData,
+            signal: AbortSignal.timeout(timeoutMs),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "Unknown error");
+          logger.error(
+            {
+              event: "jira.attach.failed",
+              issueKey,
+              filename: file.originalname,
+              statusCode: response.status,
+              error: errorText,
+            },
+            `Failed to attach ${file.originalname} to ${issueKey}`
+          );
+        } else {
+          logger.info(
+            {
+              event: "jira.attach.success",
+              issueKey,
+              filename: file.originalname,
+            },
+            `Attached ${file.originalname} to ${issueKey}`
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error(
+          {
+            event: "jira.attach.error",
+            issueKey,
+            filename: file.originalname,
+            error: message,
+          },
+          `Error attaching ${file.originalname} to ${issueKey}`
+        );
+      }
     }
   }
 

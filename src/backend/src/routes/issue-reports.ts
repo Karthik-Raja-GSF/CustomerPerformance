@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction, IRouter } from "express";
 import { z } from "zod";
+import multer from "multer";
 import { container } from "tsyringe";
 import { IJiraService, JIRA_SERVICE_TOKEN } from "@/services/IJiraService";
 import { authenticate } from "@/middleware/authenticate";
@@ -8,7 +9,16 @@ import { JiraApiError, JiraConfigError } from "@/utils/errors/jira-errors";
 
 const router: IRouter = Router();
 
-// Validation schema
+// Multer for file attachments (diagnostics + screenshot)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+    files: 4, // console-logs, network-logs, page-details, screenshot
+  },
+});
+
+// Validation schema (text fields from FormData)
 const createIssueReportSchema = z.object({
   summary: z.string().min(5).max(255),
   description: z.string().min(10).max(5000),
@@ -48,21 +58,29 @@ function handleJiraError(
 
 /**
  * POST /issue-reports
- * Submit a bug report to Jira
+ * Submit a bug report to Jira with optional file attachments
  */
 router.post(
   "/",
   authenticate,
+  upload.array("attachments", 4),
   validateRequest(createIssueReportSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const jiraService = container.resolve<IJiraService>(JIRA_SERVICE_TOKEN);
 
+      // Step 1: Create the issue
       const result = await jiraService.createIssue({
         ...req.body,
         reporterName: `${req.user!.firstName} ${req.user!.lastName}`,
         reporterEmail: req.user!.email,
       });
+
+      // Step 2: Attach diagnostic files (best-effort)
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (files && files.length > 0) {
+        await jiraService.attachFiles(result.issueKey, files);
+      }
 
       res.status(201).json({
         status: "success",

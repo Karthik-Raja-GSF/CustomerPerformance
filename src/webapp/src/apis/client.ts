@@ -4,9 +4,10 @@
  * Centralized HTTP client with error handling, type safety, and authentication
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8887';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8887";
 // Use ID token for API calls - backend verifies Cognito ID tokens
-const TOKEN_KEY = 'id_token';
+const TOKEN_KEY = "id_token";
 const MAX_REFRESH_RETRIES = 1;
 
 export class ApiError extends Error {
@@ -15,7 +16,7 @@ export class ApiError extends Error {
 
   constructor(status: number, message: string, data?: unknown) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.status = status;
     this.data = data;
   }
@@ -24,6 +25,7 @@ export class ApiError extends Error {
 interface RequestConfig extends RequestInit {
   params?: Record<string, string>;
   skipAuth?: boolean;
+  rawBody?: FormData;
 }
 
 type RefreshTokenCallback = () => Promise<void>;
@@ -64,7 +66,10 @@ class ApiClient {
     this.failedQueue = [];
   }
 
-  private async request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    config: RequestConfig = {}
+  ): Promise<T> {
     const { params, skipAuth, ...fetchConfig } = config;
 
     // Build URL with query parameters
@@ -74,9 +79,9 @@ class ApiClient {
       url += `?${queryString}`;
     }
 
-    // Set default headers
+    // Set default headers (skip Content-Type for FormData — browser sets it with boundary)
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(config.rawBody ? {} : { "Content-Type": "application/json" }),
       ...config.headers,
     };
 
@@ -84,7 +89,8 @@ class ApiClient {
     if (!skipAuth) {
       const token = localStorage.getItem(TOKEN_KEY);
       if (token) {
-        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+        (headers as Record<string, string>)["Authorization"] =
+          `Bearer ${token}`;
       }
     }
 
@@ -92,18 +98,19 @@ class ApiClient {
       const response = await fetch(url, {
         ...fetchConfig,
         headers,
+        ...(config.rawBody ? { body: config.rawBody } : {}),
       });
 
       // Handle non-JSON responses
-      const contentType = response.headers.get('content-type');
-      const isJson = contentType?.includes('application/json');
+      const contentType = response.headers.get("content-type");
+      const isJson = contentType?.includes("application/json");
 
       // Handle 401 Unauthorized - attempt token refresh (with retry limit)
       if (response.status === 401 && !skipAuth && this.refreshTokenCallback) {
         // Check if we've exceeded max refresh attempts
         if (this.refreshAttempts >= MAX_REFRESH_RETRIES) {
           this.refreshAttempts = 0;
-          throw new ApiError(401, 'Session expired. Please log in again.');
+          throw new ApiError(401, "Session expired. Please log in again.");
         }
 
         // If already refreshing, queue this request
@@ -132,7 +139,7 @@ class ApiClient {
           // Token refresh failed, reject all queued requests
           this.processQueue(refreshError as Error);
           this.refreshAttempts = 0;
-          throw new ApiError(401, 'Session expired. Please log in again.');
+          throw new ApiError(401, "Session expired. Please log in again.");
         } finally {
           this.isRefreshing = false;
         }
@@ -150,7 +157,11 @@ class ApiClient {
         if (isJson) {
           try {
             errorData = await response.json();
-            if (errorData && typeof errorData === 'object' && 'message' in errorData) {
+            if (
+              errorData &&
+              typeof errorData === "object" &&
+              "message" in errorData
+            ) {
               errorMessage = (errorData as { message: string }).message;
             }
           } catch {
@@ -180,7 +191,7 @@ class ApiClient {
       }
 
       // Unknown errors
-      throw new ApiError(0, 'An unknown error occurred');
+      throw new ApiError(0, "An unknown error occurred");
     }
   }
 
@@ -199,35 +210,59 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: 'GET' });
+    return this.request<T>(endpoint, { ...config, method: "GET" });
   }
 
-  async post<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
+  async post<T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig
+  ): Promise<T> {
     return this.request<T>(endpoint, {
       ...config,
-      method: 'POST',
+      method: "POST",
       body: data ? JSON.stringify(data) : undefined,
     });
   }
 
-  async patch<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
+  async patch<T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig
+  ): Promise<T> {
     return this.request<T>(endpoint, {
       ...config,
-      method: 'PATCH',
+      method: "PATCH",
       body: data ? JSON.stringify(data) : undefined,
     });
   }
 
-  async put<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
+  async put<T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig
+  ): Promise<T> {
     return this.request<T>(endpoint, {
       ...config,
-      method: 'PUT',
+      method: "PUT",
       body: data ? JSON.stringify(data) : undefined,
     });
   }
 
   async delete<T>(endpoint: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, { ...config, method: 'DELETE' });
+    return this.request<T>(endpoint, { ...config, method: "DELETE" });
+  }
+
+  async postFormData<T>(
+    endpoint: string,
+    formData: FormData,
+    config?: RequestConfig
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...config,
+      method: "POST",
+      rawBody: formData,
+    });
   }
 }
 

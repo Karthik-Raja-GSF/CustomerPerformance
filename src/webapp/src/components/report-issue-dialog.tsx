@@ -3,6 +3,7 @@ import { Bug, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { submitIssueReport } from "@/apis/issue-reports";
+import { useDiagnostics } from "@/hooks/use-diagnostics";
 import { Button } from "@/shadcn/components/button";
 import {
   Dialog,
@@ -16,14 +17,42 @@ import { Input } from "@/shadcn/components/input";
 import { Label } from "@/shadcn/components/label";
 import { Textarea } from "@/shadcn/components/textarea";
 
+async function captureScreenshot(): Promise<Blob | null> {
+  const overlays = document.querySelectorAll("[data-radix-portal]");
+  overlays.forEach((el) => {
+    (el as HTMLElement).style.visibility = "hidden";
+  });
+  await new Promise((r) => requestAnimationFrame(r));
+
+  try {
+    const domtoimage = await import("dom-to-image-more");
+    const blob = await domtoimage.toBlob(document.body, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    return blob;
+  } catch (error) {
+    console.error("Screenshot capture failed:", error);
+    return null;
+  } finally {
+    overlays.forEach((el) => {
+      (el as HTMLElement).style.visibility = "";
+    });
+  }
+}
+
 export function ReportIssueFab() {
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
+  const [isCollecting, setIsCollecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedIssueKey, setSubmittedIssueKey] = useState<string | null>(
     null
   );
+  const { collectDiagnostics } = useDiagnostics();
+
+  const isBusy = isCollecting || isSubmitting;
 
   const resetForm = () => {
     setSummary("");
@@ -49,6 +78,13 @@ export function ReportIssueFab() {
       return;
     }
 
+    // Step 1: Collect diagnostics + screenshot
+    setIsCollecting(true);
+    const diagnostics = collectDiagnostics();
+    const screenshot = await captureScreenshot();
+    setIsCollecting(false);
+
+    // Step 2: Submit to backend
     setIsSubmitting(true);
     try {
       const result = await submitIssueReport({
@@ -57,6 +93,8 @@ export function ReportIssueFab() {
         pageUrl: window.location.href,
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
+        diagnostics,
+        screenshot,
       });
 
       setSubmittedIssueKey(result.issueKey);
@@ -68,6 +106,12 @@ export function ReportIssueFab() {
       setIsSubmitting(false);
     }
   };
+
+  const buttonText = isCollecting
+    ? "Collecting diagnostics..."
+    : isSubmitting
+      ? "Submitting..."
+      : "Submit Report";
 
   return (
     <>
@@ -142,12 +186,12 @@ export function ReportIssueFab() {
                 <Button
                   variant="outline"
                   onClick={() => handleClose(false)}
-                  disabled={isSubmitting}
+                  disabled={isBusy}
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? "Submitting..." : "Submit Report"}
+                <Button onClick={handleSubmit} disabled={isBusy}>
+                  {buttonText}
                 </Button>
               </DialogFooter>
             </>

@@ -12,6 +12,10 @@ import "@fontsource/source-code-pro/400.css";
 import "@fontsource/source-code-pro/500.css";
 
 import "./index.css";
+import { initDiagnostics } from "@/hooks/use-diagnostics";
+
+initDiagnostics();
+
 import App from "./App.tsx";
 import { AuthProvider } from "@/contexts/auth-context";
 import { PermissionsProvider } from "@/contexts/permissions-context";
