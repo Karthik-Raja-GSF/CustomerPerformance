@@ -5,6 +5,7 @@ import { FeatureGuard } from "@/components/feature-guard";
 import AIAgent from "@/pages/AIAgent";
 import Settings from "@/pages/Settings";
 import Prompts from "@/pages/settings/Prompts";
+import RbacAdmin from "@/pages/settings/RbacAdmin";
 import StockiqSync from "@/pages/StockiqSync";
 import CustomerBidsSync from "@/pages/CustomerBidsSync";
 import DemandValidationTool from "@/pages/DemandValidationTool";
@@ -33,6 +34,7 @@ export const routes = [
   { path: "/bid-export-history", title: "Bid Items Export History" },
   { path: "/eo/risk-review", title: "Risk Review" },
   { path: "/settings", title: "Settings - Prompts" },
+  { path: "/settings/rbac", title: "Settings - Access Control" },
 ];
 
 function App() {
@@ -113,15 +115,23 @@ function App() {
               </FeatureGuard>
             }
           />
-          <Route
-            path="/settings"
-            element={
-              <FeatureGuard feature={Feature.PROMPT_BUILDER}>
-                <Settings />
-              </FeatureGuard>
-            }
-          >
-            <Route index element={<Prompts />} />
+          <Route path="/settings" element={<Settings />}>
+            <Route
+              index
+              element={
+                <FeatureGuard feature={Feature.PROMPT_BUILDER}>
+                  <Prompts />
+                </FeatureGuard>
+              }
+            />
+            <Route
+              path="rbac"
+              element={
+                <FeatureGuard feature={Feature.RBAC_ADMIN}>
+                  <RbacAdmin />
+                </FeatureGuard>
+              }
+            />
           </Route>
         </Route>
       </Routes>

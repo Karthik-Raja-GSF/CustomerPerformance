@@ -92,6 +92,11 @@ const data = {
           url: "/bid-export-history",
           feature: Feature.BID_EXPORT,
         },
+        {
+          title: "Access Control",
+          url: "/settings/rbac",
+          feature: Feature.RBAC_ADMIN,
+        },
       ],
     },
   ],

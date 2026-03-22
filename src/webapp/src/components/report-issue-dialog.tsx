@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Bug, CircleCheck } from "lucide-react";
+import { useRef, useState } from "react";
+import { Bug, CircleCheck, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { submitIssueReport } from "@/apis/issue-reports";
@@ -45,6 +45,8 @@ export function ReportIssueFab() {
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
+  const [userFiles, setUserFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCollecting, setIsCollecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedIssueKey, setSubmittedIssueKey] = useState<string | null>(
@@ -57,6 +59,8 @@ export function ReportIssueFab() {
   const resetForm = () => {
     setSummary("");
     setDescription("");
+    setUserFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setSubmittedIssueKey(null);
   };
 
@@ -95,6 +99,7 @@ export function ReportIssueFab() {
         timestamp: new Date().toISOString(),
         diagnostics,
         screenshot,
+        userFiles,
       });
 
       setSubmittedIssueKey(result.issueKey);
@@ -180,6 +185,60 @@ export function ReportIssueFab() {
                     maxLength={5000}
                     rows={5}
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="issue-attachments">
+                    Attachments{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isBusy}
+                    >
+                      <Paperclip className="h-4 w-4 mr-1" />
+                      Choose files
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      id="issue-attachments"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        setUserFiles((prev) => [...prev, ...files]);
+                      }}
+                    />
+                  </div>
+                  {userFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {userFiles.map((file, i) => (
+                        <span
+                          key={`${file.name}-${i}`}
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-muted"
+                        >
+                          {file.name}
+                          <button
+                            type="button"
+                            className="hover:text-destructive cursor-pointer"
+                            onClick={() =>
+                              setUserFiles((prev) =>
+                                prev.filter((_, idx) => idx !== i)
+                              )
+                            }
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter>

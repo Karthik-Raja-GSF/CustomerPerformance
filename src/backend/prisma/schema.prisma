@@ -1243,6 +1243,43 @@ model ChatLog {
 }
 
 // ============================================
+// RBAC Tables - Database-managed access control
+// ============================================
+
+model RbacGroup {
+  id               String   @id @default(uuid())
+  key              String   @unique // e.g. "SALES", "ADMIN"
+  displayName      String   @map("display_name")
+  azureAdGroupId   String   @default("") @map("azure_ad_group_id")
+  description      String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  groupFeatures RbacGroupFeature[]
+
+  @@index([azureAdGroupId])
+  @@map("rbac_groups")
+  @@schema("ait")
+}
+
+model RbacGroupFeature {
+  id         String   @id @default(uuid())
+  groupId    String   @map("group_id")
+  featureKey String   @map("feature_key") // e.g. "starq", "monthly-forecast"
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  group RbacGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, featureKey])
+  @@index([groupId])
+  @@index([featureKey])
+  @@map("rbac_group_features")
+  @@schema("ait")
+}
+
+// ============================================
 // SIQ SCHEMA - StockIQ Integration Tables
 // ============================================
 

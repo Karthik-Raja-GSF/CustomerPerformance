@@ -19,7 +19,11 @@ import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
  * router.get('/chat', authenticate, requireFeature(Feature.STARQ), handler);
  */
 export function requireFeature(...features: Feature[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     if (!req.user) {
       res.status(401).json({
         error: "AuthenticationError",
@@ -28,19 +32,24 @@ export function requireFeature(...features: Feature[]) {
       return;
     }
 
-    const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
-    const userGroups = req.user.groups;
-    const hasAny = features.some((f) => rbacService.hasFeature(userGroups, f));
+    try {
+      const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
+      const userGroups = req.user.groups;
+      const userFeatures = await rbacService.resolveFeatures(userGroups);
+      const hasAny = features.some((f) => userFeatures.includes(f));
 
-    if (!hasAny) {
-      res.status(403).json({
-        error: "ForbiddenError",
-        message: "Insufficient permissions",
-      });
-      return;
+      if (!hasAny) {
+        res.status(403).json({
+          error: "ForbiddenError",
+          message: "Insufficient permissions",
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      next(error);
     }
-
-    next();
   };
 }
 
@@ -52,7 +61,11 @@ export function requireFeature(...features: Feature[]) {
  * router.delete('/items/:id', authenticate, requireRole(Role.ADMIN), handler);
  */
 export function requireRole(...roles: Role[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     if (!req.user) {
       res.status(401).json({
         error: "AuthenticationError",
@@ -61,19 +74,25 @@ export function requireRole(...roles: Role[]) {
       return;
     }
 
-    const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
-    const userGroups = req.user.groups;
-    const userRoles = rbacService.resolveRoles(userGroups);
-    const hasAny = roles.some((r) => userRoles.some((ur) => ur.enumKey === r));
+    try {
+      const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
+      const userGroups = req.user.groups;
+      const userRoles = await rbacService.resolveRoles(userGroups);
+      const hasAny = roles.some((r) =>
+        userRoles.some((ur) => ur.enumKey === r)
+      );
 
-    if (!hasAny) {
-      res.status(403).json({
-        error: "ForbiddenError",
-        message: "Insufficient permissions",
-      });
-      return;
+      if (!hasAny) {
+        res.status(403).json({
+          error: "ForbiddenError",
+          message: "Insufficient permissions",
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      next(error);
     }
-
-    next();
   };
 }

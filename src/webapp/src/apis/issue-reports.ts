@@ -9,6 +9,7 @@ export interface SubmitIssueReportParams {
   timestamp: string;
   diagnostics: DiagnosticsData;
   screenshot: Blob | null;
+  userFiles: File[];
 }
 
 export interface IssueReportResult {
@@ -58,6 +59,11 @@ export async function submitIssueReport(
 
   if (params.screenshot) {
     formData.append("attachments", params.screenshot, "screenshot.png");
+  }
+
+  // User-uploaded files
+  for (const file of params.userFiles) {
+    formData.append("attachments", file, file.name);
   }
 
   const response = await apiClient.postFormData<ApiResponse>(

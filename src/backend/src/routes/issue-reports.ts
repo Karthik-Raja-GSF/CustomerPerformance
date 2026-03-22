@@ -14,7 +14,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB per file
-    files: 4, // console-logs, network-logs, page-details, screenshot
+    files: 10, // 4 auto-captured diagnostics + up to 6 user uploads
   },
 });
 
@@ -63,7 +63,7 @@ function handleJiraError(
 router.post(
   "/",
   authenticate,
-  upload.array("attachments", 4),
+  upload.array("attachments", 10),
   validateRequest(createIssueReportSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

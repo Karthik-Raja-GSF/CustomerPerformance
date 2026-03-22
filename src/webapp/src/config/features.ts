@@ -14,6 +14,7 @@ export const Feature = {
   STOCKIQ_SYNC: "stockiq-sync",
   CUSTOMER_BIDS_SYNC: "customer-bids-sync",
   EO_RISK_REVIEW: "eo-risk-review",
+  RBAC_ADMIN: "rbac-admin",
 } as const;
 
 export type Feature = (typeof Feature)[keyof typeof Feature];

@@ -383,7 +383,7 @@ export class CustomerBidService implements ICustomerBidService {
         }
 
         // Reject estimate changes on confirmed bids for SALES-only users
-        const userRoles = this.rbacService.resolveRoles(userGroups);
+        const userRoles = await this.rbacService.resolveRoles(userGroups);
         const isSalesOnly =
           userRoles.some((r) => r.enumKey === Role.SALES) &&
           !userRoles.some(

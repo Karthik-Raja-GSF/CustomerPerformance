@@ -27,6 +27,7 @@ import bidExportsRouter from "./routes/bid-exports";
 import authRouter from "./routes/auth";
 import eoRiskReviewRouter from "./routes/eo-risk-review";
 import issueReportsRouter from "./routes/issue-reports";
+import rbacAdminRouter from "./routes/rbac-admin";
 
 const serverLogger = createChildLogger("server");
 
@@ -107,6 +108,7 @@ class Server {
     apiRouter.use("/bid-exports", bidExportsRouter);
     apiRouter.use("/eo-risk-review", eoRiskReviewRouter);
     apiRouter.use("/issue-reports", issueReportsRouter);
+    apiRouter.use("/rbac", rbacAdminRouter);
 
     // Mount at root (existing public ALB, container health check)
     this.app.use("/", apiRouter);

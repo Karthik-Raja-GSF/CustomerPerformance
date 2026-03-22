@@ -51,6 +51,11 @@ import { BidExportService } from "@/services/implementations/BidExportService";
 import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
 import { RbacService } from "@/services/implementations/RbacService";
 import {
+  IRbacAdminService,
+  RBAC_ADMIN_SERVICE_TOKEN,
+} from "@/services/IRbacAdminService";
+import { RbacAdminService } from "@/services/implementations/RbacAdminService";
+import {
   IEoRiskReviewService,
   EO_RISK_REVIEW_SERVICE_TOKEN,
 } from "@/services/IEoRiskReviewService";
@@ -78,8 +83,13 @@ export function setupContainer(prisma: PrismaClient): void {
     useValue: prisma,
   });
 
-  // Register RbacService for role-based access control (singleton — config is immutable)
+  // Register RbacService for role-based access control (singleton — shared cache)
   container.registerSingleton<IRbacService>(RBAC_SERVICE_TOKEN, RbacService);
+
+  // Register RbacAdminService for RBAC group management
+  container.register<IRbacAdminService>(RBAC_ADMIN_SERVICE_TOKEN, {
+    useClass: RbacAdminService,
+  });
 
   // Register TokenService for JWT verification
   container.register<ITokenService>(TOKEN_SERVICE_TOKEN, {

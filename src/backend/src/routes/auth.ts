@@ -14,10 +14,10 @@ const router: IRouter = Router();
 router.get(
   "/access",
   authenticate,
-  (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rbacService = container.resolve<IRbacService>(RBAC_SERVICE_TOKEN);
-      const userAccess = rbacService.getUserAccess(req.user!.groups);
+      const userAccess = await rbacService.getUserAccess(req.user!.groups);
       res.json(userAccess);
     } catch (error) {
       next(error);

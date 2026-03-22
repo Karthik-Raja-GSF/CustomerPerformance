@@ -13,6 +13,7 @@ const featureRouteMap: Record<string, string> = {
   [Feature.STOCKIQ_SYNC]: "/stockiq-sync",
   [Feature.CUSTOMER_BIDS_SYNC]: "/customer-bids-sync",
   [Feature.EO_RISK_REVIEW]: "/eo/risk-review",
+  [Feature.RBAC_ADMIN]: "/settings/rbac",
 };
 
 interface FeatureGuardProps {

@@ -1,67 +1,120 @@
-import { injectable } from "tsyringe";
+import { inject, injectable } from "tsyringe";
+import { PrismaClient } from "@prisma/client";
 import { config } from "@/config/index";
 import { Feature } from "@/contracts/rbac/feature";
-import type { RoleDefinition } from "@/contracts/rbac/role-config";
 import type { UserAccessDto } from "@/contracts/dtos/rbac.dto";
 import type { IRbacService } from "@/services/IRbacService";
+
+interface CachedGroupData {
+  key: string;
+  displayName: string;
+  features: string[];
+}
 
 /**
  * RBAC Service Implementation
  *
- * Resolves Azure AD group GUIDs into roles and features using environment config.
+ * Resolves Azure AD group GUIDs into roles and features using database-backed
+ * group definitions. Uses an in-memory cache with TTL to avoid per-request DB hits.
  * When RBAC is disabled (`RBAC_ENABLED=false`), all methods grant full access.
  */
 @injectable()
 export class RbacService implements IRbacService {
   private readonly enabled: boolean;
-  private readonly groupToRole: Map<string, RoleDefinition>;
   private readonly allFeatures: string[];
-  private readonly allRoles: { enumKey: string; displayName: string }[];
+  private cache: Map<string, CachedGroupData> | null = null;
+  private allGroups: { enumKey: string; displayName: string }[] | null = null;
+  private cacheExpiry = 0;
+  private readonly cacheTtlMs = 30_000; // 30 seconds
+  private loadPromise: Promise<void> | null = null;
 
-  constructor() {
+  constructor(@inject("PrismaClient") private readonly prisma: PrismaClient) {
     this.enabled = config.rbac.enabled;
     this.allFeatures = Object.values(Feature);
-    this.allRoles = config.rbac.roles.map((r: RoleDefinition) => ({
-      enumKey: r.enumKey,
-      displayName: r.displayName,
-    }));
+  }
 
-    // Build group GUID → role lookup map (skip roles with empty groupId)
-    this.groupToRole = new Map();
-    for (const role of config.rbac.roles) {
-      if (role.groupId) {
-        this.groupToRole.set(role.groupId, role);
-      }
+  private async ensureCache(): Promise<void> {
+    if (this.cache && Date.now() < this.cacheExpiry) return;
+
+    // Prevent concurrent cache loads (stampede protection)
+    if (this.loadPromise) {
+      await this.loadPromise;
+      return;
+    }
+
+    this.loadPromise = this.loadCache();
+    try {
+      await this.loadPromise;
+    } finally {
+      this.loadPromise = null;
     }
   }
 
-  resolveRoles(
-    userGroups: string[]
-  ): { enumKey: string; displayName: string }[] {
-    if (!this.enabled) {
-      return this.allRoles;
+  private async loadCache(): Promise<void> {
+    const groups = await this.prisma.rbacGroup.findMany({
+      include: { groupFeatures: true },
+    });
+
+    const map = new Map<string, CachedGroupData>();
+    const allGroupsList: { enumKey: string; displayName: string }[] = [];
+
+    for (const group of groups) {
+      const features = group.groupFeatures.map((gf) => gf.featureKey);
+      allGroupsList.push({
+        enumKey: group.key,
+        displayName: group.displayName,
+      });
+
+      if (group.azureAdGroupId) {
+        map.set(group.azureAdGroupId, {
+          key: group.key,
+          displayName: group.displayName,
+          features,
+        });
+      }
     }
 
+    this.cache = map;
+    this.allGroups = allGroupsList;
+    this.cacheExpiry = Date.now() + this.cacheTtlMs;
+  }
+
+  clearCache(): void {
+    this.cache = null;
+    this.allGroups = null;
+    this.cacheExpiry = 0;
+  }
+
+  async resolveRoles(
+    userGroups: string[]
+  ): Promise<{ enumKey: string; displayName: string }[]> {
+    if (!this.enabled) {
+      await this.ensureCache();
+      return this.allGroups ?? [];
+    }
+
+    await this.ensureCache();
     const roles: { enumKey: string; displayName: string }[] = [];
     for (const groupId of userGroups) {
-      const role = this.groupToRole.get(groupId);
-      if (role) {
-        roles.push({ enumKey: role.enumKey, displayName: role.displayName });
+      const group = this.cache!.get(groupId);
+      if (group) {
+        roles.push({ enumKey: group.key, displayName: group.displayName });
       }
     }
     return roles;
   }
 
-  resolveFeatures(userGroups: string[]): string[] {
+  async resolveFeatures(userGroups: string[]): Promise<string[]> {
     if (!this.enabled) {
       return this.allFeatures;
     }
 
+    await this.ensureCache();
     const features = new Set<string>();
     for (const groupId of userGroups) {
-      const role = this.groupToRole.get(groupId);
-      if (role) {
-        for (const feature of role.features) {
+      const group = this.cache!.get(groupId);
+      if (group) {
+        for (const feature of group.features) {
           features.add(feature);
         }
       }
@@ -69,25 +122,26 @@ export class RbacService implements IRbacService {
     return [...features];
   }
 
-  hasFeature(userGroups: string[], feature: string): boolean {
+  async hasFeature(userGroups: string[], feature: string): Promise<boolean> {
     if (!this.enabled) {
       return true;
     }
 
+    await this.ensureCache();
     for (const groupId of userGroups) {
-      const role = this.groupToRole.get(groupId);
-      if (role && role.features.includes(feature as Feature)) {
+      const group = this.cache!.get(groupId);
+      if (group && group.features.includes(feature)) {
         return true;
       }
     }
     return false;
   }
 
-  getUserAccess(userGroups: string[]): UserAccessDto {
+  async getUserAccess(userGroups: string[]): Promise<UserAccessDto> {
     return {
       enabled: this.enabled,
-      roles: this.resolveRoles(userGroups),
-      features: this.resolveFeatures(userGroups),
+      roles: await this.resolveRoles(userGroups),
+      features: await this.resolveFeatures(userGroups),
     };
   }
 }
