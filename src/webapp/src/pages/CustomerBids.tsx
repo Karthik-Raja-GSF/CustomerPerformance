@@ -1025,10 +1025,12 @@ export default function CustomerBids({
             size="sm"
             disabled={bids.length === 0 || isLoading}
             onClick={() => {
-              const exportable = bids.filter(
-                (b) =>
-                  b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
-              );
+              const exportable = bids
+                .filter(
+                  (b) =>
+                    b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
+                )
+                .map((b) => ({ ...b, schoolYear: schoolYearString }));
               const filteredColumns = buildFilteredExportColumns(
                 exportable,
                 getMenuMonths,
@@ -1262,7 +1264,6 @@ export default function CustomerBids({
         <CSVImportDialog
           open={importDialogOpen}
           onOpenChange={setImportDialogOpen}
-          schoolYear={schoolYearString}
           onImportComplete={() => fetchData(filters)}
         />
       )}

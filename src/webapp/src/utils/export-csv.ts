@@ -301,6 +301,7 @@ export function buildFilteredExportColumns(
 export const customerBidExportColumns: ExportColumn[] = [
   // Customer info
   { key: "sourceDb", header: "Source" },
+  { key: "schoolYear", header: "School Year" },
   { key: "siteCode", header: "Site Code" },
   { key: "customerName", header: "Customer Name" },
   { key: "customerBillTo", header: "Customer Bill To" },

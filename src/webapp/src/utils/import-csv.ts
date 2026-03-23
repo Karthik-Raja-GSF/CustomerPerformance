@@ -92,6 +92,7 @@ const REQUIRED_HEADERS = [
   "Site Code",
   "Customer Bill To",
   "Item Code",
+  "School Year",
 ];
 
 function parseBoolean(
@@ -126,17 +127,29 @@ function parseNumber(value: unknown): { value: number | null; error?: string } {
   return { value: num };
 }
 
+/** Validate school year format: "YYYY-YYYY" where second year = first + 1 */
+const SCHOOL_YEAR_RE = /^\d{4}-\d{4}$/;
+
+function validateSchoolYear(value: string): string | null {
+  if (!SCHOOL_YEAR_RE.test(value)) {
+    return `Expected format "YYYY-YYYY", got "${value}"`;
+  }
+  const [startStr, endStr] = value.split("-");
+  const start = Number(startStr);
+  const end = Number(endStr);
+  if (end !== start + 1) {
+    return `End year must be start year + 1, got "${value}"`;
+  }
+  return null;
+}
+
 /**
  * Parse a CSV or XLSX file into validated import records.
  *
  * @param file - The uploaded file
- * @param schoolYear - School year string from the page (e.g., "2026-2027")
  * @returns Parsed and validated records ready for bulk-update API
  */
-export async function parseImportFile(
-  file: File,
-  schoolYear: string
-): Promise<ParsedImportResult> {
+export async function parseImportFile(file: File): Promise<ParsedImportResult> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
 
@@ -248,6 +261,7 @@ export async function parseImportFile(
     const siteCode = String(getValueByKey("siteCode") ?? "").trim();
     const customerBillTo = String(getValueByKey("customerBillTo") ?? "").trim();
     const itemCode = String(getValueByKey("itemCode") ?? "").trim();
+    const schoolYear = String(getValueByKey("schoolYear") ?? "").trim();
 
     let keyValid = true;
     if (!sourceDb) {
@@ -281,6 +295,24 @@ export async function parseImportFile(
         message: "Required field is empty",
       });
       keyValid = false;
+    }
+    if (!schoolYear) {
+      errors.push({
+        row: rowNum,
+        column: "School Year",
+        message: "Required field is empty",
+      });
+      keyValid = false;
+    } else {
+      const formatError = validateSchoolYear(schoolYear);
+      if (formatError) {
+        errors.push({
+          row: rowNum,
+          column: "School Year",
+          message: formatError,
+        });
+        keyValid = false;
+      }
     }
 
     if (!keyValid) {
@@ -397,7 +429,7 @@ export async function parseImportFile(
 
   for (let i = 0; i < allRecords.length; i++) {
     const k = allRecords[i]!.key;
-    const compositeKey = `${k.sourceDb}/${k.siteCode}/${k.customerBillTo}/${k.itemNo}`;
+    const compositeKey = `${k.sourceDb}/${k.siteCode}/${k.customerBillTo}/${k.itemNo}/${k.schoolYear}`;
     if (keyToIndex.has(compositeKey)) {
       duplicateRows++;
     }

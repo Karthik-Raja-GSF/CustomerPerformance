@@ -43,7 +43,6 @@ type Step = "upload" | "preview" | "uploading" | "results";
 interface CSVImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  schoolYear: string;
   onImportComplete: () => void;
 }
 
@@ -56,7 +55,6 @@ const BATCH_SIZE = 1000;
 export function CSVImportDialog({
   open,
   onOpenChange,
-  schoolYear,
   onImportComplete,
 }: CSVImportDialogProps) {
   const [step, setStep] = useState<Step>("upload");
@@ -102,77 +100,74 @@ export function CSVImportDialog({
 
   // ---- File selection & parsing ----
 
-  const handleFileSelect = useCallback(
-    async (selectedFile: File) => {
-      setFile(selectedFile);
-      setIsParsing(true);
+  const handleFileSelect = useCallback(async (selectedFile: File) => {
+    setFile(selectedFile);
+    setIsParsing(true);
 
-      try {
-        const result = await parseImportFile(selectedFile, schoolYear);
-        setParseResult(result);
-        setIsParsing(false);
+    try {
+      const result = await parseImportFile(selectedFile);
+      setParseResult(result);
+      setIsParsing(false);
 
-        // Call preview API to identify which records actually changed
-        if (result.records.length > 0) {
-          setIsChecking(true);
-          try {
-            const allChangedKeys = new Set<string>();
-            let totalUnchanged = 0;
+      // Call preview API to identify which records actually changed
+      if (result.records.length > 0) {
+        setIsChecking(true);
+        try {
+          const allChangedKeys = new Set<string>();
+          let totalUnchanged = 0;
 
-            // Batch preview calls (same BATCH_SIZE as import)
-            for (let i = 0; i < result.records.length; i += BATCH_SIZE) {
-              const batch = result.records.slice(i, i + BATCH_SIZE);
-              const preview = await previewBulkUpdateBids({
-                records: batch.map((r) => ({
-                  ...r.key,
-                  ...r.updates,
-                })),
-              });
-              for (const key of preview.changedKeys) {
-                allChangedKeys.add(key);
-              }
-              totalUnchanged += preview.unchanged;
+          // Batch preview calls (same BATCH_SIZE as import)
+          for (let i = 0; i < result.records.length; i += BATCH_SIZE) {
+            const batch = result.records.slice(i, i + BATCH_SIZE);
+            const preview = await previewBulkUpdateBids({
+              records: batch.map((r) => ({
+                ...r.key,
+                ...r.updates,
+              })),
+            });
+            for (const key of preview.changedKeys) {
+              allChangedKeys.add(key);
             }
-
-            setChangedKeySet(allChangedKeys);
-            setUnchangedPreviewCount(totalUnchanged);
-          } catch {
-            // If preview fails, treat all records as changed (safe fallback)
-            const fallbackKeys = new Set(
-              result.records.map(
-                (r) =>
-                  `${r.key.sourceDb}/${r.key.siteCode}/${r.key.customerBillTo}/${r.key.itemNo}/${r.key.schoolYear}`
-              )
-            );
-            setChangedKeySet(fallbackKeys);
-            setUnchangedPreviewCount(0);
-          } finally {
-            setIsChecking(false);
+            totalUnchanged += preview.unchanged;
           }
-        }
 
-        setStep("preview");
-      } catch {
-        setParseResult({
-          records: [],
-          errors: [
-            {
-              row: 0,
-              column: "",
-              message:
-                "Failed to parse file. Ensure it is a valid CSV or Excel file.",
-            },
-          ],
-          totalRows: 0,
-          skippedRows: 0,
-          duplicateRows: 0,
-        });
-        setIsParsing(false);
-        setStep("preview");
+          setChangedKeySet(allChangedKeys);
+          setUnchangedPreviewCount(totalUnchanged);
+        } catch {
+          // If preview fails, treat all records as changed (safe fallback)
+          const fallbackKeys = new Set(
+            result.records.map(
+              (r) =>
+                `${r.key.sourceDb}/${r.key.siteCode}/${r.key.customerBillTo}/${r.key.itemNo}/${r.key.schoolYear}`
+            )
+          );
+          setChangedKeySet(fallbackKeys);
+          setUnchangedPreviewCount(0);
+        } finally {
+          setIsChecking(false);
+        }
       }
-    },
-    [schoolYear]
-  );
+
+      setStep("preview");
+    } catch {
+      setParseResult({
+        records: [],
+        errors: [
+          {
+            row: 0,
+            column: "",
+            message:
+              "Failed to parse file. Ensure it is a valid CSV or Excel file.",
+          },
+        ],
+        totalRows: 0,
+        skippedRows: 0,
+        duplicateRows: 0,
+      });
+      setIsParsing(false);
+      setStep("preview");
+    }
+  }, []);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,9 +312,8 @@ export function CSVImportDialog({
       </div>
       <p className="text-xs text-muted-foreground">
         Use the exported CSV as a template. Only editable fields (Year Around,
-        Monthly Estimates, Menu Months, Confirmed) will be processed. School
-        year <Badge variant="secondary">{schoolYear}</Badge> will be applied to
-        all records.
+        Monthly Estimates, Menu Months, Confirmed) will be processed. The School
+        Year column is required in the CSV.
       </p>
     </div>
   );
