@@ -52,8 +52,6 @@ export interface CustomerBidDto {
   lastYearBidQty: number | null;
   /** Last year school year total sales amount */
   lastYearActual: number | null;
-  /** Year-to-date usage total for the current school year */
-  ytdUsage: number | null;
   /** Last year August sales amount */
   lyAugust: number | null;
   /** Last year September sales amount */
@@ -78,6 +76,33 @@ export interface CustomerBidDto {
   lyJune: number | null;
   /** Last year July sales amount */
   lyJuly: number | null;
+
+  // Current year monthly actuals (from sync)
+  /** Current year August sales amount */
+  cyAugust: number | null;
+  /** Current year September sales amount */
+  cySeptember: number | null;
+  /** Current year October sales amount */
+  cyOctober: number | null;
+  /** Current year November sales amount */
+  cyNovember: number | null;
+  /** Current year December sales amount */
+  cyDecember: number | null;
+  /** Current year January sales amount */
+  cyJanuary: number | null;
+  /** Current year February sales amount */
+  cyFebruary: number | null;
+  /** Current year March sales amount */
+  cyMarch: number | null;
+  /** Current year April sales amount */
+  cyApril: number | null;
+  /** Current year May sales amount */
+  cyMay: number | null;
+  /** Current year June sales amount */
+  cyJune: number | null;
+  /** Current year July sales amount */
+  cyJuly: number | null;
+
   /** True if item is in current year but NOT in previous year (new bid) */
   isNew: boolean;
 

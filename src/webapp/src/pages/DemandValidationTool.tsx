@@ -4,6 +4,7 @@ import { StatsCards } from "@/pages/customer-bids/stats-cards";
 const DEFAULT_COLUMN_VISIBILITY = {
   sourceDb: true,
   customerBillTo: true,
+  // Hide individual LY columns (composite lyMonths column is shown instead)
   lyAugust: false,
   lySeptember: false,
   lyOctober: false,
@@ -16,6 +17,19 @@ const DEFAULT_COLUMN_VISIBILITY = {
   lyMay: false,
   lyJune: false,
   lyJuly: false,
+  // Hide individual CY columns (YTD Usage computed column is shown instead)
+  cyAugust: false,
+  cySeptember: false,
+  cyOctober: false,
+  cyNovember: false,
+  cyDecember: false,
+  cyJanuary: false,
+  cyFebruary: false,
+  cyMarch: false,
+  cyApril: false,
+  cyMay: false,
+  cyJune: false,
+  cyJuly: false,
 };
 
 const ALWAYS_VISIBLE_COLUMNS = ["sourceDb", "customerBillTo"];

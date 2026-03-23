@@ -53,7 +53,6 @@ interface QueuedBidRow {
   erpStatus: string | null;
   lastYearBidQty: Prisma.Decimal | null;
   lastYearActual: Prisma.Decimal | null;
-  ytdUsage: Prisma.Decimal | null;
   lyAugust: Prisma.Decimal | null;
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
@@ -66,6 +65,18 @@ interface QueuedBidRow {
   lyMay: Prisma.Decimal | null;
   lyJune: Prisma.Decimal | null;
   lyJuly: Prisma.Decimal | null;
+  cyAugust: Prisma.Decimal | null;
+  cySeptember: Prisma.Decimal | null;
+  cyOctober: Prisma.Decimal | null;
+  cyNovember: Prisma.Decimal | null;
+  cyDecember: Prisma.Decimal | null;
+  cyJanuary: Prisma.Decimal | null;
+  cyFebruary: Prisma.Decimal | null;
+  cyMarch: Prisma.Decimal | null;
+  cyApril: Prisma.Decimal | null;
+  cyMay: Prisma.Decimal | null;
+  cyJune: Prisma.Decimal | null;
+  cyJuly: Prisma.Decimal | null;
   isNew: boolean | null;
   lastUpdatedAt: Date | null;
   lastUpdatedBy: string | null;
@@ -748,7 +759,6 @@ export class BidExportService implements IBidExportService {
           cbd.erp_status AS "erpStatus",
           cbd.last_year_bid_qty AS "lastYearBidQty",
           cbd.last_year_actual AS "lastYearActual",
-          cbd.ytd_usage AS "ytdUsage",
           cbd.ly_august AS "lyAugust",
           cbd.ly_september AS "lySeptember",
           cbd.ly_october AS "lyOctober",
@@ -761,6 +771,18 @@ export class BidExportService implements IBidExportService {
           cbd.ly_may AS "lyMay",
           cbd.ly_june AS "lyJune",
           cbd.ly_july AS "lyJuly",
+          cbd.cy_august AS "cyAugust",
+          cbd.cy_september AS "cySeptember",
+          cbd.cy_october AS "cyOctober",
+          cbd.cy_november AS "cyNovember",
+          cbd.cy_december AS "cyDecember",
+          cbd.cy_january AS "cyJanuary",
+          cbd.cy_february AS "cyFebruary",
+          cbd.cy_march AS "cyMarch",
+          cbd.cy_april AS "cyApril",
+          cbd.cy_may AS "cyMay",
+          cbd.cy_june AS "cyJune",
+          cbd.cy_july AS "cyJuly",
           cbd.is_new AS "isNew",
           cbd.last_updated_at AS "lastUpdatedAt",
           cbd.last_updated_by AS "lastUpdatedBy",
@@ -907,7 +929,6 @@ export class BidExportService implements IBidExportService {
       bidQuantity: decimalToNumber(row.bidQty),
       lastYearBidQty: decimalToNumber(row.lastYearBidQty),
       lastYearActual: decimalToNumber(row.lastYearActual),
-      ytdUsage: decimalToNumber(row.ytdUsage),
       lyAugust: decimalToNumber(row.lyAugust),
       lySeptember: decimalToNumber(row.lySeptember),
       lyOctober: decimalToNumber(row.lyOctober),
@@ -920,6 +941,18 @@ export class BidExportService implements IBidExportService {
       lyMay: decimalToNumber(row.lyMay),
       lyJune: decimalToNumber(row.lyJune),
       lyJuly: decimalToNumber(row.lyJuly),
+      cyAugust: decimalToNumber(row.cyAugust),
+      cySeptember: decimalToNumber(row.cySeptember),
+      cyOctober: decimalToNumber(row.cyOctober),
+      cyNovember: decimalToNumber(row.cyNovember),
+      cyDecember: decimalToNumber(row.cyDecember),
+      cyJanuary: decimalToNumber(row.cyJanuary),
+      cyFebruary: decimalToNumber(row.cyFebruary),
+      cyMarch: decimalToNumber(row.cyMarch),
+      cyApril: decimalToNumber(row.cyApril),
+      cyMay: decimalToNumber(row.cyMay),
+      cyJune: decimalToNumber(row.cyJune),
+      cyJuly: decimalToNumber(row.cyJuly),
       isNew: row.isNew ?? false,
       lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: row.lastUpdatedBy ?? null,

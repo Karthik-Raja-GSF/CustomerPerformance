@@ -63,7 +63,6 @@ interface BaseBidRow {
   // From customer_bid_data table (LEFT JOIN)
   lastYearBidQty: Prisma.Decimal | null;
   lastYearActual: Prisma.Decimal | null;
-  ytdUsage: Prisma.Decimal | null;
   lyAugust: Prisma.Decimal | null;
   lySeptember: Prisma.Decimal | null;
   lyOctober: Prisma.Decimal | null;
@@ -76,6 +75,19 @@ interface BaseBidRow {
   lyMay: Prisma.Decimal | null;
   lyJune: Prisma.Decimal | null;
   lyJuly: Prisma.Decimal | null;
+  // Current year monthly actuals
+  cyAugust: Prisma.Decimal | null;
+  cySeptember: Prisma.Decimal | null;
+  cyOctober: Prisma.Decimal | null;
+  cyNovember: Prisma.Decimal | null;
+  cyDecember: Prisma.Decimal | null;
+  cyJanuary: Prisma.Decimal | null;
+  cyFebruary: Prisma.Decimal | null;
+  cyMarch: Prisma.Decimal | null;
+  cyApril: Prisma.Decimal | null;
+  cyMay: Prisma.Decimal | null;
+  cyJune: Prisma.Decimal | null;
+  cyJuly: Prisma.Decimal | null;
   isNew: boolean | null;
   lastUpdatedAt: Date | null;
   lastUpdatedBy: string | null;
@@ -197,7 +209,6 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.erp_status AS "erpStatus",
             cbd.last_year_bid_qty AS "lastYearBidQty",
             cbd.last_year_actual AS "lastYearActual",
-            cbd.ytd_usage AS "ytdUsage",
             cbd.ly_august AS "lyAugust",
             cbd.ly_september AS "lySeptember",
             cbd.ly_october AS "lyOctober",
@@ -210,6 +221,18 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.ly_may AS "lyMay",
             cbd.ly_june AS "lyJune",
             cbd.ly_july AS "lyJuly",
+            cbd.cy_august AS "cyAugust",
+            cbd.cy_september AS "cySeptember",
+            cbd.cy_october AS "cyOctober",
+            cbd.cy_november AS "cyNovember",
+            cbd.cy_december AS "cyDecember",
+            cbd.cy_january AS "cyJanuary",
+            cbd.cy_february AS "cyFebruary",
+            cbd.cy_march AS "cyMarch",
+            cbd.cy_april AS "cyApril",
+            cbd.cy_may AS "cyMay",
+            cbd.cy_june AS "cyJune",
+            cbd.cy_july AS "cyJuly",
             cbd.is_new AS "isNew",
             cbd.last_updated_at AS "lastUpdatedAt",
             cbd.last_updated_by AS "lastUpdatedBy",
@@ -275,7 +298,6 @@ export class CustomerBidService implements ICustomerBidService {
         bidQuantity: row.bidQty ? Number(row.bidQty) : null,
         lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
         lastYearActual: row.lastYearActual ? Number(row.lastYearActual) : null,
-        ytdUsage: row.ytdUsage ? Number(row.ytdUsage) : null,
         lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
         lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
         lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
@@ -288,6 +310,18 @@ export class CustomerBidService implements ICustomerBidService {
         lyMay: row.lyMay ? Number(row.lyMay) : null,
         lyJune: row.lyJune ? Number(row.lyJune) : null,
         lyJuly: row.lyJuly ? Number(row.lyJuly) : null,
+        cyAugust: row.cyAugust ? Number(row.cyAugust) : null,
+        cySeptember: row.cySeptember ? Number(row.cySeptember) : null,
+        cyOctober: row.cyOctober ? Number(row.cyOctober) : null,
+        cyNovember: row.cyNovember ? Number(row.cyNovember) : null,
+        cyDecember: row.cyDecember ? Number(row.cyDecember) : null,
+        cyJanuary: row.cyJanuary ? Number(row.cyJanuary) : null,
+        cyFebruary: row.cyFebruary ? Number(row.cyFebruary) : null,
+        cyMarch: row.cyMarch ? Number(row.cyMarch) : null,
+        cyApril: row.cyApril ? Number(row.cyApril) : null,
+        cyMay: row.cyMay ? Number(row.cyMay) : null,
+        cyJune: row.cyJune ? Number(row.cyJune) : null,
+        cyJuly: row.cyJuly ? Number(row.cyJuly) : null,
         isNew: row.isNew ?? false,
         lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
         lastUpdatedBy: row.lastUpdatedBy ?? null,
@@ -712,7 +746,6 @@ export class CustomerBidService implements ICustomerBidService {
     itemNo: string;
     lastYearBidQty: Prisma.Decimal | null;
     lastYearActual: Prisma.Decimal | null;
-    ytdUsage: Prisma.Decimal | null;
     lyAugust: Prisma.Decimal | null;
     lySeptember: Prisma.Decimal | null;
     lyOctober: Prisma.Decimal | null;
@@ -725,6 +758,18 @@ export class CustomerBidService implements ICustomerBidService {
     lyMay: Prisma.Decimal | null;
     lyJune: Prisma.Decimal | null;
     lyJuly: Prisma.Decimal | null;
+    cyAugust: Prisma.Decimal | null;
+    cySeptember: Prisma.Decimal | null;
+    cyOctober: Prisma.Decimal | null;
+    cyNovember: Prisma.Decimal | null;
+    cyDecember: Prisma.Decimal | null;
+    cyJanuary: Prisma.Decimal | null;
+    cyFebruary: Prisma.Decimal | null;
+    cyMarch: Prisma.Decimal | null;
+    cyApril: Prisma.Decimal | null;
+    cyMay: Prisma.Decimal | null;
+    cyJune: Prisma.Decimal | null;
+    cyJuly: Prisma.Decimal | null;
     isNew: boolean;
     lastUpdatedAt: Date | null;
     lastUpdatedBy: string | null;
@@ -767,7 +812,6 @@ export class CustomerBidService implements ICustomerBidService {
       bidQuantity: null,
       lastYearBidQty: decimalToNumber(record.lastYearBidQty),
       lastYearActual: decimalToNumber(record.lastYearActual),
-      ytdUsage: decimalToNumber(record.ytdUsage),
       lyAugust: decimalToNumber(record.lyAugust),
       lySeptember: decimalToNumber(record.lySeptember),
       lyOctober: decimalToNumber(record.lyOctober),
@@ -780,6 +824,18 @@ export class CustomerBidService implements ICustomerBidService {
       lyMay: decimalToNumber(record.lyMay),
       lyJune: decimalToNumber(record.lyJune),
       lyJuly: decimalToNumber(record.lyJuly),
+      cyAugust: decimalToNumber(record.cyAugust),
+      cySeptember: decimalToNumber(record.cySeptember),
+      cyOctober: decimalToNumber(record.cyOctober),
+      cyNovember: decimalToNumber(record.cyNovember),
+      cyDecember: decimalToNumber(record.cyDecember),
+      cyJanuary: decimalToNumber(record.cyJanuary),
+      cyFebruary: decimalToNumber(record.cyFebruary),
+      cyMarch: decimalToNumber(record.cyMarch),
+      cyApril: decimalToNumber(record.cyApril),
+      cyMay: decimalToNumber(record.cyMay),
+      cyJune: decimalToNumber(record.cyJune),
+      cyJuly: decimalToNumber(record.cyJuly),
       isNew: record.isNew,
       lastUpdatedAt: record.lastUpdatedAt?.toISOString() ?? null,
       lastUpdatedBy: record.lastUpdatedBy ?? null,

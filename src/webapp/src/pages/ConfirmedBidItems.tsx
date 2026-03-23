@@ -34,6 +34,19 @@ export default function ConfirmedBidItems() {
         lyMay: false,
         lyJune: false,
         lyJuly: false,
+        cyAugust: false,
+        cySeptember: false,
+        cyOctober: false,
+        cyNovember: false,
+        cyDecember: false,
+        cyJanuary: false,
+        cyFebruary: false,
+        cyMarch: false,
+        cyApril: false,
+        cyMay: false,
+        cyJune: false,
+        cyJuly: false,
+        cyYtd: false,
       }}
     />
   );

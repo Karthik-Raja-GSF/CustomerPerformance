@@ -3,6 +3,7 @@ import type { CustomerBidDto } from "@/types/customer-bids";
 import {
   ESTIMATE_MONTHS,
   LY_MONTHS,
+  CY_MONTHS,
   YEAR_AROUND_ESTIMATE_MONTHS,
   type MonthKey,
 } from "@/utils/menu-months";
@@ -24,6 +25,7 @@ export interface ExportColumn {
 const TABLE_COLUMN_TO_EXPORT_KEYS: Record<string, string[]> = {
   estimates: ESTIMATE_MONTHS.map((m) => m.estimateKey),
   lyMonths: LY_MONTHS.map((m) => m.lyKey),
+  cyYtd: ["cyYtd"],
   menuMonths: [], // virtual UI-only column, no export counterpart
   confirmed: ["confirmedAt"],
   lastUpdated: ["lastUpdatedAt", "lastUpdatedBy"],
@@ -267,25 +269,31 @@ export function buildFilteredExportColumns(
 
   const allowedEstimateKeys = new Set<string>();
   const allowedLyKeys = new Set<string>();
+  const allowedCyKeys = new Set<string>();
   for (const m of ESTIMATE_MONTHS) {
     if (selectedMonths.has(m.menuKey)) allowedEstimateKeys.add(m.estimateKey);
   }
   for (const m of LY_MONTHS) {
     if (selectedMonths.has(m.menuKey)) allowedLyKeys.add(m.lyKey);
   }
+  for (const m of CY_MONTHS) {
+    if (selectedMonths.has(m.menuKey)) allowedCyKeys.add(m.cyKey);
+  }
 
   const allEstimateKeys = new Set<string>(
     ESTIMATE_MONTHS.map((m) => m.estimateKey)
   );
   const allLyKeys = new Set<string>(LY_MONTHS.map((m) => m.lyKey));
+  const allCyKeys = new Set<string>(CY_MONTHS.map((m) => m.cyKey));
 
   return customerBidExportColumns.filter((col) => {
     // Check column visibility first
     if (disallowedKeys?.has(col.key)) return false;
 
-    // Then apply menu-month filtering for estimate/LY columns
+    // Then apply menu-month filtering for estimate/LY/CY columns
     if (allEstimateKeys.has(col.key)) return allowedEstimateKeys.has(col.key);
     if (allLyKeys.has(col.key)) return allowedLyKeys.has(col.key);
+    if (allCyKeys.has(col.key)) return allowedCyKeys.has(col.key);
     return true;
   });
 }
@@ -342,6 +350,41 @@ export const customerBidExportColumns: ExportColumn[] = [
   { key: "lyMay", header: "LY May" },
   { key: "lyJune", header: "LY June" },
   { key: "lyJuly", header: "LY July" },
+  // Current year monthly actuals
+  { key: "cyAugust", header: "CY August" },
+  { key: "cySeptember", header: "CY September" },
+  { key: "cyOctober", header: "CY October" },
+  { key: "cyNovember", header: "CY November" },
+  { key: "cyDecember", header: "CY December" },
+  { key: "cyJanuary", header: "CY January" },
+  { key: "cyFebruary", header: "CY February" },
+  { key: "cyMarch", header: "CY March" },
+  { key: "cyApril", header: "CY April" },
+  { key: "cyMay", header: "CY May" },
+  { key: "cyJune", header: "CY June" },
+  { key: "cyJuly", header: "CY July" },
+  {
+    key: "cyYtd",
+    header: "YTD Usage",
+    computeValue: (row) => {
+      const fields = [
+        "cyAugust",
+        "cySeptember",
+        "cyOctober",
+        "cyNovember",
+        "cyDecember",
+        "cyJanuary",
+        "cyFebruary",
+        "cyMarch",
+        "cyApril",
+        "cyMay",
+        "cyJune",
+        "cyJuly",
+      ];
+      const sum = fields.reduce((acc, f) => acc + ((row[f] as number) ?? 0), 0);
+      return sum > 0 ? sum : "";
+    },
+  },
   // Tracking fields
   { key: "lastUpdatedAt", header: "Last Updated At" },
   { key: "lastUpdatedBy", header: "Last Updated By" },

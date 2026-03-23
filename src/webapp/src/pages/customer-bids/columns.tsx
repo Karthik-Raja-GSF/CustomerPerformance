@@ -604,19 +604,6 @@ export function createColumns(
         </div>
       ),
     },
-    {
-      accessorKey: "ytdUsage",
-      header: () => (
-        <div className="text-right text-muted-foreground font-medium">
-          YTD Usage
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-medium tabular-nums">
-          {formatNumber(row.getValue("ytdUsage"))}
-        </div>
-      ),
-    },
     // Conversion Rate: (LY Actual / LY Bid Qty) * 100
     {
       id: "conversionRate",
@@ -805,6 +792,243 @@ export function createColumns(
           {formatNumber(row.getValue("lyJuly"))}
         </div>
       ),
+    },
+    // Current year monthly actuals (individual columns, hidden by default)
+    {
+      accessorKey: "cyAugust",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Aug
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyAugust"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cySeptember",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Sep
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cySeptember"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyOctober",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Oct
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyOctober"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyNovember",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Nov
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyNovember"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyDecember",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Dec
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyDecember"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyJanuary",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Jan
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyJanuary"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyFebruary",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Feb
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyFebruary"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyMarch",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Mar
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyMarch"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyApril",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Apr
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyApril"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyMay",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY May
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyMay"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyJune",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Jun
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyJune"))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "cyJuly",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          CY Jul
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("cyJuly"))}
+        </div>
+      ),
+    },
+    // Computed YTD Usage - sum of all current year monthly actuals
+    {
+      id: "cyYtd",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          YTD Usage
+        </div>
+      ),
+      cell: ({ row }) => {
+        const d = row.original;
+        const cyFields = [
+          d.cyAugust,
+          d.cySeptember,
+          d.cyOctober,
+          d.cyNovember,
+          d.cyDecember,
+          d.cyJanuary,
+          d.cyFebruary,
+          d.cyMarch,
+          d.cyApril,
+          d.cyMay,
+          d.cyJune,
+          d.cyJuly,
+        ];
+        const sum = cyFields.reduce<number>((acc, val) => acc + (val ?? 0), 0);
+        return (
+          <div className="text-right font-medium tabular-nums">
+            {sum > 0 ? sum.toLocaleString() : "-"}
+          </div>
+        );
+      },
+    },
+    // Computed Current Avg - YTD sum / elapsed months since Aug
+    {
+      id: "currentAvg",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          Current Avg
+        </div>
+      ),
+      cell: ({ row }) => {
+        const d = row.original;
+        // School year month order: Jul(7)..Dec(12), Jan(1)..Jun(6)
+        const schoolYearMonths: { month: number; value: number | null }[] = [
+          { month: 7, value: d.cyJuly },
+          { month: 8, value: d.cyAugust },
+          { month: 9, value: d.cySeptember },
+          { month: 10, value: d.cyOctober },
+          { month: 11, value: d.cyNovember },
+          { month: 12, value: d.cyDecember },
+          { month: 1, value: d.cyJanuary },
+          { month: 2, value: d.cyFebruary },
+          { month: 3, value: d.cyMarch },
+          { month: 4, value: d.cyApril },
+          { month: 5, value: d.cyMay },
+          { month: 6, value: d.cyJune },
+        ];
+
+        const currentMonth = new Date().getMonth() + 1; // 1-12
+        // Count elapsed months: school year months up to and including current month
+        let elapsed = 0;
+        let sum = 0;
+        for (const m of schoolYearMonths) {
+          elapsed++;
+          sum += m.value ?? 0;
+          if (m.month === currentMonth) break;
+        }
+
+        if (elapsed === 0) {
+          return <div className="text-right text-muted-foreground">-</div>;
+        }
+
+        const avg = sum / elapsed;
+        return (
+          <div className="text-right font-medium tabular-nums">
+            {avg > 0 ? Math.round(avg).toLocaleString() : "-"}
+          </div>
+        );
+      },
     },
     // User-editable columns
     {
