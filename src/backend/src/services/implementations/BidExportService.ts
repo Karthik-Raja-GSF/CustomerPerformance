@@ -150,7 +150,7 @@ export class BidExportService implements IBidExportService {
         customerBillTo: key.customerBillTo,
         itemNo: key.itemNo,
         schoolYear: key.schoolYear,
-        exportType: exportType as "CSV" | "SIQ",
+        exportType: exportType as "WH" | "NAV",
         status: "QUEUED",
         queuedBy: userEmail,
       })),
@@ -191,7 +191,7 @@ export class BidExportService implements IBidExportService {
       // 1. Create export run
       const run = await tx.customerBidExportRun.create({
         data: {
-          exportType: exportType as "CSV" | "SIQ",
+          exportType: exportType as "WH" | "NAV",
           triggeredBy: "manual",
           status: "IN_PROGRESS",
         },
@@ -201,7 +201,7 @@ export class BidExportService implements IBidExportService {
       const queuedItems = await tx.customerBidExportItem.findMany({
         where: {
           status: "QUEUED",
-          exportType: exportType as "CSV" | "SIQ",
+          exportType: exportType as "WH" | "NAV",
         },
         select: {
           id: true,
@@ -231,7 +231,7 @@ export class BidExportService implements IBidExportService {
       await tx.customerBidExportItem.updateMany({
         where: {
           status: "QUEUED",
-          exportType: exportType as "CSV" | "SIQ",
+          exportType: exportType as "WH" | "NAV",
         },
         data: {
           status: "EXPORTED",
@@ -296,10 +296,10 @@ export class BidExportService implements IBidExportService {
       _count: true,
     });
 
-    const csv = counts.find((c) => c.exportType === "CSV")?._count ?? 0;
-    const siq = counts.find((c) => c.exportType === "SIQ")?._count ?? 0;
+    const wh = counts.find((c) => c.exportType === "WH")?._count ?? 0;
+    const nav = counts.find((c) => c.exportType === "NAV")?._count ?? 0;
 
-    return { csv, siq, total: csv + siq };
+    return { wh, nav, total: wh + nav };
   }
 
   async queueExportByKeys(
@@ -329,7 +329,7 @@ export class BidExportService implements IBidExportService {
         customerBillTo: key.customerBillTo,
         itemNo: key.itemNo,
         schoolYear: key.schoolYear,
-        exportType: exportType as "CSV" | "SIQ",
+        exportType: exportType as "WH" | "NAV",
         status: "QUEUED",
         queuedBy: userEmail,
       })),
@@ -371,7 +371,7 @@ export class BidExportService implements IBidExportService {
       // 2. Create export run
       const run = await tx.customerBidExportRun.create({
         data: {
-          exportType: exportType as "CSV" | "SIQ",
+          exportType: exportType as "WH" | "NAV",
           triggeredBy: "manual",
           status: "IN_PROGRESS",
         },
@@ -381,7 +381,7 @@ export class BidExportService implements IBidExportService {
       const queuedItems = await tx.customerBidExportItem.findMany({
         where: {
           status: "QUEUED",
-          exportType: exportType as "CSV" | "SIQ",
+          exportType: exportType as "WH" | "NAV",
         },
         select: {
           sourceDb: true,
@@ -396,7 +396,7 @@ export class BidExportService implements IBidExportService {
       await tx.customerBidExportItem.updateMany({
         where: {
           status: "QUEUED",
-          exportType: exportType as "CSV" | "SIQ",
+          exportType: exportType as "WH" | "NAV",
         },
         data: {
           status: "EXPORTED",
@@ -444,7 +444,7 @@ export class BidExportService implements IBidExportService {
       status: "QUEUED",
     };
     if (exportType) {
-      where.exportType = exportType as "CSV" | "SIQ";
+      where.exportType = exportType as "WH" | "NAV";
     }
 
     const result = await this.prisma.customerBidExportItem.updateMany({
@@ -486,7 +486,7 @@ export class BidExportService implements IBidExportService {
           status: "QUEUED",
         };
         if (exportType) {
-          where.exportType = exportType as "CSV" | "SIQ";
+          where.exportType = exportType as "WH" | "NAV";
         }
         const result = await tx.customerBidExportItem.updateMany({
           where,
@@ -551,14 +551,14 @@ export class BidExportService implements IBidExportService {
   ): Promise<WebhookExportResultDto> {
     logger.info(
       { event: "bid-export.webhook.prepare.start", userEmail },
-      "Preparing webhook export for SIQ"
+      "Preparing webhook export for NAV"
     );
 
-    // Check for an existing IN_PROGRESS SIQ run (idempotent)
+    // Check for an existing IN_PROGRESS NAV run (idempotent)
     const existingRun = await this.prisma.customerBidExportRun.findFirst({
       where: {
         status: "IN_PROGRESS",
-        exportType: "SIQ",
+        exportType: "NAV",
         triggeredBy: "webhook",
       },
       orderBy: { startedAt: "desc" },
@@ -572,7 +572,7 @@ export class BidExportService implements IBidExportService {
 
       // Fetch data for items already associated with this run
       const rows = await this.getQueuedBidRows(
-        "SIQ",
+        "NAV",
         undefined,
         existingRun.id
       );
@@ -583,8 +583,8 @@ export class BidExportService implements IBidExportService {
 
     // No existing run — create a new one atomically
     const result = await this.prisma.$transaction(async (tx) => {
-      // Fetch all QUEUED SIQ items
-      const rows = await this.getQueuedBidRows("SIQ", tx);
+      // Fetch all QUEUED NAV items
+      const rows = await this.getQueuedBidRows("NAV", tx);
 
       if (rows.length === 0) {
         return { runId: null, data: [] as WebhookBidRowDto[] };
@@ -593,17 +593,17 @@ export class BidExportService implements IBidExportService {
       // Create an IN_PROGRESS run
       const run = await tx.customerBidExportRun.create({
         data: {
-          exportType: "SIQ",
+          exportType: "NAV",
           triggeredBy: "webhook",
           status: "IN_PROGRESS",
         },
       });
 
-      // Associate all QUEUED SIQ items with this run (keep status QUEUED)
+      // Associate all QUEUED NAV items with this run (keep status QUEUED)
       await tx.customerBidExportItem.updateMany({
         where: {
           status: "QUEUED",
-          exportType: "SIQ",
+          exportType: "NAV",
         },
         data: {
           runId: run.id,

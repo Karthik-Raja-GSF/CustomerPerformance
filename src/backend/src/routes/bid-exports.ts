@@ -14,17 +14,17 @@ const router: IRouter = Router();
 // === Zod Schemas ===
 
 const queueExportSchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]),
+  exportType: z.enum(["WH", "NAV"]),
   schoolYear: z.string().min(1),
   filters: z.record(z.unknown()).default({}),
 });
 
 const markExportedSchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]),
+  exportType: z.enum(["WH", "NAV"]),
 });
 
 const exportTypeQuerySchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]),
+  exportType: z.enum(["WH", "NAV"]),
 });
 
 const historyQuerySchema = z.object({
@@ -32,7 +32,7 @@ const historyQuerySchema = z.object({
 });
 
 const queueByKeysSchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]),
+  exportType: z.enum(["WH", "NAV"]),
   keys: z
     .array(
       z.object({
@@ -48,15 +48,15 @@ const queueByKeysSchema = z.object({
 });
 
 const exportSchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]),
+  exportType: z.enum(["WH", "NAV"]),
 });
 
 const cancelSchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]).optional(),
+  exportType: z.enum(["WH", "NAV"]).optional(),
 });
 
 const cancelByKeysSchema = z.object({
-  exportType: z.enum(["CSV", "SIQ"]).optional(),
+  exportType: z.enum(["WH", "NAV"]).optional(),
   keys: z
     .array(
       z.object({
@@ -106,7 +106,7 @@ router.post(
 );
 
 /**
- * GET /bid-exports/queued-data?exportType=SIQ
+ * GET /bid-exports/queued-data?exportType=NAV
  * Get full CustomerBidDto data for all QUEUED items of a given type
  */
 router.get(
@@ -119,7 +119,7 @@ router.get(
       if (!parsed.success) {
         res.status(400).json({
           status: "error",
-          message: "exportType query parameter is required (CSV or SIQ)",
+          message: "exportType query parameter is required (WH or NAV)",
         });
         return;
       }
@@ -172,7 +172,7 @@ router.post(
       if (!parsed.success) {
         res.status(400).json({
           status: "error",
-          message: "exportType is required (CSV or SIQ)",
+          message: "exportType is required (WH or NAV)",
         });
         return;
       }
@@ -236,7 +236,7 @@ router.post(
       if (!parsed.success) {
         res.status(400).json({
           status: "error",
-          message: "exportType is required (CSV or SIQ)",
+          message: "exportType is required (WH or NAV)",
         });
         return;
       }
@@ -370,14 +370,14 @@ router.get(
 );
 
 /**
- * GET /bid-exports/webhook/siq
- * Prepare a webhook export — returns all QUEUED SIQ items with a runId.
+ * GET /bid-exports/webhook/nav
+ * Prepare a webhook export — returns all QUEUED NAV items with a runId.
  * Idempotent: returns existing IN_PROGRESS run if one exists.
  */
 router.get(
-  "/webhook/siq",
+  "/webhook/nav",
   authenticate,
-  requireFeature(Feature.BID_EXPORT),
+  requireFeature(Feature.BID_EXPORT_WEBHOOK),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const service = container.resolve<IBidExportService>(
@@ -394,14 +394,14 @@ router.get(
 );
 
 /**
- * POST /bid-exports/webhook/siq/:runId/complete
+ * POST /bid-exports/webhook/nav/:runId/complete
  * Confirm a webhook export was successfully processed.
  * Marks items as EXPORTED and the run as COMPLETED.
  */
 router.post(
-  "/webhook/siq/:runId/complete",
+  "/webhook/nav/:runId/complete",
   authenticate,
-  requireFeature(Feature.BID_EXPORT),
+  requireFeature(Feature.BID_EXPORT_WEBHOOK),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { runId } = req.params;

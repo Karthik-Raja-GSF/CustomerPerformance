@@ -146,15 +146,15 @@ export default function BidExportHistory() {
           ) : queueSummary && queueSummary.total > 0 ? (
             <div className="flex items-center gap-6">
               <div>
-                <p className="text-sm text-muted-foreground">SIQ</p>
+                <p className="text-sm text-muted-foreground">NAV</p>
                 <p className="mt-1 text-2xl font-semibold">
-                  {queueSummary.siq.toLocaleString()}
+                  {queueSummary.nav.toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">CSV</p>
+                <p className="text-sm text-muted-foreground">WH</p>
                 <p className="mt-1 text-2xl font-semibold">
-                  {queueSummary.csv.toLocaleString()}
+                  {queueSummary.wh.toLocaleString()}
                 </p>
               </div>
               <div>

@@ -9,7 +9,7 @@ export default function ConfirmedBidItems() {
       defaultExported={false}
       defaultQueued={false}
       canUnconfirm={false}
-      showSIQExport={true}
+      showNAVExport={true}
       showCSVExport={false}
       showCSVImport={false}
       showConfirmedFilter={false}

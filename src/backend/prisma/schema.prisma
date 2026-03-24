@@ -1053,8 +1053,8 @@ enum PromptStatus {
 }
 
 enum BidExportType {
-  CSV
-  SIQ
+  WH
+  NAV
 
   @@schema("ait")
 }

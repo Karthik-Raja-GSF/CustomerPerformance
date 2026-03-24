@@ -34,15 +34,14 @@ const TABLE_COLUMN_TO_EXPORT_KEYS: Record<string, string[]> = {
 };
 
 /**
- * SIQ row format for demand export
+ * NAV row format for demand export
  */
-interface SIQRow {
-  "Item Code": string;
-  "Site Code": string;
-  "Customer Ship To Code": string;
-  "Demand Date": string;
+interface NAVRow {
+  "Customer No.": string;
+  "Item No.": string;
+  "Starting Date": string;
+  "Ending Date": string;
   Quantity: number;
-  Note: string;
 }
 
 /**
@@ -89,53 +88,51 @@ export function exportToCSV<T extends object>(
 }
 
 /**
- * Monthly estimate configuration for SIQ export
+ * Monthly estimate configuration for NAV export.
+ * yearOffset: 0 = start year of school year (Jul-Dec), 1 = end year (Jan-Jun)
  */
-const SIQ_ESTIMATE_MONTHS = [
-  { key: "estimateJan" as const, month: 1, label: "01" },
-  { key: "estimateFeb" as const, month: 2, label: "02" },
-  { key: "estimateMar" as const, month: 3, label: "03" },
-  { key: "estimateApr" as const, month: 4, label: "04" },
-  { key: "estimateMay" as const, month: 5, label: "05" },
-  { key: "estimateJun" as const, month: 6, label: "06" },
-  { key: "estimateJul" as const, month: 7, label: "07" },
-  { key: "estimateAug" as const, month: 8, label: "08" },
-  { key: "estimateSep" as const, month: 9, label: "09" },
-  { key: "estimateOct" as const, month: 10, label: "10" },
-  { key: "estimateNov" as const, month: 11, label: "11" },
-  { key: "estimateDec" as const, month: 12, label: "12" },
+const NAV_ESTIMATE_MONTHS = [
+  { key: "estimateJan" as const, month: 1, yearOffset: 1 },
+  { key: "estimateFeb" as const, month: 2, yearOffset: 1 },
+  { key: "estimateMar" as const, month: 3, yearOffset: 1 },
+  { key: "estimateApr" as const, month: 4, yearOffset: 1 },
+  { key: "estimateMay" as const, month: 5, yearOffset: 1 },
+  { key: "estimateJun" as const, month: 6, yearOffset: 1 },
+  { key: "estimateJul" as const, month: 7, yearOffset: 0 },
+  { key: "estimateAug" as const, month: 8, yearOffset: 0 },
+  { key: "estimateSep" as const, month: 9, yearOffset: 0 },
+  { key: "estimateOct" as const, month: 10, yearOffset: 0 },
+  { key: "estimateNov" as const, month: 11, yearOffset: 0 },
+  { key: "estimateDec" as const, month: 12, yearOffset: 0 },
 ];
 
 /**
- * Export customer bids to SIQ CSV format
+ * Export customer bids to NAV CSV format
  *
  * Transforms each bid record into up to 12 rows (one per estimate month).
  * Only includes rows where the estimate quantity is greater than 0.
  *
- * SIQ Format:
- * - Item Code: itemCode
- * - Site Code: siteCode
- * - Customer Ship To Code: customerBillTo
- * - Demand Date: MM/01/YYYY (1st of each month)
+ * NAV Format:
+ * - Customer No.: customerBillTo
+ * - Item No.: itemCode
+ * - Starting Date: MM/01/YY (first day of month, 2-digit year)
+ * - Ending Date: MM/DD/YY (last day of month, 2-digit year)
  * - Quantity: estimate value
- * - Note: customerName
+ *
+ * Year is derived from schoolYearString (e.g. "2025-2026"):
+ * - Jul-Dec use the start year (2025)
+ * - Jan-Jun use the end year (2026)
  */
-export function exportToSIQCSV(
+export function exportToNAVCSV(
   data: CustomerBidDto[],
   filename: string,
+  schoolYearString: string,
   getMenuMonths?: (bid: CustomerBidDto) => Record<MonthKey, boolean>
 ): void {
-  const nextYear = new Date().getFullYear() + 1;
-  const siqRows: SIQRow[] = [];
+  const startYear = parseInt(schoolYearString.split("-")[0] ?? "0", 10);
+  const navRows: NAVRow[] = [];
 
   for (const row of data) {
-    const baseRow = {
-      "Item Code": row.itemCode || "",
-      "Site Code": row.siteCode || "",
-      "Customer Ship To Code": row.customerBillTo || "",
-      Note: row.customerName || "",
-    };
-
     // When getMenuMonths is provided, build the set of allowed estimate keys for this row
     let allowedEstimateKeys: Set<string> | null = null;
     if (getMenuMonths) {
@@ -155,24 +152,30 @@ export function exportToSIQCSV(
       }
     }
 
-    for (const monthConfig of SIQ_ESTIMATE_MONTHS) {
+    for (const monthConfig of NAV_ESTIMATE_MONTHS) {
       if (allowedEstimateKeys && !allowedEstimateKeys.has(monthConfig.key)) {
         continue;
       }
       const estimateValue = row[monthConfig.key];
       if (estimateValue != null && estimateValue > 0) {
-        siqRows.push({
-          ...baseRow,
-          "Demand Date": `${monthConfig.label}/01/${nextYear}`,
+        const year = startYear + monthConfig.yearOffset;
+        const yy = String(year % 100).padStart(2, "0");
+        const mm = String(monthConfig.month).padStart(2, "0");
+        const lastDay = new Date(year, monthConfig.month, 0).getDate();
+        navRows.push({
+          "Customer No.": row.customerBillTo || "",
+          "Item No.": row.itemCode || "",
+          "Starting Date": `${mm}/01/${yy}`,
+          "Ending Date": `${mm}/${String(lastDay).padStart(2, "0")}/${yy}`,
           Quantity: estimateValue,
         });
       }
     }
   }
 
-  const worksheet = XLSX.utils.json_to_sheet(siqRows);
+  const worksheet = XLSX.utils.json_to_sheet(navRows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "SIQ");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "NAV");
 
   const timestamp = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(workbook, `${filename}-${timestamp}.csv`);

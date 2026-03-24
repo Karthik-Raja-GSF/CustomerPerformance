@@ -36,7 +36,7 @@ export interface IBidExportService {
 
   /**
    * Get full CustomerBidDto data for all QUEUED items of a given export type.
-   * Used by the frontend to generate SIQ/CSV files.
+   * Used by the frontend to generate NAV/WH files.
    */
   getQueuedBidData(exportType: BidExportType): Promise<CustomerBidDto[]>;
 
@@ -109,9 +109,9 @@ export interface IBidExportService {
   processPendingExports(): Promise<BidExportProcessResultDto>;
 
   /**
-   * Prepare a webhook export — find all QUEUED SIQ items, create an IN_PROGRESS run,
+   * Prepare a webhook export — find all QUEUED NAV items, create an IN_PROGRESS run,
    * and return bid data in webhook format.
-   * Idempotent: if an IN_PROGRESS SIQ run already exists, returns that same run.
+   * Idempotent: if an IN_PROGRESS NAV run already exists, returns that same run.
    */
   prepareWebhookExport(userEmail: string): Promise<WebhookExportResultDto>;
 

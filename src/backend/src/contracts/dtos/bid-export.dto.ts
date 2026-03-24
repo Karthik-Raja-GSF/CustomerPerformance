@@ -4,7 +4,7 @@
 
 import type { CustomerBidDto } from "@/contracts/dtos/customer-bid.dto";
 
-export type BidExportType = "CSV" | "SIQ";
+export type BidExportType = "WH" | "NAV";
 export type BidExportItemStatus = "QUEUED" | "EXPORTED" | "CANCELLED";
 export type BidExportRunStatus = "IN_PROGRESS" | "COMPLETED" | "FAILED";
 
@@ -75,8 +75,8 @@ export interface BidExportRunDto {
  * Queue summary — count of QUEUED items by export type
  */
 export interface QueueSummaryDto {
-  csv: number;
-  siq: number;
+  wh: number;
+  nav: number;
   total: number;
 }
 
@@ -159,7 +159,7 @@ export interface WebhookBidRowDto {
 }
 
 /**
- * Response for GET /webhook/siq — prepare export and return bid data
+ * Response for GET /webhook/nav — prepare export and return bid data
  */
 export interface WebhookExportResultDto {
   runId: string | null;
@@ -167,7 +167,7 @@ export interface WebhookExportResultDto {
 }
 
 /**
- * Response for POST /webhook/siq/:runId/complete — confirm export success
+ * Response for POST /webhook/nav/:runId/complete — confirm export success
  */
 export interface WebhookCompleteResultDto {
   runId: string;

@@ -66,7 +66,7 @@ import {
 import { createColumns, canConfirmBid } from "@/pages/customer-bids/columns";
 import {
   exportToCSV,
-  exportToSIQCSV,
+  exportToNAVCSV,
   buildFilteredExportColumns,
 } from "@/utils/export-csv";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
@@ -234,7 +234,7 @@ interface CustomerBidsProps {
   defaultQueued?: boolean;
   defaultColumnVisibility?: VisibilityState;
   canUnconfirm?: boolean;
-  showSIQExport?: boolean;
+  showNAVExport?: boolean;
   showCSVExport?: boolean;
   showCSVImport?: boolean;
   showConfirmedFilter?: boolean;
@@ -259,7 +259,7 @@ export default function CustomerBids({
   defaultExcludeItemPrefixes,
   defaultColumnVisibility,
   canUnconfirm = true,
-  showSIQExport = false,
+  showNAVExport = false,
   showCSVExport = true,
   showCSVImport = true,
   showConfirmedFilter = true,
@@ -447,7 +447,7 @@ export default function CustomerBids({
     showPendingQueue,
     setShowPendingQueue,
     isConfirmingQueue,
-    isExportingSIQ,
+    isExportingNAV,
     queueSummary,
     displayedBids,
     isQueued,
@@ -455,7 +455,7 @@ export default function CustomerBids({
     handleQueueAll,
     handleRemoveAllQueued,
     handleConfirmQueue,
-    handleExportSIQ,
+    handleExportNAV,
     handleDequeue,
     handleCancelExport,
   } = useExportQueue({
@@ -1079,7 +1079,7 @@ export default function CustomerBids({
           </Button>
         )}
 
-        {/* Queue-based SIQ export (Confirmed Bid Items page) */}
+        {/* Queue-based NAV export (Confirmed Bid Items page) */}
         {showQueueExport && (
           <>
             {/* Local queue buttons — hidden when viewing backend-queued or exported items */}
@@ -1142,7 +1142,7 @@ export default function CustomerBids({
                           {queuedKeys.size !== 1 ? "s" : ""} to the export
                           queue. Queued items will be picked up by the nightly
                           export run, or you can export manually using
-                          &quot;Export SIQ&quot;.
+                          &quot;Export NAV&quot;.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -1159,43 +1159,48 @@ export default function CustomerBids({
               </>
             )}
 
-            {/* Export SIQ — atomic: marks exported + returns data for CSV */}
+            {/* Export NAV — atomic: marks exported + returns data for CSV */}
             <Button
               variant="outline"
               size="sm"
               disabled={
-                isExportingSIQ || !queueSummary || queueSummary.siq === 0
+                isExportingNAV || !queueSummary || queueSummary.nav === 0
               }
-              onClick={() => void handleExportSIQ()}
+              onClick={() => void handleExportNAV()}
             >
-              {isExportingSIQ ? (
+              {isExportingNAV ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Download className="h-4 w-4 mr-2" />
               )}
-              Export SIQ
-              {queueSummary && queueSummary.siq > 0 && (
+              Export NAV
+              {queueSummary && queueSummary.nav > 0 && (
                 <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1.5">
-                  {queueSummary.siq}
+                  {queueSummary.nav}
                 </Badge>
               )}
             </Button>
           </>
         )}
 
-        {/* Legacy SIQ export (non-queue, e.g. Back to School page) */}
-        {showSIQExport && !showQueueExport && (
+        {/* Legacy NAV export (non-queue, e.g. Back to School page) */}
+        {showNAVExport && !showQueueExport && (
           <Button
             variant="outline"
             size="sm"
             disabled={bids.length === 0 || isLoading}
             onClick={() => {
-              exportToSIQCSV(bids, "customer-bids-siq", getMenuMonths);
-              toast.success("SIQ CSV exported successfully");
+              exportToNAVCSV(
+                bids,
+                "customer-bids-nav",
+                schoolYearString,
+                getMenuMonths
+              );
+              toast.success("NAV CSV exported successfully");
             }}
           >
             <Download className="h-4 w-4 mr-2" />
-            Export SIQ
+            Export NAV
           </Button>
         )}
 

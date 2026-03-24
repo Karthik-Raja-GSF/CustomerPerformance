@@ -100,9 +100,9 @@ info:
 
     ## Webhook Integration Flow
     ```
-    1. GET  /bid-exports/webhook/siq              → { runId, data }
+    1. GET  /bid-exports/webhook/nav              → { runId, data }
     2. [external system processes data]
-    3. POST /bid-exports/webhook/siq/{runId}/complete  → { runId, totalExported }
+    3. POST /bid-exports/webhook/nav/{runId}/complete  → { runId, totalExported }
     ```
     The GET is idempotent — calling it again before completing returns the same run.
   version: "1.0.0"
@@ -127,12 +127,12 @@ security:
 paths:
   # ─── Webhook Endpoints ─────────────────────────────────────
 
-  /bid-exports/webhook/siq:
+  /bid-exports/webhook/nav:
     get:
       tags: [Webhook]
       summary: Prepare webhook export
       description: |
-        Returns all QUEUED SIQ bid items with a `runId`.
+        Returns all QUEUED NAV bid items with a `runId`.
 
         **Idempotent**: If an IN_PROGRESS webhook run already exists, returns that same run
         and its associated data instead of creating a new one.
@@ -173,7 +173,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /bid-exports/webhook/siq/{runId}/complete:
+  /bid-exports/webhook/nav/{runId}/complete:
     post:
       tags: [Webhook]
       summary: Confirm webhook export success
@@ -218,7 +218,7 @@ paths:
     post:
       tags: [Queue]
       summary: Queue items by composite keys
-      description: Queue specific bid items for SIQ export using their composite keys.
+      description: Queue specific bid items for NAV export using their composite keys.
       operationId: queueBidExportByKeys
       requestBody:
         required: true
@@ -227,7 +227,7 @@ paths:
             schema:
               $ref: "#/components/schemas/QueueByKeysRequest"
             example:
-              exportType: "SIQ"
+              exportType: "NAV"
               keys:
                 - sourceDb: "NAV"
                   siteCode: "SITE-A"
@@ -270,8 +270,8 @@ paths:
               example:
                 status: success
                 data:
-                  csv: 0
-                  siq: 42
+                  wh: 0
+                  nav: 42
                   total: 42
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -340,7 +340,7 @@ paths:
                 data:
                   - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                     status: "COMPLETED"
-                    exportType: "SIQ"
+                    exportType: "NAV"
                     triggeredBy: "webhook"
                     totalRecords: 42
                     startedAt: "2026-02-22T03:00:00.000Z"
@@ -374,7 +374,7 @@ components:
 
     BidExportType:
       type: string
-      enum: [CSV, SIQ]
+      enum: [WH, NAV]
 
     BidExportRunStatus:
       type: string
@@ -494,9 +494,9 @@ components:
     QueueSummary:
       type: object
       properties:
-        csv:
+        wh:
           type: integer
-        siq:
+        nav:
           type: integer
         total:
           type: integer

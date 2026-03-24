@@ -13,7 +13,7 @@ import {
   exportAndReturn,
   getQueueSummary,
 } from "@/apis/bid-exports";
-import { exportToSIQCSV } from "@/utils/export-csv";
+import { exportToNAVCSV } from "@/utils/export-csv";
 import { deriveMenuMonthsFromEstimates } from "@/utils/menu-months";
 import type { CustomerBidDto, CustomerBidFilters } from "@/types/customer-bids";
 import type { QueueSummary } from "@/types/bid-export";
@@ -50,7 +50,7 @@ export function useExportQueue({
   const [showPendingQueue, setShowPendingQueue] = useState(false);
   const [queueSummary, setQueueSummary] = useState<QueueSummary | null>(null);
   const [isConfirmingQueue, setIsConfirmingQueue] = useState(false);
-  const [isExportingSIQ, setIsExportingSIQ] = useState(false);
+  const [isExportingNAV, setIsExportingNAV] = useState(false);
 
   // Auto-reset pending queue view when queue becomes empty
   useEffect(() => {
@@ -145,7 +145,7 @@ export function useExportQueue({
       });
 
       const result = await queueBidExportByKeys({
-        exportType: "SIQ",
+        exportType: "NAV",
         keys,
       });
 
@@ -166,19 +166,22 @@ export function useExportQueue({
     }
   }, [queuedKeys, schoolYearString, fetchQueueSummary, fetchData, filters]);
 
-  // Export SIQ: atomic backend call — marks exported + returns bid data for CSV
-  const handleExportSIQ = useCallback(async () => {
-    setIsExportingSIQ(true);
+  // Export NAV: atomic backend call — marks exported + returns bid data for CSV
+  const handleExportNAV = useCallback(async () => {
+    setIsExportingNAV(true);
     try {
-      const result = await exportAndReturn("SIQ");
+      const result = await exportAndReturn("NAV");
       if (result.totalExported === 0) {
         toast.info(
-          "No items queued for SIQ export. Queue items for export first."
+          "No items queued for NAV export. Queue items for export first."
         );
         return;
       }
-      exportToSIQCSV(result.data, "customer-bids-siq", (bid) =>
-        deriveMenuMonthsFromEstimates(bid)
+      exportToNAVCSV(
+        result.data,
+        "customer-bids-nav",
+        schoolYearString,
+        (bid) => deriveMenuMonthsFromEstimates(bid)
       );
       toast.success(
         `Exported ${result.totalExported} item${result.totalExported !== 1 ? "s" : ""}`
@@ -189,9 +192,9 @@ export function useExportQueue({
       const message = err instanceof Error ? err.message : "Failed to export";
       toast.error(message);
     } finally {
-      setIsExportingSIQ(false);
+      setIsExportingNAV(false);
     }
-  }, [fetchQueueSummary, fetchData, filters]);
+  }, [fetchQueueSummary, fetchData, filters, schoolYearString]);
 
   // Dequeue a single item from the backend export queue
   const handleDequeue = useCallback(
@@ -248,7 +251,7 @@ export function useExportQueue({
     showPendingQueue,
     setShowPendingQueue,
     isConfirmingQueue,
-    isExportingSIQ,
+    isExportingNAV,
     queueSummary,
     // Computed
     displayedBids,
@@ -261,7 +264,7 @@ export function useExportQueue({
     handleRemoveAllQueued,
     // Backend queue
     handleConfirmQueue,
-    handleExportSIQ,
+    handleExportNAV,
     handleDequeue,
     handleCancelExport,
     fetchQueueSummary,

@@ -2,7 +2,7 @@
  * Bid Export Types - Frontend type definitions for Bid Export Queue feature
  */
 
-export type BidExportType = "CSV" | "SIQ";
+export type BidExportType = "WH" | "NAV";
 export type BidExportItemStatus = "QUEUED" | "EXPORTED" | "CANCELLED";
 export type BidExportRunStatus = "IN_PROGRESS" | "COMPLETED" | "FAILED";
 
@@ -41,8 +41,8 @@ export interface MarkExportedResult {
  * Queue summary — count of QUEUED items by export type
  */
 export interface QueueSummary {
-  csv: number;
-  siq: number;
+  wh: number;
+  nav: number;
   total: number;
 }
 

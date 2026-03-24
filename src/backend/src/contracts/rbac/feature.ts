@@ -15,6 +15,7 @@ export const Feature = {
   CUSTOMER_BIDS_SYNC: "customer-bids-sync",
   EO_RISK_REVIEW: "eo-risk-review",
   RBAC_ADMIN: "rbac-admin",
+  BID_EXPORT_WEBHOOK: "bid-export-webhook",
 } as const;
 
 export type Feature = (typeof Feature)[keyof typeof Feature];
