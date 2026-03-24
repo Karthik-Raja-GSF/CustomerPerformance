@@ -55,6 +55,8 @@ import type {
 } from "@/types/customer-bids";
 import {
   deriveMenuMonthsFromEstimates,
+  ESTIMATE_MONTHS,
+  LY_MONTHS,
   type MonthKey,
 } from "@/utils/menu-months";
 import {
@@ -398,7 +400,10 @@ export default function CustomerBids({
     async (currentFilters: CustomerBidFilters) => {
       if (!hasStatsSlot) return;
       try {
-        const data = await getCustomerBidStats(currentFilters);
+        const data = await getCustomerBidStats({
+          ...currentFilters,
+          confirmed: undefined,
+        });
         setStats(data);
       } catch {
         setStats(null);
@@ -1025,19 +1030,41 @@ export default function CustomerBids({
             size="sm"
             disabled={bids.length === 0 || isLoading}
             onClick={() => {
-              const exportable = bids
-                .filter(
-                  (b) =>
-                    b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
-                )
-                .map((b) => ({ ...b, schoolYear: schoolYearString }));
+              const filtered = bids.filter(
+                (b) =>
+                  b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
+              );
               const filteredColumns = buildFilteredExportColumns(
-                exportable,
+                filtered,
                 getMenuMonths,
                 columnVisibility
               );
+              const exportable = filtered.map((b) => {
+                const months = getMenuMonths(b);
+                const row: Record<string, unknown> = {
+                  ...b,
+                  schoolYear: schoolYearString,
+                };
+                for (const m of ESTIMATE_MONTHS) {
+                  if (!months[m.menuKey]) continue;
+                  if (b[m.estimateKey] != null && b[m.estimateKey] !== 0)
+                    continue;
+                  const lyMonth = LY_MONTHS.find(
+                    (ly) => ly.menuKey === m.menuKey
+                  );
+                  if (lyMonth) {
+                    const lyVal = b[lyMonth.lyKey as keyof CustomerBidDto] as
+                      | number
+                      | null;
+                    if (lyVal != null && lyVal > 0) {
+                      row[m.estimateKey] = lyVal;
+                    }
+                  }
+                }
+                return row;
+              });
               exportToCSV(exportable, filteredColumns, "customer-bids");
-              const skipped = bids.length - exportable.length;
+              const skipped = bids.length - filtered.length;
               if (skipped > 0) {
                 toast.success(
                   `CSV exported (${skipped} record${skipped > 1 ? "s" : ""} skipped — missing key fields)`
@@ -1184,8 +1211,8 @@ export default function CustomerBids({
           </Button>
         )}
 
-        {/* Confirm All button — only when viewing unconfirmed bids */}
-        {!filters.confirmed && confirmableBids.length > 0 && (
+        {/* Confirm All button — visible whenever confirmable bids exist on the page */}
+        {confirmableBids.length > 0 && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
