@@ -115,8 +115,8 @@ const NAV_ESTIMATE_MONTHS = [
  * NAV Format:
  * - Customer No.: customerBillTo
  * - Item No.: itemCode
- * - Starting Date: MM/01/YY (first day of month, 2-digit year)
- * - Ending Date: MM/DD/YY (last day of month, 2-digit year)
+ * - Starting Date: MM/01/YYYY (first day of month, 4-digit year)
+ * - Ending Date: MM/DD/YYYY (last day of month, 4-digit year)
  * - Quantity: estimate value
  *
  * Year is derived from schoolYearString (e.g. "2025-2026"):
@@ -159,14 +159,14 @@ export function exportToNAVCSV(
       const estimateValue = row[monthConfig.key];
       if (estimateValue != null && estimateValue > 0) {
         const year = startYear + monthConfig.yearOffset;
-        const yy = String(year % 100).padStart(2, "0");
+        const yyyy = String(year);
         const mm = String(monthConfig.month).padStart(2, "0");
         const lastDay = new Date(year, monthConfig.month, 0).getDate();
         navRows.push({
           "Customer No.": row.customerBillTo || "",
           "Item No.": row.itemCode || "",
-          "Starting Date": `${mm}/01/${yy}`,
-          "Ending Date": `${mm}/${String(lastDay).padStart(2, "0")}/${yy}`,
+          "Starting Date": `${mm}/01/${yyyy}`,
+          "Ending Date": `${mm}/${String(lastDay).padStart(2, "0")}/${yyyy}`,
           Quantity: estimateValue,
         });
       }
