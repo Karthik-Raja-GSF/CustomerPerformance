@@ -8,6 +8,8 @@ interface EditableNumberCellProps {
   disabled?: boolean;
   /** Shown in muted text when value is null (e.g. LY estimate) */
   placeholder?: string;
+  /** Raw numeric value to pre-fill when entering edit mode with a null value (e.g. LY actual) */
+  prefillValue?: number | null;
 }
 
 export function EditableNumberCell({
@@ -15,6 +17,7 @@ export function EditableNumberCell({
   onSave,
   disabled = false,
   placeholder,
+  prefillValue,
 }: EditableNumberCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,6 +41,9 @@ export function EditableNumberCell({
 
   const handleClick = () => {
     if (!disabled && !isSaving) {
+      if (value === null && prefillValue != null) {
+        setInputValue(prefillValue.toString());
+      }
       setIsEditing(true);
     }
   };
@@ -117,9 +123,20 @@ export function EditableNumberCell({
     <div
       tabIndex={disabled ? -1 : 0}
       onClick={handleClick}
+      onFocus={() => {
+        if (!disabled && !isSaving) {
+          if (value === null && prefillValue != null) {
+            setInputValue(prefillValue.toString());
+          }
+          setIsEditing(true);
+        }
+      }}
       onKeyDown={(e) => {
         if ((e.key === "Enter" || e.key === " ") && !disabled && !isSaving) {
           e.preventDefault();
+          if (value === null && prefillValue != null) {
+            setInputValue(prefillValue.toString());
+          }
           setIsEditing(true);
         }
       }}

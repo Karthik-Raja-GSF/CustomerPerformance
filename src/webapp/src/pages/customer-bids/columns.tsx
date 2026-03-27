@@ -1194,6 +1194,7 @@ export function createColumns(
                   <EditableNumberCell
                     value={row.original[estimateKey]}
                     disabled={isLockedForSales}
+                    prefillValue={lyValue}
                     placeholder={
                       lyValue != null ? lyValue.toLocaleString() : undefined
                     }

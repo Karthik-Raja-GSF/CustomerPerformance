@@ -790,7 +790,14 @@ export default function CustomerBids({
         const next = new Map(prev);
         for (const bid of batchMenuEligibleBids) {
           const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
-          next.set(key, months);
+          const existing = getMenuMonths(bid);
+          const merged = { ...existing };
+          for (const [mk, selected] of Object.entries(months)) {
+            if (selected) {
+              merged[mk as MonthKey] = true;
+            }
+          }
+          next.set(key, merged);
         }
         return next;
       });
