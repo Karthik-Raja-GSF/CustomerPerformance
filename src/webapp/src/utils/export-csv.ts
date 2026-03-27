@@ -26,6 +26,7 @@ const TABLE_COLUMN_TO_EXPORT_KEYS: Record<string, string[]> = {
   estimates: ESTIMATE_MONTHS.map((m) => m.estimateKey),
   lyMonths: LY_MONTHS.map((m) => m.lyKey),
   cyYtd: ["cyYtd"],
+  currentAvg: ["currentAvg"],
   menuMonths: [], // virtual UI-only column, no export counterpart
   confirmed: ["confirmedAt"],
   lastUpdated: ["lastUpdatedAt", "lastUpdatedBy"],
@@ -387,6 +388,37 @@ export const customerBidExportColumns: ExportColumn[] = [
       ];
       const sum = fields.reduce((acc, f) => acc + ((row[f] as number) ?? 0), 0);
       return sum > 0 ? sum : "";
+    },
+  },
+  {
+    key: "currentAvg",
+    header: "Current Avg",
+    computeValue: (row) => {
+      const schoolYearMonths: { month: number; field: string }[] = [
+        { month: 7, field: "cyJuly" },
+        { month: 8, field: "cyAugust" },
+        { month: 9, field: "cySeptember" },
+        { month: 10, field: "cyOctober" },
+        { month: 11, field: "cyNovember" },
+        { month: 12, field: "cyDecember" },
+        { month: 1, field: "cyJanuary" },
+        { month: 2, field: "cyFebruary" },
+        { month: 3, field: "cyMarch" },
+        { month: 4, field: "cyApril" },
+        { month: 5, field: "cyMay" },
+        { month: 6, field: "cyJune" },
+      ];
+      const currentMonth = new Date().getMonth() + 1;
+      let elapsed = 0;
+      let sum = 0;
+      for (const m of schoolYearMonths) {
+        elapsed++;
+        sum += (row[m.field] as number) ?? 0;
+        if (m.month === currentMonth) break;
+      }
+      if (elapsed === 0) return "";
+      const avg = sum / elapsed;
+      return avg > 0 ? Math.round(avg) : "";
     },
   },
   // Tracking fields
