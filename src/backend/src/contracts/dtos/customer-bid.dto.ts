@@ -171,7 +171,7 @@ export interface CustomerBidQueryDto {
   page?: number;
   limit?: number;
   siteCode?: string;
-  customerBillTo?: string;
+  customerBillTo?: string[];
   customerName?: string;
   salesRep?: string;
   itemCode?: string;

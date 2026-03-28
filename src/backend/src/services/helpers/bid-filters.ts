@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 
 export interface BidFilterParams {
   siteCode?: string;
-  customerBillTo?: string;
+  customerBillTo?: string[];
   customerName?: string;
   salesRep?: string;
   itemCode?: string;
@@ -31,12 +31,11 @@ export function buildBidFilterConditions(
   if (filters.siteCode) {
     conditions.push(Prisma.sql`cbd.site_code = ${filters.siteCode}`);
   }
-  if (filters.customerBillTo) {
-    conditions.push(
-      Prisma.sql`cbd.customer_bill_to ILIKE ${
-        "%" + filters.customerBillTo + "%"
-      }`
+  if (filters.customerBillTo && filters.customerBillTo.length > 0) {
+    const billToConditions = filters.customerBillTo.map(
+      (bt) => Prisma.sql`cbd.customer_bill_to ILIKE ${"%" + bt + "%"}`
     );
+    conditions.push(Prisma.sql`(${Prisma.join(billToConditions, " OR ")})`);
   }
   if (filters.customerName) {
     conditions.push(

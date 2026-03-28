@@ -860,9 +860,11 @@ export class BidExportService implements IBidExportService {
     // Cast untyped filter record to typed params for shared builder
     const whereConditions = buildBidFilterConditions({
       siteCode: filters.siteCode ? String(filters.siteCode) : undefined,
-      customerBillTo: filters.customerBillTo
-        ? String(filters.customerBillTo)
-        : undefined,
+      customerBillTo: Array.isArray(filters.customerBillTo)
+        ? (filters.customerBillTo as string[])
+        : filters.customerBillTo
+          ? [String(filters.customerBillTo)]
+          : undefined,
       customerName: filters.customerName
         ? String(filters.customerName)
         : undefined,

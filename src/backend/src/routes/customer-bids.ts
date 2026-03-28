@@ -24,7 +24,17 @@ const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(500).default(50),
   siteCode: z.string().optional(),
-  customerBillTo: z.string().optional(),
+  customerBillTo: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined
+    ),
   customerName: z.string().optional(),
   salesRep: z.string().optional(),
   itemCode: z.string().optional(),

@@ -199,16 +199,19 @@ export function FilterSheet({
               htmlFor="customerBillTo"
               className="text-sm font-medium text-foreground"
             >
-              Customer Bill To
+              Customer Bill Tos
             </Label>
             <Input
               id="customerBillTo"
-              placeholder="e.g. CUST001"
+              placeholder="e.g. CUST001, CUST002"
               value={filterInputs.customerBillTo}
               onChange={(e) => updateField("customerBillTo")(e.target.value)}
               onKeyDown={handleKeyDown}
               className="h-11"
             />
+            <p className="text-xs text-muted-foreground">
+              Comma-separated bill-to codes
+            </p>
           </div>
           <div className="space-y-3">
             <Label
