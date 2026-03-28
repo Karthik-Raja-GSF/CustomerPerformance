@@ -282,39 +282,21 @@ export class SchedulerService implements ISchedulerService {
         );
       }
 
-      // Sync "current" if never successfully synced (once per school year)
-      const currSchoolYear = getSchoolYearString("current");
-      if (!(await this.hasCompletedSync(currSchoolYear))) {
-        logger.info(
-          {
-            event: "scheduler.customerbid.current.needed",
-            schoolYear: currSchoolYear,
-          },
-          "Current school year has no completed sync — syncing now"
-        );
-        const currentResult = await this.customerBidService.sync(
-          "current",
-          "scheduled"
-        );
-        logger.info(
-          {
-            event: "scheduler.customerbid.current.complete",
-            syncId: currentResult.syncId,
-            schoolYear: currentResult.schoolYear,
-            recordsTotal: currentResult.recordsTotal,
-            durationMs: currentResult.durationMs,
-          },
-          "Scheduled Customer Bid sync (current) completed"
-        );
-      } else {
-        logger.info(
-          {
-            event: "scheduler.customerbid.current.skipped",
-            schoolYear: currSchoolYear,
-          },
-          "Current school year already synced — skipping"
-        );
-      }
+      // Always sync "current" school year (daily)
+      const currentResult = await this.customerBidService.sync(
+        "current",
+        "scheduled"
+      );
+      logger.info(
+        {
+          event: "scheduler.customerbid.current.complete",
+          syncId: currentResult.syncId,
+          schoolYear: currentResult.schoolYear,
+          recordsTotal: currentResult.recordsTotal,
+          durationMs: currentResult.durationMs,
+        },
+        "Scheduled Customer Bid sync (current) completed"
+      );
 
       // Always sync "next" school year (daily)
       const nextResult = await this.customerBidService.sync(
