@@ -604,6 +604,19 @@ export function createColumns(
         </div>
       ),
     },
+    {
+      accessorKey: "openOrderQty",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          Open Order Qty
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("openOrderQty"))}
+        </div>
+      ),
+    },
     // Conversion Rate: (LY Actual / LY Bid Qty) * 100
     {
       id: "conversionRate",

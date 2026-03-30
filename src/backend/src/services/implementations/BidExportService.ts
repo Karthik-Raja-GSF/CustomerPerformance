@@ -929,6 +929,7 @@ export class BidExportService implements IBidExportService {
       customerLeadTime: null,
       erpStatus: row.erpStatus,
       bidQuantity: decimalToNumber(row.bidQty),
+      openOrderQty: 0,
       lastYearBidQty: decimalToNumber(row.lastYearBidQty),
       lastYearActual: decimalToNumber(row.lastYearActual),
       lyAugust: decimalToNumber(row.lyAugust),

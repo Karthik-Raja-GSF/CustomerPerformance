@@ -333,6 +333,7 @@ export const customerBidExportColumns: ExportColumn[] = [
   // Last year data
   { key: "lastYearBidQty", header: "LY Bid Qty" },
   { key: "lastYearActual", header: "LY Actual" },
+  { key: "openOrderQty", header: "Open Order Qty" },
   {
     key: "conversionRate",
     header: "Conversion Rate (%)",

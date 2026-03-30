@@ -109,6 +109,7 @@ interface BaseBidRow {
   estimateOct: Prisma.Decimal | null;
   estimateNov: Prisma.Decimal | null;
   estimateDec: Prisma.Decimal | null;
+  openOrderQty: Prisma.Decimal | null;
 }
 
 /**
@@ -252,7 +253,8 @@ export class CustomerBidService implements ICustomerBidService {
             cbd.estimate_sep AS "estimateSep",
             cbd.estimate_oct AS "estimateOct",
             cbd.estimate_nov AS "estimateNov",
-            cbd.estimate_dec AS "estimateDec"
+            cbd.estimate_dec AS "estimateDec",
+            cbd.open_order_qty AS "openOrderQty"
         FROM ait.customer_bid_data cbd
         INNER JOIN dw2_nav.customer c
             ON cbd.customer_bill_to = c.no_
@@ -342,6 +344,7 @@ export class CustomerBidService implements ICustomerBidService {
         estimateOct: row.estimateOct ? Number(row.estimateOct) : null,
         estimateNov: row.estimateNov ? Number(row.estimateNov) : null,
         estimateDec: row.estimateDec ? Number(row.estimateDec) : null,
+        openOrderQty: row.openOrderQty ? Number(row.openOrderQty) : 0,
       }));
 
       logger.info(
@@ -810,6 +813,7 @@ export class CustomerBidService implements ICustomerBidService {
       customerLeadTime: null,
       erpStatus: null,
       bidQuantity: null,
+      openOrderQty: 0,
       lastYearBidQty: decimalToNumber(record.lastYearBidQty),
       lastYearActual: decimalToNumber(record.lastYearActual),
       lyAugust: decimalToNumber(record.lyAugust),

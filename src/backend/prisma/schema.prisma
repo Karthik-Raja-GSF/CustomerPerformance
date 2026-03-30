@@ -1084,6 +1084,7 @@ model CustomerBidData {
   bidQty         Decimal? @map("bid_qty")
   lastYearBidQty Decimal? @map("last_year_bid_qty")
   lastYearActual Decimal? @map("last_year_actual")
+  openOrderQty   Decimal? @map("open_order_qty")
   lyAugust       Decimal? @map("ly_august")
   lySeptember    Decimal? @map("ly_september")
   lyOctober      Decimal? @map("ly_october")

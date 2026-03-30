@@ -46,6 +46,8 @@ export interface CustomerBidDto {
   customerLeadTime: number | null;
   erpStatus: string | null;
   bidQuantity: number | null;
+  /** Sum of open sales order quantities (shipment_date >= today) */
+  openOrderQty: number;
 
   // Pre-calculated fields (from sync)
   /** Last year bid quantity (previous school year relative to current view) */
