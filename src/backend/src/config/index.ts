@@ -27,6 +27,7 @@ const databaseUrl = getDatabaseUrl();
 export const config = {
   port: process.env.PORT || 8887,
   nodeEnv: process.env.NODE_ENV || "development",
+  appEnv: process.env.APP_ENV || "local",
   databaseUrl,
   corsOrigin: process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
@@ -51,7 +52,7 @@ export const config = {
   telemetry: {
     serviceName: process.env.OTEL_SERVICE_NAME || "ait-backend",
     serviceVersion: process.env.OTEL_SERVICE_VERSION || "1.0.0",
-    environment: process.env.NODE_ENV || "development",
+    environment: process.env.APP_ENV || "local",
   },
   // StockIQ API Configuration
   // Credentials are injected from AWS Secrets Manager at runtime

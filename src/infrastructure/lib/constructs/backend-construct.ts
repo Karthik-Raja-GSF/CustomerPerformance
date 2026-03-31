@@ -172,6 +172,7 @@ export class BackendConstruct extends Construct {
       environment: {
         PORT: "8887",
         NODE_ENV: "production",
+        APP_ENV: naming.env,
         CORS_ORIGIN: frontendUrl,
         AWS_REGION: cdk.Aws.REGION,
         AWS_COGNITO_USER_POOL_ID: cognitoUserPoolId,

@@ -25,7 +25,8 @@ const severityMap: Record<LogLevel, { number: SeverityNumber; text: string }> =
   };
 
 // Get the minimum log level
-const minLevel = config.nodeEnv === "development" ? "debug" : "warn";
+const isVerbose = config.appEnv === "local" || config.appEnv === "dev";
+const minLevel = isVerbose ? "debug" : "warn";
 const levelPriority: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
@@ -115,7 +116,7 @@ function createLoggerImpl(bindings: Record<string, unknown> = {}): Logger {
     });
 
     // Also output to console in development for immediate feedback
-    if (config.nodeEnv === "development") {
+    if (config.appEnv === "local") {
       const timestamp = new Date().toISOString();
       const prefix = `[${timestamp}] ${severity.text}`;
       const component = bindings["component"]

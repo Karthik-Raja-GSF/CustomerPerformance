@@ -69,8 +69,8 @@ export function telemetryMiddleware(
     "http.user_agent": req.headers["user-agent"] || "unknown",
   });
 
-  // Log incoming request (only in development to reduce log volume)
-  if (process.env.NODE_ENV === "development") {
+  // Log incoming request (only in dev/local to reduce log volume)
+  if (process.env.APP_ENV === "local" || process.env.APP_ENV === "dev") {
     logger.info({
       event: "request.start",
       requestId,
@@ -112,7 +112,9 @@ export function telemetryMiddleware(
 
     // Log response (only errors in production to reduce log volume)
     const shouldLogCompletion =
-      process.env.NODE_ENV === "development" || isError;
+      process.env.APP_ENV === "local" ||
+      process.env.APP_ENV === "dev" ||
+      isError;
 
     if (shouldLogCompletion) {
       const logMethod = isError ? "error" : "info";
