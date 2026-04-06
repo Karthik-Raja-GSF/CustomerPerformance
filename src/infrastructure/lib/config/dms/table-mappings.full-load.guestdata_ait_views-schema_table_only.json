@@ -225,6 +225,15 @@
       "rule-action": "rename",
       "value": "vendor"
     },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1015",
+      "rule-name": "rename_user_setup",
+      "rule-target": "table",
+      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]User Setup" },
+      "rule-action": "rename",
+      "value": "user_setup"
+    },
 
     {
       "rule-type": "transformation",
