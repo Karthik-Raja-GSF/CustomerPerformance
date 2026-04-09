@@ -15,13 +15,13 @@ datasource db {
 }
 
 // ============================================
-// DW2_NAV SCHEMA - NAV Data Warehouse Tables (15 models)
+// DW2_NAV SCHEMA - NAV Data Warehouse Tables (18 models)
 // ============================================
 // READ-ONLY external tables - Prisma won't manage migrations
 // Source: Microsoft Dynamics NAV Data Warehouse (DW2.nav)
 
 // =============================================================================
-// Core Tables (14 models)
+// Core Tables (17 models)
 // =============================================================================
 
 model PalletBinContent {
@@ -1027,6 +1027,120 @@ model SalesLine {
   @@schema("dw2_nav")
 }
 
+model Contact {
+  sourceDb                String  @map("source_db")
+  hash                    String?
+  no                      String  @map("no_")
+  name                    String?
+  searchName              String? @map("search_name")
+  name2                   String? @map("name_2")
+  address                 String?
+  address2                String? @map("address_2")
+  city                    String?
+  phoneNo                 String? @map("phone_no_")
+  salespersonCode         String? @map("salesperson_code")
+  faxNo                   String? @map("fax_no_")
+  postCode                String? @map("post_code")
+  county                  String?
+  eMail                   String? @map("e_mail")
+  homePage                String? @map("home_page")
+  noSeries                String? @map("no_series")
+  type                    Int?
+  companyNo               String? @map("company_no_")
+  companyName             String? @map("company_name")
+  firstName               String? @map("first_name")
+  middleName              String? @map("middle_name")
+  surname                 String?
+  jobTitle                String? @map("job_title")
+  mobilePhoneNo           String? @map("mobile_phone_no_")
+  pager                   String?
+  organizationalLevelCode String? @map("organizational_level_code")
+  excludeFromSegment      Int?    @map("exclude_from_segment")
+  searchEMail             String? @map("search_e_mail")
+  eMail2                  String? @map("e_mail_2")
+
+  @@id([sourceDb, no])
+  @@map("contact")
+  @@schema("dw2_nav")
+}
+
+model SegmentHeader {
+  sourceDb                  String    @map("source_db")
+  hash                      String?
+  no                        String    @map("no_")
+  description               String?
+  campaignNo                String?   @map("campaign_no_")
+  salespersonCode           String?   @map("salesperson_code")
+  correspondenceTypeDefault Int?      @map("correspondence_type_default")
+  interactionTemplateCode   String?   @map("interaction_template_code")
+  unitCostLcy               Decimal?  @map("unit_cost_lcy")
+  unitDurationMin           Decimal?  @map("unit_duration_min_")
+  date                      DateTime?
+  campaignTarget            Int?      @map("campaign_target")
+  informationFlow           Int?      @map("information_flow")
+  initiatedBy               Int?      @map("initiated_by")
+  noSeries                  String?   @map("no_series")
+  campaignResponse          Int?      @map("campaign_response")
+  languageCodeDefault       String?   @map("language_code_default")
+  interactionGroupCode      String?   @map("interaction_group_code")
+  sendWordDocsAsAttmt       Int?      @map("send_word_docs_as_attmt_")
+  ignoreContactCorresType   Int?      @map("ignore_contact_corres_type")
+  subjectDefault            String?   @map("subject_default")
+
+  @@id([sourceDb, no])
+  @@map("segment_header")
+  @@schema("dw2_nav")
+}
+
+model SegmentLine {
+  sourceDb                String    @map("source_db")
+  hash                    String?
+  segmentNo               String    @map("segment_no_")
+  lineNo                  Int       @map("line_no_")
+  contactNo               String?   @map("contact_no_")
+  campaignNo              String?   @map("campaign_no_")
+  salespersonCode         String?   @map("salesperson_code")
+  correspondenceType      Int?      @map("correspondence_type")
+  interactionTemplateCode String?   @map("interaction_template_code")
+  costLcy                 Decimal?  @map("cost_lcy")
+  durationMin             Decimal?  @map("duration_min_")
+  attachmentNo            Int?      @map("attachment_no_")
+  campaignResponse        Int?      @map("campaign_response")
+  informationFlow         Int?      @map("information_flow")
+  initiatedBy             Int?      @map("initiated_by")
+  contactAltAddressCode   String?   @map("contact_alt_address_code")
+  evaluation              Int?
+  campaignTarget          Int?      @map("campaign_target")
+  languageCode            String?   @map("language_code")
+  description             String?
+  date                    DateTime?
+  timeOfInteraction       DateTime? @map("time_of_interaction")
+  attemptFailed           Int?      @map("attempt_failed")
+  toDoNo                  String?   @map("to_do_no_")
+  contactCompanyNo        String?   @map("contact_company_no_")
+  campaignEntryNo         Int?      @map("campaign_entry_no_")
+  interactionGroupCode    String?   @map("interaction_group_code")
+  documentType            Int?      @map("document_type")
+  documentNo              String?   @map("document_no_")
+  sendWordDocAsAttmt      Int?      @map("send_word_doc_as_attmt_")
+  contactVia              String?   @map("contact_via")
+  versionNo               Int?      @map("version_no_")
+  docNoOccurrence         Int?      @map("doc_no_occurrence")
+  subject                 String?
+  opportunityNo           String?   @map("opportunity_no_")
+  wizardStep              Int?      @map("wizard_step")
+  wizardContactName       String?   @map("wizard_contact_name")
+  opportunityDescription  String?   @map("opportunity_description")
+  campaignDescription     String?   @map("campaign_description")
+  interactionSuccessful   Int?      @map("interaction_successful")
+  dialContact             Int?      @map("dial_contact")
+  mailContact             Int?      @map("mail_contact")
+
+  @@id([sourceDb, segmentNo, lineNo])
+  @@map("segment_line")
+  @@schema("dw2_nav")
+}
+
 model CompletedBid {
   sourceDb      String? @map("source_db")
   hash          String?
@@ -1073,12 +1187,13 @@ model Prompt {
 }
 
 model CustomerBidData {
-  // Composite primary key
+  id             String @id @default(uuid(7)) @db.Uuid
   sourceDb       String @map("source_db")
   siteCode       String @map("site_code")
   customerBillTo String @map("customer_bill_to")
   itemNo         String @map("item_no")
   schoolYear     String @map("school_year") // "2025-2026"
+  salesType      Int    @default(0) @map("sales_type")
 
   // Pre-calculated fields (populated by sync job)
   bidQty         Decimal? @map("bid_qty")
@@ -1116,6 +1231,7 @@ model CustomerBidData {
   bidStart       DateTime? @map("bid_start")
   bidEnd         DateTime? @map("bid_end")
   erpStatus      String?   @map("erp_status")
+  comCoOpCode    String?   @map("com_co_op_code")
 
   // User-editable fields
   yearAround      Boolean  @default(false) @map("year_around")
@@ -1153,13 +1269,23 @@ model CustomerBidData {
   // Relations
   exportItems CustomerBidExportItem[]
 
-  @@id([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
+  @@unique([sourceDb, siteCode, customerBillTo, itemNo, schoolYear, salesType])
   @@index([schoolYear])
   @@index([confirmedAt])
   @@index([isNew])
   @@index([lastExportedAt])
   @@index([schoolYear, siteCode, itemNo, customerBillTo])
   @@map("customer_bid_data")
+  @@schema("ait")
+}
+
+model CoopCustomerMap {
+  sourceDb       String @map("source_db")
+  coopCode       String @map("coop_code")
+  customerBillTo String @map("customer_bill_to")
+
+  @@id([sourceDb, coopCode, customerBillTo])
+  @@map("coop_customer_map")
   @@schema("ait")
 }
 
@@ -1204,11 +1330,7 @@ model CustomerBidExportRun {
 
 model CustomerBidExportItem {
   id             String        @id @default(uuid())
-  sourceDb       String        @map("source_db")
-  siteCode       String        @map("site_code")
-  customerBillTo String        @map("customer_bill_to")
-  itemNo         String        @map("item_no")
-  schoolYear     String        @map("school_year")
+  bidId          String        @map("bid_id") @db.Uuid
   exportType     BidExportType @map("export_type")
   status         String        @default("QUEUED") // QUEUED, EXPORTED, CANCELLED
   queuedBy       String        @map("queued_by")
@@ -1216,13 +1338,13 @@ model CustomerBidExportItem {
   runId          String?       @map("run_id")
 
   // Relations
-  customerBid CustomerBidData      @relation(fields: [sourceDb, siteCode, customerBillTo, itemNo, schoolYear], references: [sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
+  customerBid CustomerBidData      @relation(fields: [bidId], references: [id])
   exportRun   CustomerBidExportRun? @relation(fields: [runId], references: [id])
 
   @@index([status])
   @@index([queuedAt])
   @@index([runId])
-  @@index([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
+  @@index([bidId])
   @@map("customer_bid_export_item")
   @@schema("ait")
 }

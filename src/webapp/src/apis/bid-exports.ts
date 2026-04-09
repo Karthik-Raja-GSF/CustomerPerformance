@@ -8,8 +8,8 @@ import { apiClient } from "@/apis/client";
 import type {
   BidExportType,
   QueueBidExportRequest,
-  QueueBidExportByKeysRequest,
-  CancelBidExportByKeysRequest,
+  QueueBidExportByIdsRequest,
+  CancelBidExportByIdsRequest,
   QueueBidExportResult,
   ExportResult,
   QueueSummary,
@@ -36,13 +36,13 @@ export async function queueBidExport(
 }
 
 /**
- * Queue bid items for export using explicit composite keys
+ * Queue bid items for export using explicit UUIDs
  */
-export async function queueBidExportByKeys(
-  data: QueueBidExportByKeysRequest
+export async function queueBidExportByIds(
+  data: QueueBidExportByIdsRequest
 ): Promise<QueueBidExportResult> {
   const response = await apiClient.post<ApiResponse<QueueBidExportResult>>(
-    "/bid-exports/queue-by-keys",
+    "/bid-exports/queue-by-ids",
     data
   );
   return response.data;
@@ -72,33 +72,27 @@ export async function getQueueSummary(): Promise<QueueSummary> {
 }
 
 /**
- * Cancel QUEUED items by explicit composite keys
+ * Cancel QUEUED items by explicit UUIDs
  */
-export async function cancelBidExportByKeys(
-  data: CancelBidExportByKeysRequest
+export async function cancelBidExportByIds(
+  data: CancelBidExportByIdsRequest
 ): Promise<{ cancelled: number }> {
   const response = await apiClient.post<ApiResponse<{ cancelled: number }>>(
-    "/bid-exports/cancel-by-keys",
+    "/bid-exports/cancel-by-ids",
     data
   );
   return response.data;
 }
 
 /**
- * Clear export tracking (last_exported_at/by) on customer_bid_data by composite keys
+ * Clear export tracking (last_exported_at/by) on customer_bid_data by UUIDs
  */
-export async function clearExportByKeys(
-  keys: Array<{
-    sourceDb: string;
-    siteCode: string;
-    customerBillTo: string;
-    itemNo: string;
-    schoolYear: string;
-  }>
+export async function clearExportByIds(
+  bidIds: string[]
 ): Promise<{ cleared: number }> {
   const response = await apiClient.post<ApiResponse<{ cleared: number }>>(
-    "/bid-exports/clear-export-by-keys",
-    { keys }
+    "/bid-exports/clear-export-by-ids",
+    { bidIds }
   );
   return response.data;
 }

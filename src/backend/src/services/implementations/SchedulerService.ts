@@ -248,6 +248,16 @@ export class SchedulerService implements ISchedulerService {
         "Starting scheduled Customer Bid sync"
       );
 
+      // Refresh COOP → bill-to customer lookup table before syncing
+      const coopResult = await this.prisma.$queryRaw<
+        { refresh_coop_customer_map: number }[]
+      >`SELECT ait.refresh_coop_customer_map() AS refresh_coop_customer_map`;
+      const coopCount = coopResult[0]?.refresh_coop_customer_map ?? 0;
+      logger.info(
+        { event: "scheduler.customerbid.coop_refresh", count: coopCount },
+        `Refreshed COOP customer map: ${coopCount} mappings`
+      );
+
       // Sync "previous" if never successfully synced (once per school year)
       const prevSchoolYear = getSchoolYearString("previous");
       if (!(await this.hasCompletedSync(prevSchoolYear))) {

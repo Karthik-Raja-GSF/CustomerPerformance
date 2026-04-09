@@ -31,20 +31,9 @@ const historyQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-const queueByKeysSchema = z.object({
+const queueByIdsSchema = z.object({
   exportType: z.enum(["WH", "NAV"]),
-  keys: z
-    .array(
-      z.object({
-        sourceDb: z.string().min(1),
-        siteCode: z.string().min(1),
-        customerBillTo: z.string().min(1),
-        itemNo: z.string().min(1),
-        schoolYear: z.string().min(1),
-      })
-    )
-    .min(1)
-    .max(5000),
+  bidIds: z.array(z.string().uuid()).min(1).max(5000),
 });
 
 const exportSchema = z.object({
@@ -55,20 +44,13 @@ const cancelSchema = z.object({
   exportType: z.enum(["WH", "NAV"]).optional(),
 });
 
-const cancelByKeysSchema = z.object({
+const cancelByIdsSchema = z.object({
   exportType: z.enum(["WH", "NAV"]).optional(),
-  keys: z
-    .array(
-      z.object({
-        sourceDb: z.string().min(1),
-        siteCode: z.string().min(1),
-        customerBillTo: z.string().min(1),
-        itemNo: z.string().min(1),
-        schoolYear: z.string().min(1),
-      })
-    )
-    .min(1)
-    .max(5000),
+  bidIds: z.array(z.string().uuid()).min(1).max(5000),
+});
+
+const clearExportByIdsSchema = z.object({
+  bidIds: z.array(z.string().uuid()).min(1).max(5000),
 });
 
 // === Routes ===
@@ -191,16 +173,16 @@ router.post(
 );
 
 /**
- * POST /bid-exports/queue-by-keys
- * Queue bid items for export using explicit composite keys
+ * POST /bid-exports/queue-by-ids
+ * Queue bid items for export using explicit UUIDs
  */
 router.post(
-  "/queue-by-keys",
+  "/queue-by-ids",
   authenticate,
   requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const parsed = queueByKeysSchema.safeParse(req.body);
+      const parsed = queueByIdsSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({
           status: "error",
@@ -213,7 +195,7 @@ router.post(
         BID_EXPORT_SERVICE_TOKEN
       );
       const userEmail = req.user?.email || "unknown";
-      const result = await service.queueExportByKeys(parsed.data, userEmail);
+      const result = await service.queueExportByIds(parsed.data, userEmail);
 
       res.status(201).json({ status: "success", data: result });
     } catch (error) {
@@ -283,16 +265,16 @@ router.post(
 );
 
 /**
- * POST /bid-exports/cancel-by-keys
- * Cancel QUEUED items by explicit composite keys
+ * POST /bid-exports/cancel-by-ids
+ * Cancel QUEUED items by explicit UUIDs
  */
 router.post(
-  "/cancel-by-keys",
+  "/cancel-by-ids",
   authenticate,
   requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const parsed = cancelByKeysSchema.safeParse(req.body);
+      const parsed = cancelByIdsSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({
           status: "error",
@@ -304,7 +286,7 @@ router.post(
       const service = container.resolve<IBidExportService>(
         BID_EXPORT_SERVICE_TOKEN
       );
-      const cancelled = await service.cancelByKeys(parsed.data);
+      const cancelled = await service.cancelByIds(parsed.data);
 
       res.json({ status: "success", data: { cancelled } });
     } catch (error) {
@@ -314,16 +296,16 @@ router.post(
 );
 
 /**
- * POST /bid-exports/clear-export-by-keys
- * Clear export tracking (last_exported_at/by) on customer_bid_data by composite keys
+ * POST /bid-exports/clear-export-by-ids
+ * Clear export tracking (last_exported_at/by) on customer_bid_data by UUIDs
  */
 router.post(
-  "/clear-export-by-keys",
+  "/clear-export-by-ids",
   authenticate,
   requireFeature(Feature.BID_EXPORT),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const parsed = cancelByKeysSchema.safeParse(req.body);
+      const parsed = clearExportByIdsSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({
           status: "error",
@@ -335,7 +317,7 @@ router.post(
       const service = container.resolve<IBidExportService>(
         BID_EXPORT_SERVICE_TOKEN
       );
-      const cleared = await service.clearExportByKeys(parsed.data.keys);
+      const cleared = await service.clearExportByIds(parsed.data.bidIds);
 
       res.json({ status: "success", data: { cleared } });
     } catch (error) {

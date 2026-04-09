@@ -21,6 +21,10 @@ export interface DateRangeDto {
  * Single customer bid record DTO
  */
 export interface CustomerBidDto {
+  /** UUID primary key */
+  id: string;
+  /** Sales type: 0 = Direct, 3 = COOP */
+  salesType: number;
   /** Source database identifier */
   sourceDb: string | null;
   siteCode: string | null;
@@ -28,6 +32,8 @@ export interface CustomerBidDto {
   customerBillTo: string | null;
   /** Customer co-op code */
   coOpCode: string | null;
+  /** Commercial co-op code (from COOP campaign) */
+  comCoOpCode: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -179,7 +185,10 @@ export interface CustomerBidQueryDto {
   itemCode?: string;
   erpStatus?: string;
   coOpCode?: string;
+  comCoOpCode?: string[];
   sourceDb?: string;
+  /** Sales type filter - 0 = Direct, 3 = COOP */
+  salesType?: number;
   isNew?: boolean;
   confirmed?: boolean;
   exported?: boolean;
@@ -197,6 +206,7 @@ export interface CustomerBidFilterOptionsDto {
   salesReps: string[];
   erpStatuses: string[];
   coOpCodes: string[];
+  comCoOpCodes: string[];
 }
 
 // ============================================
@@ -207,11 +217,7 @@ export interface CustomerBidFilterOptionsDto {
  * Composite key for identifying a customer bid record
  */
 export interface CustomerBidKeyDto {
-  sourceDb: string;
-  siteCode: string;
-  customerBillTo: string;
-  itemNo: string;
-  schoolYear: string;
+  id: string;
 }
 
 /**
@@ -240,7 +246,7 @@ export interface UpdateCustomerBidDto {
  * DTO for bulk updating multiple customer bids
  */
 export interface BulkUpdateCustomerBidDto {
-  records: Array<CustomerBidKeyDto & UpdateCustomerBidDto>;
+  records: Array<{ id: string } & UpdateCustomerBidDto>;
 }
 
 /**
@@ -249,7 +255,7 @@ export interface BulkUpdateCustomerBidDto {
 export interface BulkUpdatePreviewResultDto {
   changed: number;
   unchanged: number;
-  /** Composite key strings: "sourceDb/siteCode/customerBillTo/itemNo/schoolYear" */
+  /** UUIDs of records that would change */
   changedKeys: string[];
 }
 

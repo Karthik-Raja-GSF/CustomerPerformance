@@ -13,10 +13,13 @@ export interface BidFilterParams {
   erpStatus?: string;
   sourceDb?: string;
   coOpCode?: string;
+  comCoOpCode?: string[];
   isNew?: boolean;
   confirmed?: boolean;
   exported?: boolean;
   excludeItemPrefixes?: string[];
+  /** Sales type filter - 0 = Direct, 3 = COOP */
+  salesType?: number;
 }
 
 /**
@@ -65,6 +68,12 @@ export function buildBidFilterConditions(
   if (filters.coOpCode) {
     conditions.push(Prisma.sql`c.co_op_code = ${filters.coOpCode}`);
   }
+  if (filters.comCoOpCode && filters.comCoOpCode.length > 0) {
+    const coopConditions = filters.comCoOpCode.map(
+      (code) => Prisma.sql`cbd.com_co_op_code = ${code}`
+    );
+    conditions.push(Prisma.sql`(${Prisma.join(coopConditions, " OR ")})`);
+  }
 
   if (filters.isNew !== undefined) {
     conditions.push(Prisma.sql`cbd.is_new = ${filters.isNew}`);
@@ -83,6 +92,9 @@ export function buildBidFilterConditions(
         ? Prisma.sql`cbd.last_exported_at IS NOT NULL`
         : Prisma.sql`cbd.last_exported_at IS NULL`
     );
+  }
+  if (filters.salesType !== undefined) {
+    conditions.push(Prisma.sql`cbd.sales_type = ${filters.salesType}`);
   }
 
   return conditions;

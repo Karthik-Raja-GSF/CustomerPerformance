@@ -41,7 +41,6 @@ import {
   confirmCustomerBid,
   unconfirmCustomerBid,
   bulkUpdateCustomerBids,
-  buildBidKey,
 } from "@/apis/customer-bids";
 import type {
   CustomerBidDto,
@@ -161,6 +160,7 @@ function parseFiltersFromURL(
     itemCode: searchParams.get("itemCode") || undefined,
     erpStatus: searchParams.get("erpStatus") || undefined,
     coOpCode: searchParams.get("coOpCode") || undefined,
+    comCoOpCode: searchParams.get("comCoOpCode") || undefined,
     isNew,
     confirmed: confirmed ?? defaultConfirmed,
     exported: exported ?? defaultExported,
@@ -202,6 +202,7 @@ function filtersToURLParams(
   if (filters.itemCode) params.set("itemCode", filters.itemCode);
   if (filters.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters.coOpCode) params.set("coOpCode", filters.coOpCode);
+  if (filters.comCoOpCode) params.set("comCoOpCode", filters.comCoOpCode);
   if (filters.isNew !== undefined) {
     params.set("isNew", filters.isNew.toString());
   }
@@ -304,6 +305,7 @@ export default function CustomerBids({
     itemCode: searchParams.get("itemCode") || "",
     erpStatus: searchParams.get("erpStatus") || "",
     coOpCode: searchParams.get("coOpCode") || "",
+    comCoOpCode: searchParams.get("comCoOpCode") || "",
     excludeItemPrefixes:
       searchParams.get("excludeItemPrefixes") ||
       defaultExcludeItemPrefixes ||
@@ -339,6 +341,16 @@ export default function CustomerBids({
     const param = searchParams.get("queued");
     return param === "true" ? true : param === "false" ? false : defaultQueued;
   });
+
+  // Sales type filter: undefined = all, 0 = Direct, 3 = COOP
+  const [salesTypeFilter, setSalesTypeFilter] = useState<number | undefined>(
+    () => {
+      const param = searchParams.get("salesType");
+      if (param === "0") return 0;
+      if (param === "3") return 3;
+      return undefined;
+    }
+  );
 
   // Filter options for datalist autocomplete
   const [filterOptions, setFilterOptions] =
@@ -520,6 +532,7 @@ export default function CustomerBids({
       itemCode: filters.itemCode || undefined,
       erpStatus: filters.erpStatus || undefined,
       coOpCode: filters.coOpCode || undefined,
+      comCoOpCode: filters.comCoOpCode || undefined,
       excludeItemPrefixes: filters.excludeItemPrefixes || undefined,
     });
     const urlFiltersStr = JSON.stringify(urlFilters);
@@ -535,6 +548,7 @@ export default function CustomerBids({
         itemCode: urlFilters.itemCode || "",
         erpStatus: urlFilters.erpStatus || "",
         coOpCode: urlFilters.coOpCode || "",
+        comCoOpCode: urlFilters.comCoOpCode || "",
         excludeItemPrefixes: urlFilters.excludeItemPrefixes || "",
       });
       setExportedFilter(urlFilters.exported);
@@ -556,6 +570,7 @@ export default function CustomerBids({
       itemCode: filterInputs.itemCode || undefined,
       erpStatus: filterInputs.erpStatus || undefined,
       coOpCode: filterInputs.coOpCode || undefined,
+      comCoOpCode: filterInputs.comCoOpCode || undefined,
       isNew:
         isNewFilter === "renewed"
           ? false
@@ -565,6 +580,7 @@ export default function CustomerBids({
       confirmed: confirmedFilter,
       exported: exportedFilter,
       queued: queuedFilter,
+      salesType: salesTypeFilter,
       excludeItemPrefixes: filterInputs.excludeItemPrefixes || undefined,
     };
     setFilters(newFilters);
@@ -579,6 +595,7 @@ export default function CustomerBids({
     setConfirmedFilter(defaultConfirmed);
     setExportedFilter(defaultExported);
     setQueuedFilter(defaultQueued);
+    setSalesTypeFilter(undefined);
     setIsNewFilter("all");
     setShowPendingQueue(false);
     setFilters((prev) => ({
@@ -610,11 +627,13 @@ export default function CustomerBids({
       filterInputs.itemCode ||
       filterInputs.erpStatus ||
       filterInputs.coOpCode ||
+      filterInputs.comCoOpCode ||
       excludePrefixesActive ||
       isNewFilter !== "all" ||
       (showConfirmedFilter && confirmedFilter) ||
       exportedFilter !== undefined ||
-      queuedFilter !== undefined
+      queuedFilter !== undefined ||
+      salesTypeFilter !== undefined
   );
 
   const activeFilterCount = [
@@ -625,32 +644,26 @@ export default function CustomerBids({
     filterInputs.itemCode,
     filterInputs.erpStatus,
     filterInputs.coOpCode,
+    filterInputs.comCoOpCode,
     excludePrefixesActive,
     isNewFilter !== "all",
     showConfirmedFilter && confirmedFilter,
     exportedFilter !== undefined,
     queuedFilter !== undefined,
+    salesTypeFilter !== undefined,
   ].filter(Boolean).length;
 
   // Handle cell updates for editable columns
   const handleCellUpdate = useCallback(
     async (bid: CustomerBidDto, updates: UpdateCustomerBidDto) => {
-      const schoolYearString = getSchoolYearString(
-        filters.schoolYear || "next"
-      );
-      const key = buildBidKey(bid, schoolYearString);
-
       try {
-        const updated = await updateCustomerBid(key, updates);
+        const updated = await updateCustomerBid(bid.id, updates);
 
         // Update local state with only the editable fields
         // (API returns partial DTO with nulls for non-editable fields)
         setBids((prev) =>
           prev.map((b) =>
-            b.sourceDb === bid.sourceDb &&
-            b.siteCode === bid.siteCode &&
-            b.customerBillTo === bid.customerBillTo &&
-            b.itemCode === bid.itemCode
+            b.id === bid.id
               ? {
                   ...b,
                   lastUpdatedAt: updated.lastUpdatedAt,
@@ -683,29 +696,14 @@ export default function CustomerBids({
         throw err; // Re-throw so the cell component can revert
       }
     },
-    [filters.schoolYear]
+    []
   );
 
   const handleConfirm = useCallback(
     async (bid: CustomerBidDto) => {
-      const schoolYearString = getSchoolYearString(
-        filters.schoolYear || "next"
-      );
-      const key = buildBidKey(bid, schoolYearString);
-
       try {
-        await confirmCustomerBid(key);
-        setBids((prev) =>
-          prev.filter(
-            (b) =>
-              !(
-                b.sourceDb === bid.sourceDb &&
-                b.siteCode === bid.siteCode &&
-                b.customerBillTo === bid.customerBillTo &&
-                b.itemCode === bid.itemCode
-              )
-          )
-        );
+        await confirmCustomerBid(bid.id);
+        setBids((prev) => prev.filter((b) => b.id !== bid.id));
         toast.success("Bid confirmed");
         void refreshStats(filters);
       } catch (err) {
@@ -715,24 +713,16 @@ export default function CustomerBids({
         throw err;
       }
     },
-    [filters.schoolYear, filters, refreshStats]
+    [filters, refreshStats]
   );
 
   const handleUnconfirm = useCallback(
     async (bid: CustomerBidDto) => {
-      const schoolYearString = getSchoolYearString(
-        filters.schoolYear || "next"
-      );
-      const key = buildBidKey(bid, schoolYearString);
-
       try {
-        const updated = await unconfirmCustomerBid(key);
+        const updated = await unconfirmCustomerBid(bid.id);
         setBids((prev) =>
           prev.map((b) =>
-            b.sourceDb === bid.sourceDb &&
-            b.siteCode === bid.siteCode &&
-            b.customerBillTo === bid.customerBillTo &&
-            b.itemCode === bid.itemCode
+            b.id === bid.id
               ? {
                   ...b,
                   confirmedAt: updated.confirmedAt,
@@ -750,14 +740,13 @@ export default function CustomerBids({
         throw err;
       }
     },
-    [filters.schoolYear, filters, refreshStats]
+    [filters, refreshStats]
   );
 
   // Get menu month state for a bid: use override if available, otherwise derive from estimates
   const getMenuMonths = useCallback(
     (bid: CustomerBidDto): Record<MonthKey, boolean> => {
-      const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
-      const override = menuMonthOverrides.get(key);
+      const override = menuMonthOverrides.get(bid.id);
       if (override) return override;
       return deriveMenuMonthsFromEstimates(bid);
     },
@@ -767,10 +756,9 @@ export default function CustomerBids({
   // Update local menu month state for a bid (frontend-only, no API call)
   const onMenuMonthsChange = useCallback(
     (bid: CustomerBidDto, months: Record<MonthKey, boolean>) => {
-      const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
       setMenuMonthOverrides((prev) => {
         const next = new Map(prev);
-        next.set(key, months);
+        next.set(bid.id, months);
         return next;
       });
     },
@@ -789,7 +777,6 @@ export default function CustomerBids({
       setMenuMonthOverrides((prev) => {
         const next = new Map(prev);
         for (const bid of batchMenuEligibleBids) {
-          const key = `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`;
           const existing = getMenuMonths(bid);
           const merged = { ...existing };
           for (const [mk, selected] of Object.entries(months)) {
@@ -797,7 +784,7 @@ export default function CustomerBids({
               merged[mk as MonthKey] = true;
             }
           }
-          next.set(key, merged);
+          next.set(bid.id, merged);
         }
         return next;
       });
@@ -805,7 +792,7 @@ export default function CustomerBids({
         `Menu months updated for ${batchMenuEligibleBids.length} record${batchMenuEligibleBids.length !== 1 ? "s" : ""}`
       );
     },
-    [batchMenuEligibleBids]
+    [batchMenuEligibleBids, getMenuMonths]
   );
 
   // Bulk confirm — bids eligible for confirmation on the current page
@@ -817,28 +804,16 @@ export default function CustomerBids({
   const [isConfirmingAll, setIsConfirmingAll] = useState(false);
 
   const handleConfirmAll = useCallback(async () => {
-    const schoolYearString = getSchoolYearString(filters.schoolYear || "next");
     const records = confirmableBids.map((bid) => ({
-      ...buildBidKey(bid, schoolYearString),
+      id: bid.id,
       confirmed: true as const,
     }));
 
     setIsConfirmingAll(true);
     try {
       const result = await bulkUpdateCustomerBids({ records });
-      const confirmedKeys = new Set(
-        confirmableBids.map(
-          (b) => `${b.sourceDb}/${b.siteCode}/${b.customerBillTo}/${b.itemCode}`
-        )
-      );
-      setBids((prev) =>
-        prev.filter(
-          (b) =>
-            !confirmedKeys.has(
-              `${b.sourceDb}/${b.siteCode}/${b.customerBillTo}/${b.itemCode}`
-            )
-        )
-      );
+      const confirmedIds = new Set(confirmableBids.map((b) => b.id));
+      setBids((prev) => prev.filter((b) => !confirmedIds.has(b.id)));
       toast.success(
         `${result.updated} bid${result.updated !== 1 ? "s" : ""} confirmed`
       );
@@ -978,6 +953,8 @@ export default function CustomerBids({
           onQueuedFilterChange={setQueuedFilter}
           exportedFilter={exportedFilter}
           onExportedFilterChange={setExportedFilter}
+          salesTypeFilter={salesTypeFilter}
+          onSalesTypeFilterChange={setSalesTypeFilter}
           queuedKeysSize={queuedKeys.size}
         />
 
@@ -1037,10 +1014,7 @@ export default function CustomerBids({
             size="sm"
             disabled={bids.length === 0 || isLoading}
             onClick={() => {
-              const filtered = bids.filter(
-                (b) =>
-                  b.sourceDb && b.siteCode && b.customerBillTo && b.itemCode
-              );
+              const filtered = bids.filter((b) => b.id);
               const filteredColumns = buildFilteredExportColumns(
                 filtered,
                 getMenuMonths,
@@ -1295,6 +1269,7 @@ export default function CustomerBids({
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={setColumnVisibility}
           onTableReady={setTableInstance}
+          getRowId={(row) => row.id}
         />
       </div>
 
@@ -1304,6 +1279,7 @@ export default function CustomerBids({
           open={importDialogOpen}
           onOpenChange={setImportDialogOpen}
           onImportComplete={() => fetchData(filters)}
+          loadedBids={bids}
         />
       )}
     </div>

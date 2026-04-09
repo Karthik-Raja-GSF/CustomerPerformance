@@ -52,6 +52,8 @@ interface DataTableProps<TData, TValue> {
   columnVisibility?: VisibilityState;
   onColumnVisibilityChange?: (visibility: VisibilityState) => void;
   onTableReady?: (table: TanstackTable<TData>) => void;
+  /** Stable row identifier — required for selection state to survive sort/filter */
+  getRowId?: (row: TData, index: number) => string;
 }
 
 // Export VisibilityState for use in parent components
@@ -71,6 +73,7 @@ export function DataTable<TData, TValue>({
   columnVisibility: controlledColumnVisibility,
   onColumnVisibilityChange,
   onTableReady,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [internalColumnVisibility, setInternalColumnVisibility] =
@@ -110,6 +113,7 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onColumnVisibilityChange: handleColumnVisibilityChange,
+    getRowId,
     state: {
       sorting,
       columnVisibility,

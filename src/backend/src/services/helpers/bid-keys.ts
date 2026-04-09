@@ -1,36 +1,33 @@
 /**
- * Shared composite-key utilities for CustomerBidData.
+ * Shared key utilities for CustomerBidData.
  * Used by CustomerBidService and BidExportService.
  */
 
-/** 5-field composite key shape */
+/** 6-field composite key (for sync upserts via unique constraint) */
 export interface BidCompositeKey {
   sourceDb: string;
   siteCode: string;
   customerBillTo: string;
   itemNo: string;
   schoolYear: string;
+  salesType: number;
 }
 
-/** Build Prisma WHERE for the 5-field composite PK */
+/** Build Prisma WHERE for the 6-field unique constraint (used in sync/upsert) */
 export function buildCompositeKeyWhere(key: BidCompositeKey) {
   return {
-    sourceDb_siteCode_customerBillTo_itemNo_schoolYear: {
+    sourceDb_siteCode_customerBillTo_itemNo_schoolYear_salesType: {
       sourceDb: key.sourceDb,
       siteCode: key.siteCode,
       customerBillTo: key.customerBillTo,
       itemNo: key.itemNo,
       schoolYear: key.schoolYear,
+      salesType: key.salesType,
     },
   };
 }
 
-/** Build pipe-delimited map key (for sync lookups) */
-export function buildMapKey(
-  sourceDb: string,
-  siteCode: string,
-  customerBillTo: string,
-  itemNo: string
-): string {
-  return `${sourceDb}|${siteCode}|${customerBillTo}|${itemNo}`;
+/** Build Prisma WHERE for UUID PK (used in API operations) */
+export function buildIdWhere(id: string) {
+  return { id };
 }

@@ -166,6 +166,39 @@
       "rule-action": "include"
     },
     {
+      "rule-type": "selection",
+      "rule-id": "16",
+      "rule-name": "include_contact",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "table-type": "view"
+      },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "17",
+      "rule-name": "include_segment_header",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "table-type": "view"
+      },
+      "rule-action": "include"
+    },
+    {
+      "rule-type": "selection",
+      "rule-id": "18",
+      "rule-name": "include_segment_line",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "table-type": "view"
+      },
+      "rule-action": "include"
+    },
+    {
       "rule-type": "transformation",
       "rule-id": "1001",
       "rule-name": "rename_customer",
@@ -344,6 +377,42 @@
       },
       "rule-action": "rename",
       "value": "completed_bid"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1016",
+      "rule-name": "rename_contact",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact"
+      },
+      "rule-action": "rename",
+      "value": "contact"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1017",
+      "rule-name": "rename_segment_header",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header"
+      },
+      "rule-action": "rename",
+      "value": "segment_header"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "1018",
+      "rule-name": "rename_segment_line",
+      "rule-target": "table",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line"
+      },
+      "rule-action": "rename",
+      "value": "segment_line"
     },
     {
       "rule-type": "transformation",
@@ -12122,6 +12191,1215 @@
       },
       "rule-action": "rename",
       "value": "user_name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20907",
+      "rule-name": "contact_col_source_db",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Source DB"
+      },
+      "rule-action": "rename",
+      "value": "source_db"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20908",
+      "rule-name": "contact_col_hash",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Hash"
+      },
+      "rule-action": "rename",
+      "value": "hash"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20909",
+      "rule-name": "contact_col_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "No[_]"
+      },
+      "rule-action": "rename",
+      "value": "no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20910",
+      "rule-name": "contact_col_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Name"
+      },
+      "rule-action": "rename",
+      "value": "name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20911",
+      "rule-name": "contact_col_search_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Search Name"
+      },
+      "rule-action": "rename",
+      "value": "search_name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20912",
+      "rule-name": "contact_col_name_2",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Name 2"
+      },
+      "rule-action": "rename",
+      "value": "name_2"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20913",
+      "rule-name": "contact_col_address",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Address"
+      },
+      "rule-action": "rename",
+      "value": "address"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20914",
+      "rule-name": "contact_col_address_2",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Address 2"
+      },
+      "rule-action": "rename",
+      "value": "address_2"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20915",
+      "rule-name": "contact_col_city",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "City"
+      },
+      "rule-action": "rename",
+      "value": "city"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20916",
+      "rule-name": "contact_col_phone_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Phone No[_]"
+      },
+      "rule-action": "rename",
+      "value": "phone_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20917",
+      "rule-name": "contact_col_salesperson_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Salesperson Code"
+      },
+      "rule-action": "rename",
+      "value": "salesperson_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20918",
+      "rule-name": "contact_col_fax_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Fax No[_]"
+      },
+      "rule-action": "rename",
+      "value": "fax_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20919",
+      "rule-name": "contact_col_post_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Post Code"
+      },
+      "rule-action": "rename",
+      "value": "post_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20920",
+      "rule-name": "contact_col_county",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "County"
+      },
+      "rule-action": "rename",
+      "value": "county"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20921",
+      "rule-name": "contact_col_e_mail",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "E-Mail"
+      },
+      "rule-action": "rename",
+      "value": "e_mail"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20922",
+      "rule-name": "contact_col_home_page",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Home Page"
+      },
+      "rule-action": "rename",
+      "value": "home_page"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20923",
+      "rule-name": "contact_col_no_series",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "No[_] Series"
+      },
+      "rule-action": "rename",
+      "value": "no_series"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20924",
+      "rule-name": "contact_col_type",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Type"
+      },
+      "rule-action": "rename",
+      "value": "type"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20925",
+      "rule-name": "contact_col_company_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Company No[_]"
+      },
+      "rule-action": "rename",
+      "value": "company_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20926",
+      "rule-name": "contact_col_company_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Company Name"
+      },
+      "rule-action": "rename",
+      "value": "company_name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20927",
+      "rule-name": "contact_col_first_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "First Name"
+      },
+      "rule-action": "rename",
+      "value": "first_name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20928",
+      "rule-name": "contact_col_middle_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Middle Name"
+      },
+      "rule-action": "rename",
+      "value": "middle_name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20929",
+      "rule-name": "contact_col_surname",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Surname"
+      },
+      "rule-action": "rename",
+      "value": "surname"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20930",
+      "rule-name": "contact_col_job_title",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Job Title"
+      },
+      "rule-action": "rename",
+      "value": "job_title"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20931",
+      "rule-name": "contact_col_mobile_phone_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Mobile Phone No[_]"
+      },
+      "rule-action": "rename",
+      "value": "mobile_phone_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20932",
+      "rule-name": "contact_col_pager",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Pager"
+      },
+      "rule-action": "rename",
+      "value": "pager"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20933",
+      "rule-name": "contact_col_organizational_level_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Organizational Level Code"
+      },
+      "rule-action": "rename",
+      "value": "organizational_level_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20934",
+      "rule-name": "contact_col_exclude_from_segment",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Exclude from Segment"
+      },
+      "rule-action": "rename",
+      "value": "exclude_from_segment"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20935",
+      "rule-name": "contact_col_search_e_mail",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "Search E-Mail"
+      },
+      "rule-action": "rename",
+      "value": "search_e_mail"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20936",
+      "rule-name": "contact_col_e_mail_2",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Contact",
+        "column-name": "E-Mail 2"
+      },
+      "rule-action": "rename",
+      "value": "e_mail_2"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20937",
+      "rule-name": "segment_header_col_source_db",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Source DB"
+      },
+      "rule-action": "rename",
+      "value": "source_db"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20938",
+      "rule-name": "segment_header_col_hash",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Hash"
+      },
+      "rule-action": "rename",
+      "value": "hash"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20939",
+      "rule-name": "segment_header_col_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "No[_]"
+      },
+      "rule-action": "rename",
+      "value": "no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20940",
+      "rule-name": "segment_header_col_description",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Description"
+      },
+      "rule-action": "rename",
+      "value": "description"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20941",
+      "rule-name": "segment_header_col_campaign_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Campaign No[_]"
+      },
+      "rule-action": "rename",
+      "value": "campaign_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20942",
+      "rule-name": "segment_header_col_salesperson_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Salesperson Code"
+      },
+      "rule-action": "rename",
+      "value": "salesperson_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20943",
+      "rule-name": "segment_header_col_correspondence_type_default",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Correspondence Type (Default)"
+      },
+      "rule-action": "rename",
+      "value": "correspondence_type_default"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20944",
+      "rule-name": "segment_header_col_interaction_template_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Interaction Template Code"
+      },
+      "rule-action": "rename",
+      "value": "interaction_template_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20945",
+      "rule-name": "segment_header_col_unit_cost_lcy",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Unit Cost (LCY)"
+      },
+      "rule-action": "rename",
+      "value": "unit_cost_lcy"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20946",
+      "rule-name": "segment_header_col_unit_duration_min_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Unit Duration (Min[_])"
+      },
+      "rule-action": "rename",
+      "value": "unit_duration_min_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20947",
+      "rule-name": "segment_header_col_date",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Date"
+      },
+      "rule-action": "rename",
+      "value": "date"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20948",
+      "rule-name": "segment_header_col_campaign_target",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Campaign Target"
+      },
+      "rule-action": "rename",
+      "value": "campaign_target"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20949",
+      "rule-name": "segment_header_col_information_flow",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Information Flow"
+      },
+      "rule-action": "rename",
+      "value": "information_flow"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20950",
+      "rule-name": "segment_header_col_initiated_by",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Initiated By"
+      },
+      "rule-action": "rename",
+      "value": "initiated_by"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20951",
+      "rule-name": "segment_header_col_no_series",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "No[_] Series"
+      },
+      "rule-action": "rename",
+      "value": "no_series"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20952",
+      "rule-name": "segment_header_col_campaign_response",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Campaign Response"
+      },
+      "rule-action": "rename",
+      "value": "campaign_response"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20953",
+      "rule-name": "segment_header_col_language_code_default",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Language Code (Default)"
+      },
+      "rule-action": "rename",
+      "value": "language_code_default"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20954",
+      "rule-name": "segment_header_col_interaction_group_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Interaction Group Code"
+      },
+      "rule-action": "rename",
+      "value": "interaction_group_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20955",
+      "rule-name": "segment_header_col_send_word_docs_as_attmt_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Send Word Docs[_] as Attmt[_]"
+      },
+      "rule-action": "rename",
+      "value": "send_word_docs_as_attmt_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20956",
+      "rule-name": "segment_header_col_ignore_contact_corres_type",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Ignore Contact Corres[_] Type"
+      },
+      "rule-action": "rename",
+      "value": "ignore_contact_corres_type"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20957",
+      "rule-name": "segment_header_col_subject_default",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Header",
+        "column-name": "Subject (Default)"
+      },
+      "rule-action": "rename",
+      "value": "subject_default"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20958",
+      "rule-name": "segment_line_col_source_db",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Source DB"
+      },
+      "rule-action": "rename",
+      "value": "source_db"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20959",
+      "rule-name": "segment_line_col_hash",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Hash"
+      },
+      "rule-action": "rename",
+      "value": "hash"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20960",
+      "rule-name": "segment_line_col_segment_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Segment No[_]"
+      },
+      "rule-action": "rename",
+      "value": "segment_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20961",
+      "rule-name": "segment_line_col_line_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Line No[_]"
+      },
+      "rule-action": "rename",
+      "value": "line_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20962",
+      "rule-name": "segment_line_col_contact_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Contact No[_]"
+      },
+      "rule-action": "rename",
+      "value": "contact_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20963",
+      "rule-name": "segment_line_col_campaign_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Campaign No[_]"
+      },
+      "rule-action": "rename",
+      "value": "campaign_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20964",
+      "rule-name": "segment_line_col_salesperson_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Salesperson Code"
+      },
+      "rule-action": "rename",
+      "value": "salesperson_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20965",
+      "rule-name": "segment_line_col_correspondence_type",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Correspondence Type"
+      },
+      "rule-action": "rename",
+      "value": "correspondence_type"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20966",
+      "rule-name": "segment_line_col_interaction_template_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Interaction Template Code"
+      },
+      "rule-action": "rename",
+      "value": "interaction_template_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20967",
+      "rule-name": "segment_line_col_cost_lcy",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Cost (LCY)"
+      },
+      "rule-action": "rename",
+      "value": "cost_lcy"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20968",
+      "rule-name": "segment_line_col_duration_min_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Duration (Min[_])"
+      },
+      "rule-action": "rename",
+      "value": "duration_min_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20969",
+      "rule-name": "segment_line_col_attachment_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Attachment No[_]"
+      },
+      "rule-action": "rename",
+      "value": "attachment_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20970",
+      "rule-name": "segment_line_col_campaign_response",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Campaign Response"
+      },
+      "rule-action": "rename",
+      "value": "campaign_response"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20971",
+      "rule-name": "segment_line_col_information_flow",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Information Flow"
+      },
+      "rule-action": "rename",
+      "value": "information_flow"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20972",
+      "rule-name": "segment_line_col_initiated_by",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Initiated By"
+      },
+      "rule-action": "rename",
+      "value": "initiated_by"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20973",
+      "rule-name": "segment_line_col_contact_alt_address_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Contact Alt[_] Address Code"
+      },
+      "rule-action": "rename",
+      "value": "contact_alt_address_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20974",
+      "rule-name": "segment_line_col_evaluation",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Evaluation"
+      },
+      "rule-action": "rename",
+      "value": "evaluation"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20975",
+      "rule-name": "segment_line_col_campaign_target",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Campaign Target"
+      },
+      "rule-action": "rename",
+      "value": "campaign_target"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20976",
+      "rule-name": "segment_line_col_language_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Language Code"
+      },
+      "rule-action": "rename",
+      "value": "language_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20977",
+      "rule-name": "segment_line_col_description",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Description"
+      },
+      "rule-action": "rename",
+      "value": "description"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20978",
+      "rule-name": "segment_line_col_date",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Date"
+      },
+      "rule-action": "rename",
+      "value": "date"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20979",
+      "rule-name": "segment_line_col_time_of_interaction",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Time of Interaction"
+      },
+      "rule-action": "rename",
+      "value": "time_of_interaction"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20980",
+      "rule-name": "segment_line_col_attempt_failed",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Attempt Failed"
+      },
+      "rule-action": "rename",
+      "value": "attempt_failed"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20981",
+      "rule-name": "segment_line_col_to_do_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "To-do No[_]"
+      },
+      "rule-action": "rename",
+      "value": "to_do_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20982",
+      "rule-name": "segment_line_col_contact_company_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Contact Company No[_]"
+      },
+      "rule-action": "rename",
+      "value": "contact_company_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20983",
+      "rule-name": "segment_line_col_campaign_entry_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Campaign Entry No[_]"
+      },
+      "rule-action": "rename",
+      "value": "campaign_entry_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20984",
+      "rule-name": "segment_line_col_interaction_group_code",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Interaction Group Code"
+      },
+      "rule-action": "rename",
+      "value": "interaction_group_code"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20985",
+      "rule-name": "segment_line_col_document_type",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Document Type"
+      },
+      "rule-action": "rename",
+      "value": "document_type"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20986",
+      "rule-name": "segment_line_col_document_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Document No[_]"
+      },
+      "rule-action": "rename",
+      "value": "document_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20987",
+      "rule-name": "segment_line_col_send_word_doc_as_attmt_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Send Word Doc[_] As Attmt[_]"
+      },
+      "rule-action": "rename",
+      "value": "send_word_doc_as_attmt_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20988",
+      "rule-name": "segment_line_col_contact_via",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Contact Via"
+      },
+      "rule-action": "rename",
+      "value": "contact_via"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20989",
+      "rule-name": "segment_line_col_version_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Version No[_]"
+      },
+      "rule-action": "rename",
+      "value": "version_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20990",
+      "rule-name": "segment_line_col_doc_no_occurrence",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Doc[_] No[_] Occurrence"
+      },
+      "rule-action": "rename",
+      "value": "doc_no_occurrence"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20991",
+      "rule-name": "segment_line_col_subject",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Subject"
+      },
+      "rule-action": "rename",
+      "value": "subject"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20992",
+      "rule-name": "segment_line_col_opportunity_no_",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Opportunity No[_]"
+      },
+      "rule-action": "rename",
+      "value": "opportunity_no_"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20993",
+      "rule-name": "segment_line_col_wizard_step",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Wizard Step"
+      },
+      "rule-action": "rename",
+      "value": "wizard_step"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20994",
+      "rule-name": "segment_line_col_wizard_contact_name",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Wizard Contact Name"
+      },
+      "rule-action": "rename",
+      "value": "wizard_contact_name"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20995",
+      "rule-name": "segment_line_col_opportunity_description",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Opportunity Description"
+      },
+      "rule-action": "rename",
+      "value": "opportunity_description"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20996",
+      "rule-name": "segment_line_col_campaign_description",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Campaign Description"
+      },
+      "rule-action": "rename",
+      "value": "campaign_description"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20997",
+      "rule-name": "segment_line_col_interaction_successful",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Interaction Successful"
+      },
+      "rule-action": "rename",
+      "value": "interaction_successful"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20998",
+      "rule-name": "segment_line_col_dial_contact",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Dial Contact"
+      },
+      "rule-action": "rename",
+      "value": "dial_contact"
+    },
+    {
+      "rule-type": "transformation",
+      "rule-id": "20999",
+      "rule-name": "segment_line_col_mail_contact",
+      "rule-target": "column",
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Segment Line",
+        "column-name": "Mail Contact"
+      },
+      "rule-action": "rename",
+      "value": "mail_contact"
     },
     {
       "rule-type": "transformation",

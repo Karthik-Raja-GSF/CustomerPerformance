@@ -32,7 +32,10 @@ import {
   previewBulkUpdateBids,
 } from "@/apis/customer-bids";
 import { parseImportFile, type ParsedImportResult } from "@/utils/import-csv";
-import type { BulkUpdateResultDto } from "@/types/customer-bids";
+import type {
+  BulkUpdateResultDto,
+  CustomerBidDto,
+} from "@/types/customer-bids";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +47,9 @@ interface CSVImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImportComplete: () => void;
+  /** Bids currently loaded in the page — used as a fallback lookup for legacy
+   *  CSV files that don't include the `Bid ID` column. */
+  loadedBids: CustomerBidDto[];
 }
 
 const BATCH_SIZE = 1000;
@@ -56,6 +62,7 @@ export function CSVImportDialog({
   open,
   onOpenChange,
   onImportComplete,
+  loadedBids,
 }: CSVImportDialogProps) {
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
@@ -121,7 +128,7 @@ export function CSVImportDialog({
             const batch = result.records.slice(i, i + BATCH_SIZE);
             const preview = await previewBulkUpdateBids({
               records: batch.map((r) => ({
-                ...r.key,
+                id: r.id,
                 ...r.updates,
               })),
             });
@@ -135,12 +142,7 @@ export function CSVImportDialog({
           setUnchangedPreviewCount(totalUnchanged);
         } catch {
           // If preview fails, treat all records as changed (safe fallback)
-          const fallbackKeys = new Set(
-            result.records.map(
-              (r) =>
-                `${r.key.sourceDb}/${r.key.siteCode}/${r.key.customerBillTo}/${r.key.itemNo}/${r.key.schoolYear}`
-            )
-          );
+          const fallbackKeys = new Set(result.records.map((r) => r.id));
           setChangedKeySet(fallbackKeys);
           setUnchangedPreviewCount(0);
         } finally {
@@ -196,11 +198,15 @@ export function CSVImportDialog({
 
   const changedRecords = useMemo(() => {
     if (!parseResult || changedKeySet.size === 0) return [];
-    return parseResult.records.filter((r) => {
-      const keyStr = `${r.key.sourceDb}/${r.key.siteCode}/${r.key.customerBillTo}/${r.key.itemNo}/${r.key.schoolYear}`;
-      return changedKeySet.has(keyStr);
-    });
+    return parseResult.records.filter((r) => changedKeySet.has(r.id));
   }, [parseResult, changedKeySet]);
+
+  // Lookup map from bid UUID → loaded DTO, for display in the preview table
+  const loadedBidsById = useMemo(() => {
+    const m = new Map<string, CustomerBidDto>();
+    for (const b of loadedBids) m.set(b.id, b);
+    return m;
+  }, [loadedBids]);
 
   // ---- Upload / bulk update ----
 
@@ -226,7 +232,7 @@ export function CSVImportDialog({
       try {
         const result = await bulkUpdateCustomerBids({
           records: batch.map((r) => ({
-            ...r.key,
+            id: r.id,
             ...r.updates,
           })),
         });
@@ -311,9 +317,9 @@ export function CSVImportDialog({
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        Use the exported CSV as a template. Only editable fields (Year Around,
-        Monthly Estimates, Menu Months, Confirmed) will be processed. The School
-        Year column is required in the CSV.
+        Use the exported CSV as a template. The <strong>Bid ID</strong> column
+        is required (it uniquely identifies each row). Only editable fields
+        (Year Around, Monthly Estimates, Confirmed) will be processed.
       </p>
     </div>
   );
@@ -403,25 +409,30 @@ export function CSVImportDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {changedRecords.slice(0, 10).map((record) => (
-                    <tr
-                      key={record.rowNumber}
-                      className="border-b last:border-0"
-                    >
-                      <td className="p-2 text-muted-foreground">
-                        {record.rowNumber}
-                      </td>
-                      <td className="p-2">{record.key.sourceDb}</td>
-                      <td className="p-2">{record.key.siteCode}</td>
-                      <td className="p-2">{record.key.customerBillTo}</td>
-                      <td className="p-2">{record.key.itemNo}</td>
-                      <td className="p-2">
-                        <Badge variant="secondary">
-                          {Object.keys(record.updates).length}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
+                  {changedRecords.slice(0, 10).map((record) => {
+                    const bid = loadedBidsById.get(record.id);
+                    return (
+                      <tr
+                        key={record.rowNumber}
+                        className="border-b last:border-0"
+                      >
+                        <td className="p-2 text-muted-foreground">
+                          {record.rowNumber}
+                        </td>
+                        <td className="p-2">{bid?.sourceDb ?? "-"}</td>
+                        <td className="p-2">{bid?.siteCode ?? "-"}</td>
+                        <td className="p-2">{bid?.customerBillTo ?? "-"}</td>
+                        <td className="p-2">
+                          {bid?.itemCode ?? record.id.slice(0, 8)}
+                        </td>
+                        <td className="p-2">
+                          <Badge variant="secondary">
+                            {Object.keys(record.updates).length}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </ScrollArea>

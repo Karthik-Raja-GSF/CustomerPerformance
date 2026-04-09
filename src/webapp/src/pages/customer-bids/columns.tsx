@@ -398,6 +398,20 @@ export function createColumns(
       cell: ({ row }) => row.getValue<string | null>("sourceDb") ?? "-",
       enableHiding: true,
     },
+    // Sales type — Customer (0) vs Campaign (3)
+    {
+      id: "salesType",
+      accessorFn: (row) => row.salesType,
+      header: ({ column }) => <SortableHeader column={column} title="Type" />,
+      cell: ({ row }) => {
+        const t = row.original.salesType;
+        return (
+          <Badge variant={t === 3 ? "secondary" : "outline"}>
+            {t === 3 ? "Campaign" : "Customer"}
+          </Badge>
+        );
+      },
+    },
     {
       accessorKey: "siteCode",
       header: ({ column }) => (
@@ -427,6 +441,14 @@ export function createColumns(
         <span className="text-muted-foreground font-medium">Co-op Code</span>
       ),
       cell: ({ row }) => row.getValue<string | null>("coOpCode") ?? "-",
+    },
+    {
+      accessorKey: "comCoOpCode",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Commercial Co-Op" />
+      ),
+      cell: ({ row }) => row.getValue<string | null>("comCoOpCode") ?? "-",
+      enableHiding: true,
     },
     {
       accessorKey: "contactName",
@@ -601,19 +623,6 @@ export function createColumns(
       cell: ({ row }) => (
         <div className="text-right font-medium tabular-nums">
           {formatNumber(row.getValue("lastYearActual"))}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "openOrderQty",
-      header: () => (
-        <div className="text-right text-muted-foreground font-medium">
-          Open Order Qty
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-medium tabular-nums">
-          {formatNumber(row.getValue("openOrderQty"))}
         </div>
       ),
     },
@@ -1042,6 +1051,19 @@ export function createColumns(
           </div>
         );
       },
+    },
+    {
+      accessorKey: "openOrderQty",
+      header: () => (
+        <div className="text-right text-muted-foreground font-medium">
+          Open Order Qty
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-medium tabular-nums">
+          {formatNumber(row.getValue("openOrderQty"))}
+        </div>
+      ),
     },
     // User-editable columns
     {

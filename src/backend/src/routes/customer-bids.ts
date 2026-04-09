@@ -56,7 +56,19 @@ const querySchema = z.object({
     .transform((v) => v === "true")
     .optional(),
   coOpCode: z.string().optional(),
+  comCoOpCode: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined
+    ),
   sourceDb: z.string().optional(),
+  salesType: z.coerce.number().int().optional(),
   excludeItemPrefixes: z
     .string()
     .optional()
@@ -74,14 +86,8 @@ const querySchema = z.object({
 /**
  * Path parameters schema for single record operations
  */
-const pathParamsSchema = z.object({
-  sourceDb: z.string().min(1),
-  siteCode: z.string().min(1),
-  customerBillTo: z.string().min(1),
-  itemNo: z.string().min(1),
-  schoolYear: z
-    .string()
-    .regex(/^\d{4}-\d{4}$/, "School year must be in format YYYY-YYYY"),
+const idParamSchema = z.object({
+  id: z.string().uuid(),
 });
 
 /**
@@ -111,11 +117,7 @@ const bulkUpdateSchema = z.object({
   records: z
     .array(
       z.object({
-        sourceDb: z.string().min(1),
-        siteCode: z.string().min(1),
-        customerBillTo: z.string().min(1),
-        itemNo: z.string().min(1),
-        schoolYear: z.string().regex(/^\d{4}-\d{4}$/),
+        id: z.string().uuid(),
         yearAround: z.boolean().optional(),
         // Monthly estimates
         estimateJan: z.number().nullable().optional(),
@@ -311,29 +313,24 @@ router.get(
 );
 
 /**
- * PATCH /customer-bids/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear
+ * PATCH /customer-bids/:id
  * Update user-editable fields on a customer bid record
  *
  * Path Parameters:
- * - sourceDb: Source database identifier
- * - siteCode: Site/location code
- * - customerBillTo: Customer bill-to number
- * - itemNo: Item number
- * - schoolYear: School year in format YYYY-YYYY (e.g., "2025-2026")
+ * - id: UUID of the customer bid record
  *
  * Request Body:
- * - augustDemand?: number | null - August demand forecast
- * - septemberDemand?: number | null - September demand forecast
- * - octoberDemand?: number | null - October demand forecast
+ * - yearAround?: boolean
+ * - estimateJan..estimateDec?: number | null - monthly estimates
  */
 router.patch(
-  "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear",
+  "/:id",
   authenticate,
   requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate path parameters
-      const pathParsed = pathParamsSchema.safeParse(req.params);
+      const pathParsed = idParamSchema.safeParse(req.params);
       if (!pathParsed.success) {
         throw new CustomerBidQueryError(
           `Invalid path parameters: ${pathParsed.error.errors.map((e) => e.message).join(", ")}`
@@ -355,7 +352,7 @@ router.patch(
       const userEmail = req.user?.email || "unknown";
       const userGroups = req.user?.groups || [];
       const result = await customerBidService.updateBid(
-        pathParsed.data,
+        { id: pathParsed.data.id },
         bodyParsed.data,
         userEmail,
         userGroups
@@ -459,19 +456,19 @@ router.post(
 );
 
 /**
- * POST /customer-bids/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/confirm
+ * POST /customer-bids/:id/confirm
  * Confirm a customer bid record
  *
  * Sets confirmed_at to current UTC timestamp and confirmed_by to the
- * authenticated user's email. Creates the record if it doesn't exist.
+ * authenticated user's email.
  */
 router.post(
-  "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/confirm",
+  "/:id/confirm",
   authenticate,
   requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const pathParsed = pathParamsSchema.safeParse(req.params);
+      const pathParsed = idParamSchema.safeParse(req.params);
       if (!pathParsed.success) {
         throw new CustomerBidQueryError(
           `Invalid path parameters: ${pathParsed.error.errors.map((e) => e.message).join(", ")}`
@@ -485,7 +482,7 @@ router.post(
       const userEmail = req.user?.email || "unknown";
 
       const result = await customerBidService.confirmBid(
-        pathParsed.data,
+        { id: pathParsed.data.id },
         userEmail
       );
 
@@ -500,18 +497,18 @@ router.post(
 );
 
 /**
- * POST /customer-bids/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/unconfirm
+ * POST /customer-bids/:id/unconfirm
  * Unconfirm a customer bid record
  *
  * Clears confirmed_at and confirmed_by fields (sets to null).
  */
 router.post(
-  "/:sourceDb/:siteCode/:customerBillTo/:itemNo/:schoolYear/unconfirm",
+  "/:id/unconfirm",
   authenticate,
   requireFeature(Feature.DEMAND_VALIDATION_TOOL),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const pathParsed = pathParamsSchema.safeParse(req.params);
+      const pathParsed = idParamSchema.safeParse(req.params);
       if (!pathParsed.success) {
         throw new CustomerBidQueryError(
           `Invalid path parameters: ${pathParsed.error.errors.map((e) => e.message).join(", ")}`
@@ -522,7 +519,9 @@ router.post(
         CUSTOMER_BID_SERVICE_TOKEN
       );
 
-      const result = await customerBidService.unconfirmBid(pathParsed.data);
+      const result = await customerBidService.unconfirmBid({
+        id: pathParsed.data.id,
+      });
 
       res.json({
         status: "success",

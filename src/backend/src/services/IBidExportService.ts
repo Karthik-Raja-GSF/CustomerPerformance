@@ -1,7 +1,7 @@
 import {
   QueueBidExportDto,
-  QueueBidExportByKeysDto,
-  CancelBidExportByKeysDto,
+  QueueBidExportByIdsDto,
+  CancelBidExportByIdsDto,
   QueueBidExportResultDto,
   MarkExportedDto,
   MarkExportedResultDto,
@@ -60,11 +60,11 @@ export interface IBidExportService {
   getQueueSummary(): Promise<QueueSummaryDto>;
 
   /**
-   * Queue bid items for export using explicit composite keys.
+   * Queue bid items for export using explicit UUIDs.
    * Directly inserts QUEUED entries without filter resolution.
    */
-  queueExportByKeys(
-    data: QueueBidExportByKeysDto,
+  queueExportByIds(
+    data: QueueBidExportByIdsDto,
     userEmail: string
   ): Promise<QueueBidExportResultDto>;
 
@@ -83,23 +83,15 @@ export interface IBidExportService {
   cancelQueuedItems(exportType?: BidExportType): Promise<number>;
 
   /**
-   * Cancel QUEUED items by explicit composite keys.
+   * Cancel QUEUED items by explicit UUIDs.
    */
-  cancelByKeys(data: CancelBidExportByKeysDto): Promise<number>;
+  cancelByIds(data: CancelBidExportByIdsDto): Promise<number>;
 
   /**
-   * Clear export tracking (last_exported_at/by) on customer_bid_data for given keys.
+   * Clear export tracking (last_exported_at/by) on customer_bid_data for given UUIDs.
    * Does NOT modify customer_bid_export_item records (preserves audit trail).
    */
-  clearExportByKeys(
-    keys: Array<{
-      sourceDb: string;
-      siteCode: string;
-      customerBillTo: string;
-      itemNo: string;
-      schoolYear: string;
-    }>
-  ): Promise<number>;
+  clearExportByIds(bidIds: string[]): Promise<number>;
 
   /**
    * Process pending exports — scheduler entry point.

@@ -21,6 +21,10 @@ export interface DateRangeDto {
  * Single customer bid record
  */
 export interface CustomerBidDto {
+  /** UUID primary key */
+  id: string;
+  /** Sales type: 0 = Direct, 3 = COOP */
+  salesType: number;
   /** Source database identifier (e.g., "GSF", "NC") */
   sourceDb: string | null;
   siteCode: string | null;
@@ -28,6 +32,8 @@ export interface CustomerBidDto {
   customerBillTo: string | null;
   /** Customer co-op code */
   coOpCode: string | null;
+  /** Commercial co-op code (COOP campaign) */
+  comCoOpCode: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -168,17 +174,6 @@ export interface UpdateCustomerBidDto {
 }
 
 /**
- * Composite key to identify a customer bid record
- */
-export interface CustomerBidKey {
-  sourceDb: string;
-  siteCode: string;
-  customerBillTo: string;
-  itemNo: string;
-  schoolYear: string;
-}
-
-/**
  * Pagination metadata
  * Uses hasMore pattern for performance (avoids expensive count queries)
  */
@@ -201,6 +196,9 @@ export interface CustomerBidFilters {
   itemCode?: string;
   erpStatus?: string;
   coOpCode?: string;
+  comCoOpCode?: string;
+  /** Sales type filter - 0 = Direct, 3 = COOP */
+  salesType?: number;
   /** School year filter - defaults to "next" */
   schoolYear?: SchoolYear;
   /** Filter by renewed/new status */
@@ -223,13 +221,14 @@ export interface CustomerBidFilterOptions {
   salesReps: string[];
   erpStatuses: string[];
   coOpCodes: string[];
+  comCoOpCodes: string[];
 }
 
 /**
- * Bulk update request payload - array of records with composite key + editable fields
+ * Bulk update request payload - array of records with UUID + editable fields
  */
 export interface BulkUpdateCustomerBidDto {
-  records: Array<CustomerBidKey & UpdateCustomerBidDto>;
+  records: Array<{ id: string } & UpdateCustomerBidDto>;
 }
 
 /**

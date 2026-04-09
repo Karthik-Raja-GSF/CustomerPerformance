@@ -20,16 +20,12 @@ import {
   CustomerBidDatabaseError,
   CustomerBidQueryError,
   CustomerBidSyncInProgressError,
+  CustomerBidNotFoundError,
 } from "@/utils/errors/customer-bid-errors";
 import { createChildLogger } from "@/telemetry/logger";
 import { IRbacService, RBAC_SERVICE_TOKEN } from "@/services/IRbacService";
 import { Role } from "@/contracts/rbac/role";
-import { buildCompositeKeyWhere } from "@/services/helpers/bid-keys";
-import {
-  ESTIMATE_FIELDS,
-  decimalToNumber,
-  mapEstimates,
-} from "@/services/helpers/bid-converters";
+import { ESTIMATE_FIELDS } from "@/services/helpers/bid-converters";
 import { buildBidFilterConditions } from "@/services/helpers/bid-filters";
 import {
   getSchoolYearBoundaries,
@@ -42,11 +38,14 @@ const logger = createChildLogger("customer-bid");
  * Raw database row result from the base customer bids query
  */
 interface BaseBidRow {
+  id: string;
+  salesType: number;
   sourceDb: string | null;
   siteCode: string | null;
   customerName: string | null;
   customerBillTo: string | null;
   coOpCode: string | null;
+  comCoOpCode: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -129,6 +128,179 @@ export class CustomerBidService implements ICustomerBidService {
   ) {}
 
   /**
+   * Shared mapper from raw SQL row to CustomerBidDto.
+   * Used by both getCustomerBids (list path) and fetchBidById (single-record path).
+   */
+  private mapBaseRowToDto(row: BaseBidRow): CustomerBidDto {
+    return {
+      id: row.id,
+      salesType: row.salesType,
+      sourceDb: row.sourceDb,
+      siteCode: row.siteCode,
+      customerName: row.customerName,
+      customerBillTo: row.customerBillTo,
+      coOpCode: row.coOpCode,
+      comCoOpCode: row.comCoOpCode,
+      contactName: row.contactName,
+      contactEmail: row.contactEmail,
+      contactPhone: row.contactPhone,
+      salesRep: row.salesRep,
+      bidStartDate: row.bidStart?.toISOString() ?? "",
+      bidEndDate: row.bidEnd?.toISOString() ?? null,
+      itemCode: row.itemNo,
+      itemDescription: row.itemDescription,
+      brandName: row.brandName,
+      packSize: row.packSize,
+      customerLeadTime: row.customerLeadTime ?? null,
+      erpStatus: row.erpStatus,
+      bidQuantity: row.bidQty ? Number(row.bidQty) : null,
+      lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
+      lastYearActual: row.lastYearActual ? Number(row.lastYearActual) : null,
+      lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
+      lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
+      lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
+      lyNovember: row.lyNovember ? Number(row.lyNovember) : null,
+      lyDecember: row.lyDecember ? Number(row.lyDecember) : null,
+      lyJanuary: row.lyJanuary ? Number(row.lyJanuary) : null,
+      lyFebruary: row.lyFebruary ? Number(row.lyFebruary) : null,
+      lyMarch: row.lyMarch ? Number(row.lyMarch) : null,
+      lyApril: row.lyApril ? Number(row.lyApril) : null,
+      lyMay: row.lyMay ? Number(row.lyMay) : null,
+      lyJune: row.lyJune ? Number(row.lyJune) : null,
+      lyJuly: row.lyJuly ? Number(row.lyJuly) : null,
+      cyAugust: row.cyAugust ? Number(row.cyAugust) : null,
+      cySeptember: row.cySeptember ? Number(row.cySeptember) : null,
+      cyOctober: row.cyOctober ? Number(row.cyOctober) : null,
+      cyNovember: row.cyNovember ? Number(row.cyNovember) : null,
+      cyDecember: row.cyDecember ? Number(row.cyDecember) : null,
+      cyJanuary: row.cyJanuary ? Number(row.cyJanuary) : null,
+      cyFebruary: row.cyFebruary ? Number(row.cyFebruary) : null,
+      cyMarch: row.cyMarch ? Number(row.cyMarch) : null,
+      cyApril: row.cyApril ? Number(row.cyApril) : null,
+      cyMay: row.cyMay ? Number(row.cyMay) : null,
+      cyJune: row.cyJune ? Number(row.cyJune) : null,
+      cyJuly: row.cyJuly ? Number(row.cyJuly) : null,
+      isNew: row.isNew ?? false,
+      lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
+      lastUpdatedBy: row.lastUpdatedBy ?? null,
+      confirmedAt: row.confirmedAt?.toISOString() ?? null,
+      confirmedBy: row.confirmedBy ?? null,
+      lastExportedAt: row.lastExportedAt?.toISOString() ?? null,
+      lastExportedBy: row.lastExportedBy ?? null,
+      yearAround: row.yearAround ?? false,
+      estimateJan: row.estimateJan ? Number(row.estimateJan) : null,
+      estimateFeb: row.estimateFeb ? Number(row.estimateFeb) : null,
+      estimateMar: row.estimateMar ? Number(row.estimateMar) : null,
+      estimateApr: row.estimateApr ? Number(row.estimateApr) : null,
+      estimateMay: row.estimateMay ? Number(row.estimateMay) : null,
+      estimateJun: row.estimateJun ? Number(row.estimateJun) : null,
+      estimateJul: row.estimateJul ? Number(row.estimateJul) : null,
+      estimateAug: row.estimateAug ? Number(row.estimateAug) : null,
+      estimateSep: row.estimateSep ? Number(row.estimateSep) : null,
+      estimateOct: row.estimateOct ? Number(row.estimateOct) : null,
+      estimateNov: row.estimateNov ? Number(row.estimateNov) : null,
+      estimateDec: row.estimateDec ? Number(row.estimateDec) : null,
+      openOrderQty: row.openOrderQty ? Number(row.openOrderQty) : 0,
+    };
+  }
+
+  /**
+   * Fetch a single bid by UUID, returning a fully populated DTO via the same JOIN
+   * shape as getCustomerBids. Used after mutations to return the updated record.
+   */
+  private async fetchBidById(id: string): Promise<CustomerBidDto> {
+    const rows = await this.prisma.$queryRaw<BaseBidRow[]>(Prisma.sql`
+      SELECT
+          cbd.id AS "id",
+          cbd.sales_type AS "salesType",
+          cbd.source_db AS "sourceDb",
+          cbd.site_code AS "siteCode",
+          c."name" AS "customerName",
+          cbd.customer_bill_to AS "customerBillTo",
+          c.co_op_code AS "coOpCode",
+          cbd.com_co_op_code AS "comCoOpCode",
+          c.contact AS "contactName",
+          c.e_mail AS "contactEmail",
+          c.phone_no_ AS "contactPhone",
+          c.salesperson_code AS "salesRep",
+          cbd.item_no AS "itemNo",
+          i.description AS "itemDescription",
+          i.description_2 AS "brandName",
+          i.pack_size AS "packSize",
+          sku.customer_lead_time AS "customerLeadTime",
+          cbd.bid_qty AS "bidQty",
+          cbd.bid_start AS "bidStart",
+          cbd.bid_end AS "bidEnd",
+          cbd.erp_status AS "erpStatus",
+          cbd.last_year_bid_qty AS "lastYearBidQty",
+          cbd.last_year_actual AS "lastYearActual",
+          cbd.ly_august AS "lyAugust",
+          cbd.ly_september AS "lySeptember",
+          cbd.ly_october AS "lyOctober",
+          cbd.ly_november AS "lyNovember",
+          cbd.ly_december AS "lyDecember",
+          cbd.ly_january AS "lyJanuary",
+          cbd.ly_february AS "lyFebruary",
+          cbd.ly_march AS "lyMarch",
+          cbd.ly_april AS "lyApril",
+          cbd.ly_may AS "lyMay",
+          cbd.ly_june AS "lyJune",
+          cbd.ly_july AS "lyJuly",
+          cbd.cy_august AS "cyAugust",
+          cbd.cy_september AS "cySeptember",
+          cbd.cy_october AS "cyOctober",
+          cbd.cy_november AS "cyNovember",
+          cbd.cy_december AS "cyDecember",
+          cbd.cy_january AS "cyJanuary",
+          cbd.cy_february AS "cyFebruary",
+          cbd.cy_march AS "cyMarch",
+          cbd.cy_april AS "cyApril",
+          cbd.cy_may AS "cyMay",
+          cbd.cy_june AS "cyJune",
+          cbd.cy_july AS "cyJuly",
+          cbd.is_new AS "isNew",
+          cbd.last_updated_at AS "lastUpdatedAt",
+          cbd.last_updated_by AS "lastUpdatedBy",
+          cbd.confirmed_at AS "confirmedAt",
+          cbd.confirmed_by AS "confirmedBy",
+          cbd.last_exported_at AS "lastExportedAt",
+          cbd.last_exported_by AS "lastExportedBy",
+          cbd.year_around AS "yearAround",
+          cbd.estimate_jan AS "estimateJan",
+          cbd.estimate_feb AS "estimateFeb",
+          cbd.estimate_mar AS "estimateMar",
+          cbd.estimate_apr AS "estimateApr",
+          cbd.estimate_may AS "estimateMay",
+          cbd.estimate_jun AS "estimateJun",
+          cbd.estimate_jul AS "estimateJul",
+          cbd.estimate_aug AS "estimateAug",
+          cbd.estimate_sep AS "estimateSep",
+          cbd.estimate_oct AS "estimateOct",
+          cbd.estimate_nov AS "estimateNov",
+          cbd.estimate_dec AS "estimateDec",
+          cbd.open_order_qty AS "openOrderQty"
+      FROM ait.customer_bid_data cbd
+      INNER JOIN dw2_nav.customer c
+          ON cbd.customer_bill_to = c.no_
+          AND cbd.source_db = c.source_db
+      INNER JOIN dw2_nav.item i
+          ON cbd.item_no = i.no_
+          AND cbd.source_db = i.source_db
+      LEFT JOIN dw2_nav.stockkeeping_unit sku
+          ON cbd.item_no = sku.item_no_
+          AND cbd.source_db = sku.source_db
+          AND cbd.site_code = sku.location_code
+      WHERE cbd.id = ${id}::uuid
+      LIMIT 1
+    `);
+
+    if (rows.length === 0) {
+      throw new CustomerBidNotFoundError(id);
+    }
+    return this.mapBaseRowToDto(rows[0]!);
+  }
+
+  /**
    * Get paginated customer bid records
    */
   async getCustomerBids(
@@ -168,11 +340,7 @@ export class CustomerBidService implements ICustomerBidService {
       if (query.queued !== undefined) {
         const queuedSubquery = Prisma.sql`
           SELECT 1 FROM ait.customer_bid_export_item bei
-          WHERE bei.source_db = cbd.source_db
-            AND bei.site_code = cbd.site_code
-            AND bei.customer_bill_to = cbd.customer_bill_to
-            AND bei.item_no = cbd.item_no
-            AND bei.school_year = cbd.school_year
+          WHERE bei.bid_id = cbd.id
             AND bei.status = 'QUEUED'
         `;
         if (query.queued) {
@@ -190,11 +358,14 @@ export class CustomerBidService implements ICustomerBidService {
       // Query from pre-aggregated customer_bid_data, joining customer/item for metadata
       const baseQuery = Prisma.sql`
         SELECT
+            cbd.id AS "id",
+            cbd.sales_type AS "salesType",
             cbd.source_db AS "sourceDb",
             cbd.site_code AS "siteCode",
             c."name" AS "customerName",
             cbd.customer_bill_to AS "customerBillTo",
             c.co_op_code AS "coOpCode",
+            cbd.com_co_op_code AS "comCoOpCode",
             c.contact AS "contactName",
             c.e_mail AS "contactEmail",
             c.phone_no_ AS "contactPhone",
@@ -278,74 +449,10 @@ export class CustomerBidService implements ICustomerBidService {
       const hasMore = rows.length > limit;
       const trimmedRows = hasMore ? rows.slice(0, limit) : rows;
 
-      // Map to DTO
-      const data: CustomerBidDto[] = trimmedRows.map((row) => ({
-        sourceDb: row.sourceDb,
-        siteCode: row.siteCode,
-        customerName: row.customerName,
-        customerBillTo: row.customerBillTo,
-        coOpCode: row.coOpCode,
-        contactName: row.contactName,
-        contactEmail: row.contactEmail,
-        contactPhone: row.contactPhone,
-        salesRep: row.salesRep,
-        bidStartDate: row.bidStart?.toISOString() ?? "",
-        bidEndDate: row.bidEnd?.toISOString() ?? null,
-        itemCode: row.itemNo,
-        itemDescription: row.itemDescription,
-        brandName: row.brandName,
-        packSize: row.packSize,
-        customerLeadTime: row.customerLeadTime ?? null,
-        erpStatus: row.erpStatus,
-        bidQuantity: row.bidQty ? Number(row.bidQty) : null,
-        lastYearBidQty: row.lastYearBidQty ? Number(row.lastYearBidQty) : null,
-        lastYearActual: row.lastYearActual ? Number(row.lastYearActual) : null,
-        lyAugust: row.lyAugust ? Number(row.lyAugust) : null,
-        lySeptember: row.lySeptember ? Number(row.lySeptember) : null,
-        lyOctober: row.lyOctober ? Number(row.lyOctober) : null,
-        lyNovember: row.lyNovember ? Number(row.lyNovember) : null,
-        lyDecember: row.lyDecember ? Number(row.lyDecember) : null,
-        lyJanuary: row.lyJanuary ? Number(row.lyJanuary) : null,
-        lyFebruary: row.lyFebruary ? Number(row.lyFebruary) : null,
-        lyMarch: row.lyMarch ? Number(row.lyMarch) : null,
-        lyApril: row.lyApril ? Number(row.lyApril) : null,
-        lyMay: row.lyMay ? Number(row.lyMay) : null,
-        lyJune: row.lyJune ? Number(row.lyJune) : null,
-        lyJuly: row.lyJuly ? Number(row.lyJuly) : null,
-        cyAugust: row.cyAugust ? Number(row.cyAugust) : null,
-        cySeptember: row.cySeptember ? Number(row.cySeptember) : null,
-        cyOctober: row.cyOctober ? Number(row.cyOctober) : null,
-        cyNovember: row.cyNovember ? Number(row.cyNovember) : null,
-        cyDecember: row.cyDecember ? Number(row.cyDecember) : null,
-        cyJanuary: row.cyJanuary ? Number(row.cyJanuary) : null,
-        cyFebruary: row.cyFebruary ? Number(row.cyFebruary) : null,
-        cyMarch: row.cyMarch ? Number(row.cyMarch) : null,
-        cyApril: row.cyApril ? Number(row.cyApril) : null,
-        cyMay: row.cyMay ? Number(row.cyMay) : null,
-        cyJune: row.cyJune ? Number(row.cyJune) : null,
-        cyJuly: row.cyJuly ? Number(row.cyJuly) : null,
-        isNew: row.isNew ?? false,
-        lastUpdatedAt: row.lastUpdatedAt?.toISOString() ?? null,
-        lastUpdatedBy: row.lastUpdatedBy ?? null,
-        confirmedAt: row.confirmedAt?.toISOString() ?? null,
-        confirmedBy: row.confirmedBy ?? null,
-        lastExportedAt: row.lastExportedAt?.toISOString() ?? null,
-        lastExportedBy: row.lastExportedBy ?? null,
-        yearAround: row.yearAround ?? false,
-        estimateJan: row.estimateJan ? Number(row.estimateJan) : null,
-        estimateFeb: row.estimateFeb ? Number(row.estimateFeb) : null,
-        estimateMar: row.estimateMar ? Number(row.estimateMar) : null,
-        estimateApr: row.estimateApr ? Number(row.estimateApr) : null,
-        estimateMay: row.estimateMay ? Number(row.estimateMay) : null,
-        estimateJun: row.estimateJun ? Number(row.estimateJun) : null,
-        estimateJul: row.estimateJul ? Number(row.estimateJul) : null,
-        estimateAug: row.estimateAug ? Number(row.estimateAug) : null,
-        estimateSep: row.estimateSep ? Number(row.estimateSep) : null,
-        estimateOct: row.estimateOct ? Number(row.estimateOct) : null,
-        estimateNov: row.estimateNov ? Number(row.estimateNov) : null,
-        estimateDec: row.estimateDec ? Number(row.estimateDec) : null,
-        openOrderQty: row.openOrderQty ? Number(row.openOrderQty) : 0,
-      }));
+      // Map to DTO via shared mapper
+      const data: CustomerBidDto[] = trimmedRows.map((row) =>
+        this.mapBaseRowToDto(row)
+      );
 
       logger.info(
         {
@@ -404,14 +511,16 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
-      const compositeKey = buildCompositeKeyWhere(key);
-
-      // Check if bid is confirmed — enforce restrictions
+      // Check if bid exists and is confirmed — enforce restrictions
       const existing = await this.prisma.customerBidData.findUnique({
-        where: compositeKey,
+        where: { id: key.id },
       });
 
-      if (existing?.confirmedAt) {
+      if (!existing) {
+        throw new CustomerBidNotFoundError(key.id);
+      }
+
+      if (existing.confirmedAt) {
         // Reject yearAround changes on confirmed bids (all roles)
         if (data.yearAround !== undefined) {
           throw new CustomerBidQueryError(
@@ -441,33 +550,10 @@ export class CustomerBidService implements ICustomerBidService {
 
       const now = new Date();
 
-      // Upsert the record - create if not exists, update if exists
-      const record = await this.prisma.customerBidData.upsert({
-        where: compositeKey,
-        create: {
-          sourceDb: key.sourceDb,
-          siteCode: key.siteCode,
-          customerBillTo: key.customerBillTo,
-          itemNo: key.itemNo,
-          schoolYear: key.schoolYear,
-          yearAround: data.yearAround ?? false,
-          lastUpdatedAt: now,
-          lastUpdatedBy: userEmail,
-          // Monthly estimates
-          estimateJan: data.estimateJan,
-          estimateFeb: data.estimateFeb,
-          estimateMar: data.estimateMar,
-          estimateApr: data.estimateApr,
-          estimateMay: data.estimateMay,
-          estimateJun: data.estimateJun,
-          estimateJul: data.estimateJul,
-          estimateAug: data.estimateAug,
-          estimateSep: data.estimateSep,
-          estimateOct: data.estimateOct,
-          estimateNov: data.estimateNov,
-          estimateDec: data.estimateDec,
-        },
-        update: {
+      // Plain update - new rows are exclusively created by the sync function
+      await this.prisma.customerBidData.update({
+        where: { id: key.id },
+        data: {
           yearAround: data.yearAround,
           lastUpdatedAt: now,
           lastUpdatedBy: userEmail,
@@ -492,9 +578,12 @@ export class CustomerBidService implements ICustomerBidService {
         "Customer bid updated successfully"
       );
 
-      return this.recordToDto(record);
+      return this.fetchBidById(key.id);
     } catch (error) {
-      if (error instanceof CustomerBidQueryError) {
+      if (
+        error instanceof CustomerBidQueryError ||
+        error instanceof CustomerBidNotFoundError
+      ) {
         throw error;
       }
 
@@ -539,20 +628,6 @@ export class CustomerBidService implements ICustomerBidService {
   }
 
   /**
-   * Check if an incoming update has any non-default values worth writing.
-   * Used when no existing DB record exists — only create if there's real data.
-   */
-  private hasNonDefaultValues(incoming: UpdateCustomerBidDto): boolean {
-    if (incoming.yearAround === true) return true;
-
-    for (const f of ESTIMATE_FIELDS) {
-      if (incoming[f] !== undefined && incoming[f] !== null) return true;
-    }
-
-    return false;
-  }
-
-  /**
    * Preview which records in a bulk update would actually change.
    * Uses a single findMany query for efficiency (read-only, no writes).
    */
@@ -564,24 +639,16 @@ export class CustomerBidService implements ICustomerBidService {
       "Previewing bulk update"
     );
 
-    // Build OR conditions for a single batch query
-    const orConditions = data.records.map((r) => ({
-      sourceDb: r.sourceDb,
-      siteCode: r.siteCode,
-      customerBillTo: r.customerBillTo,
-      itemNo: r.itemNo,
-      schoolYear: r.schoolYear,
-    }));
+    const ids = data.records.map((r) => r.id);
 
     const existingRecords = await this.prisma.customerBidData.findMany({
-      where: { OR: orConditions },
+      where: { id: { in: ids } },
     });
 
-    // Build lookup map: "sourceDb/siteCode/customerBillTo/itemNo/schoolYear" → record
+    // Build lookup map keyed by UUID
     const existingMap = new Map<string, CustomerBidData>();
     for (const rec of existingRecords) {
-      const key = `${rec.sourceDb}/${rec.siteCode}/${rec.customerBillTo}/${rec.itemNo}/${rec.schoolYear}`;
-      existingMap.set(key, rec);
+      existingMap.set(rec.id, rec);
     }
 
     let changed = 0;
@@ -589,23 +656,28 @@ export class CustomerBidService implements ICustomerBidService {
     const changedKeys: string[] = [];
 
     for (const record of data.records) {
-      const keyStr = `${record.sourceDb}/${record.siteCode}/${record.customerBillTo}/${record.itemNo}/${record.schoolYear}`;
-      const existing = existingMap.get(keyStr);
+      const existing = existingMap.get(record.id);
+
+      // Records that don't exist in the DB are counted as "would-fail" — flag as
+      // changed so the UI surfaces them, the bulk-update path will then error.
+      if (!existing) {
+        changed++;
+        changedKeys.push(record.id);
+        continue;
+      }
 
       let needsConfirmChange = false;
-      if (record.confirmed === true && !existing?.confirmedAt) {
+      if (record.confirmed === true && !existing.confirmedAt) {
         needsConfirmChange = true;
-      } else if (record.confirmed === false && existing?.confirmedAt) {
+      } else if (record.confirmed === false && existing.confirmedAt) {
         needsConfirmChange = true;
       }
 
-      const needsFieldUpdate = existing
-        ? this.hasEditableChanges(existing, record)
-        : this.hasNonDefaultValues(record);
+      const needsFieldUpdate = this.hasEditableChanges(existing, record);
 
       if (needsFieldUpdate || needsConfirmChange) {
         changed++;
-        changedKeys.push(keyStr);
+        changedKeys.push(record.id);
       } else {
         unchanged++;
       }
@@ -637,31 +709,31 @@ export class CustomerBidService implements ICustomerBidService {
     const errors: Array<{ key: string; message: string }> = [];
 
     for (const record of data.records) {
-      const key = {
-        sourceDb: record.sourceDb,
-        siteCode: record.siteCode,
-        customerBillTo: record.customerBillTo,
-        itemNo: record.itemNo,
-        schoolYear: record.schoolYear,
-      };
-      const keyStr = `${key.sourceDb}/${key.siteCode}/${key.customerBillTo}/${key.itemNo}/${key.schoolYear}`;
+      const key = { id: record.id };
 
       try {
         // Fetch existing record to check for actual changes
         const existing = await this.prisma.customerBidData.findUnique({
-          where: buildCompositeKeyWhere(key),
+          where: { id: record.id },
         });
 
+        if (!existing) {
+          failed++;
+          errors.push({
+            key: record.id,
+            message: "Record not found",
+          });
+          continue;
+        }
+
         let needsConfirmChange = false;
-        if (record.confirmed === true && !existing?.confirmedAt) {
+        if (record.confirmed === true && !existing.confirmedAt) {
           needsConfirmChange = true;
-        } else if (record.confirmed === false && existing?.confirmedAt) {
+        } else if (record.confirmed === false && existing.confirmedAt) {
           needsConfirmChange = true;
         }
 
-        const needsFieldUpdate = existing
-          ? this.hasEditableChanges(existing, record)
-          : this.hasNonDefaultValues(record);
+        const needsFieldUpdate = this.hasEditableChanges(existing, record);
 
         // Skip if nothing actually changed
         if (!needsFieldUpdate && !needsConfirmChange) {
@@ -675,7 +747,7 @@ export class CustomerBidService implements ICustomerBidService {
             await this.unconfirmBid(key);
           } catch (unconfirmError) {
             errors.push({
-              key: keyStr,
+              key: record.id,
               message: `Unconfirm failed: ${unconfirmError instanceof Error ? unconfirmError.message : "Unknown error"}`,
             });
           }
@@ -712,7 +784,7 @@ export class CustomerBidService implements ICustomerBidService {
             await this.confirmBid(key, userEmail);
           } catch (confirmError) {
             errors.push({
-              key: keyStr,
+              key: record.id,
               message: `Fields updated but confirmation failed: ${confirmError instanceof Error ? confirmError.message : "Unknown error"}`,
             });
           }
@@ -720,7 +792,7 @@ export class CustomerBidService implements ICustomerBidService {
       } catch (error) {
         failed++;
         errors.push({
-          key: keyStr,
+          key: record.id,
           message: error instanceof Error ? error.message : "Unknown error",
         });
       }
@@ -739,119 +811,6 @@ export class CustomerBidService implements ICustomerBidService {
     };
   }
 
-  /**
-   * Map a CustomerBidData Prisma record to a minimal CustomerBidDto
-   */
-  private recordToDto(record: {
-    sourceDb: string;
-    siteCode: string;
-    customerBillTo: string;
-    itemNo: string;
-    lastYearBidQty: Prisma.Decimal | null;
-    lastYearActual: Prisma.Decimal | null;
-    lyAugust: Prisma.Decimal | null;
-    lySeptember: Prisma.Decimal | null;
-    lyOctober: Prisma.Decimal | null;
-    lyNovember: Prisma.Decimal | null;
-    lyDecember: Prisma.Decimal | null;
-    lyJanuary: Prisma.Decimal | null;
-    lyFebruary: Prisma.Decimal | null;
-    lyMarch: Prisma.Decimal | null;
-    lyApril: Prisma.Decimal | null;
-    lyMay: Prisma.Decimal | null;
-    lyJune: Prisma.Decimal | null;
-    lyJuly: Prisma.Decimal | null;
-    cyAugust: Prisma.Decimal | null;
-    cySeptember: Prisma.Decimal | null;
-    cyOctober: Prisma.Decimal | null;
-    cyNovember: Prisma.Decimal | null;
-    cyDecember: Prisma.Decimal | null;
-    cyJanuary: Prisma.Decimal | null;
-    cyFebruary: Prisma.Decimal | null;
-    cyMarch: Prisma.Decimal | null;
-    cyApril: Prisma.Decimal | null;
-    cyMay: Prisma.Decimal | null;
-    cyJune: Prisma.Decimal | null;
-    cyJuly: Prisma.Decimal | null;
-    isNew: boolean;
-    lastUpdatedAt: Date | null;
-    lastUpdatedBy: string | null;
-    confirmedAt: Date | null;
-    confirmedBy: string | null;
-    lastExportedAt: Date | null;
-    lastExportedBy: string | null;
-    yearAround: boolean;
-    estimateJan: Prisma.Decimal | null;
-    estimateFeb: Prisma.Decimal | null;
-    estimateMar: Prisma.Decimal | null;
-    estimateApr: Prisma.Decimal | null;
-    estimateMay: Prisma.Decimal | null;
-    estimateJun: Prisma.Decimal | null;
-    estimateJul: Prisma.Decimal | null;
-    estimateAug: Prisma.Decimal | null;
-    estimateSep: Prisma.Decimal | null;
-    estimateOct: Prisma.Decimal | null;
-    estimateNov: Prisma.Decimal | null;
-    estimateDec: Prisma.Decimal | null;
-  }): CustomerBidDto {
-    return {
-      sourceDb: record.sourceDb,
-      siteCode: record.siteCode,
-      customerName: null,
-      customerBillTo: record.customerBillTo,
-      coOpCode: null,
-      contactName: null,
-      contactEmail: null,
-      contactPhone: null,
-      salesRep: null,
-      bidStartDate: "",
-      bidEndDate: null,
-      itemCode: record.itemNo,
-      itemDescription: null,
-      brandName: null,
-      packSize: null,
-      customerLeadTime: null,
-      erpStatus: null,
-      bidQuantity: null,
-      openOrderQty: 0,
-      lastYearBidQty: decimalToNumber(record.lastYearBidQty),
-      lastYearActual: decimalToNumber(record.lastYearActual),
-      lyAugust: decimalToNumber(record.lyAugust),
-      lySeptember: decimalToNumber(record.lySeptember),
-      lyOctober: decimalToNumber(record.lyOctober),
-      lyNovember: decimalToNumber(record.lyNovember),
-      lyDecember: decimalToNumber(record.lyDecember),
-      lyJanuary: decimalToNumber(record.lyJanuary),
-      lyFebruary: decimalToNumber(record.lyFebruary),
-      lyMarch: decimalToNumber(record.lyMarch),
-      lyApril: decimalToNumber(record.lyApril),
-      lyMay: decimalToNumber(record.lyMay),
-      lyJune: decimalToNumber(record.lyJune),
-      lyJuly: decimalToNumber(record.lyJuly),
-      cyAugust: decimalToNumber(record.cyAugust),
-      cySeptember: decimalToNumber(record.cySeptember),
-      cyOctober: decimalToNumber(record.cyOctober),
-      cyNovember: decimalToNumber(record.cyNovember),
-      cyDecember: decimalToNumber(record.cyDecember),
-      cyJanuary: decimalToNumber(record.cyJanuary),
-      cyFebruary: decimalToNumber(record.cyFebruary),
-      cyMarch: decimalToNumber(record.cyMarch),
-      cyApril: decimalToNumber(record.cyApril),
-      cyMay: decimalToNumber(record.cyMay),
-      cyJune: decimalToNumber(record.cyJune),
-      cyJuly: decimalToNumber(record.cyJuly),
-      isNew: record.isNew,
-      lastUpdatedAt: record.lastUpdatedAt?.toISOString() ?? null,
-      lastUpdatedBy: record.lastUpdatedBy ?? null,
-      confirmedAt: record.confirmedAt?.toISOString() ?? null,
-      confirmedBy: record.confirmedBy ?? null,
-      lastExportedAt: record.lastExportedAt?.toISOString() ?? null,
-      lastExportedBy: record.lastExportedBy ?? null,
-      yearAround: record.yearAround,
-      ...mapEstimates(record),
-    };
-  }
-
   async confirmBid(
     key: CustomerBidKeyDto,
     userEmail: string
@@ -862,15 +821,13 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
-      // Validate: at least 1 month must have both an estimate and a menu month
+      // Validate: at least 1 month must have an estimate > 0
       const existing = await this.prisma.customerBidData.findUnique({
-        where: buildCompositeKeyWhere(key),
+        where: { id: key.id },
       });
 
       if (!existing) {
-        throw new CustomerBidQueryError(
-          "Cannot confirm: no estimate data exists for this bid"
-        );
+        throw new CustomerBidNotFoundError(key.id);
       }
 
       const hasValidMonth = ESTIMATE_FIELDS.some(
@@ -883,8 +840,8 @@ export class CustomerBidService implements ICustomerBidService {
         );
       }
 
-      const record = await this.prisma.customerBidData.update({
-        where: buildCompositeKeyWhere(key),
+      await this.prisma.customerBidData.update({
+        where: { id: key.id },
         data: {
           confirmedBy: userEmail,
           confirmedAt: new Date(),
@@ -896,8 +853,14 @@ export class CustomerBidService implements ICustomerBidService {
         "Customer bid confirmed"
       );
 
-      return this.recordToDto(record);
+      return this.fetchBidById(key.id);
     } catch (error) {
+      if (
+        error instanceof CustomerBidQueryError ||
+        error instanceof CustomerBidNotFoundError
+      ) {
+        throw error;
+      }
       logger.error(
         { event: "customer-bid.confirm.error", key, error },
         "Failed to confirm customer bid"
@@ -917,8 +880,8 @@ export class CustomerBidService implements ICustomerBidService {
     );
 
     try {
-      const record = await this.prisma.customerBidData.update({
-        where: buildCompositeKeyWhere(key),
+      await this.prisma.customerBidData.update({
+        where: { id: key.id },
         data: {
           confirmedBy: null,
           confirmedAt: null,
@@ -930,8 +893,11 @@ export class CustomerBidService implements ICustomerBidService {
         "Customer bid unconfirmed"
       );
 
-      return this.recordToDto(record);
+      return this.fetchBidById(key.id);
     } catch (error) {
+      if (error instanceof CustomerBidNotFoundError) {
+        throw error;
+      }
       logger.error(
         { event: "customer-bid.unconfirm.error", key, error },
         "Failed to unconfirm customer bid"
@@ -1168,11 +1134,7 @@ export class CustomerBidService implements ICustomerBidService {
       if (query.queued !== undefined) {
         const queuedSubquery = Prisma.sql`
           SELECT 1 FROM ait.customer_bid_export_item bei
-          WHERE bei.source_db = cbd.source_db
-            AND bei.site_code = cbd.site_code
-            AND bei.customer_bill_to = cbd.customer_bill_to
-            AND bei.item_no = cbd.item_no
-            AND bei.school_year = cbd.school_year
+          WHERE bei.bid_id = cbd.id
             AND bei.status = 'QUEUED'
         `;
         if (query.queued) {
@@ -1247,6 +1209,9 @@ export class CustomerBidService implements ICustomerBidService {
         UNION ALL
         SELECT 'coOpCode', co_op_code
         FROM (SELECT DISTINCT co_op_code FROM dw2_nav.customer WHERE co_op_code IS NOT NULL AND co_op_code != '' ORDER BY 1) t
+        UNION ALL
+        SELECT 'comCoOpCode', com_co_op_code
+        FROM (SELECT DISTINCT com_co_op_code FROM ait.customer_bid_data WHERE com_co_op_code IS NOT NULL AND com_co_op_code != '' ORDER BY 1) t
       `);
 
       const grouped: Record<string, string[]> = {};
@@ -1259,6 +1224,7 @@ export class CustomerBidService implements ICustomerBidService {
         salesReps: grouped["salesRep"] ?? [],
         erpStatuses: grouped["erpStatus"] ?? [],
         coOpCodes: grouped["coOpCode"] ?? [],
+        comCoOpCodes: grouped["comCoOpCode"] ?? [],
       };
     } catch (error) {
       logger.error(

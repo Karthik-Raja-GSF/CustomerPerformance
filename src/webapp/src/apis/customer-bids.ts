@@ -7,7 +7,6 @@
 import { apiClient } from "@/apis/client";
 import type {
   CustomerBidDto,
-  CustomerBidKey,
   CustomerBidFilters,
   CustomerBidFilterOptions,
   CustomerBidListResponse,
@@ -43,6 +42,8 @@ export async function getCustomerBids(
   if (filters?.itemCode) params.set("itemCode", filters.itemCode);
   if (filters?.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
+  if (filters?.salesType !== undefined)
+    params.set("salesType", filters.salesType.toString());
   if (filters?.isNew !== undefined)
     params.set("isNew", filters.isNew.toString());
   if (filters?.confirmed !== undefined)
@@ -84,6 +85,8 @@ export async function getCustomerBidStats(
   if (filters?.itemCode) params.set("itemCode", filters.itemCode);
   if (filters?.erpStatus) params.set("erpStatus", filters.erpStatus);
   if (filters?.coOpCode) params.set("coOpCode", filters.coOpCode);
+  if (filters?.salesType !== undefined)
+    params.set("salesType", filters.salesType.toString());
   if (filters?.isNew !== undefined)
     params.set("isNew", filters.isNew.toString());
   if (filters?.confirmed !== undefined)
@@ -103,22 +106,21 @@ export async function getCustomerBidStats(
 }
 
 /**
- * Build the REST path for a customer bid record
+ * Build the REST path for a customer bid record by UUID
  */
-function buildBidPath(key: CustomerBidKey): string {
-  const { sourceDb, siteCode, customerBillTo, itemNo, schoolYear } = key;
-  return `/customer-bids/${encodeURIComponent(sourceDb)}/${encodeURIComponent(siteCode)}/${encodeURIComponent(customerBillTo)}/${encodeURIComponent(itemNo)}/${encodeURIComponent(schoolYear)}`;
+function buildBidPath(id: string): string {
+  return `/customer-bids/${encodeURIComponent(id)}`;
 }
 
 /**
  * Update a customer bid record's user-editable fields
  */
 export async function updateCustomerBid(
-  key: CustomerBidKey,
+  id: string,
   updates: UpdateCustomerBidDto
 ): Promise<CustomerBidDto> {
   const response = await apiClient.patch<ApiResponse<CustomerBidDto>>(
-    buildBidPath(key),
+    buildBidPath(id),
     updates
   );
   return response.data;
@@ -127,11 +129,9 @@ export async function updateCustomerBid(
 /**
  * Confirm a customer bid record (sets confirmed_at and confirmed_by)
  */
-export async function confirmCustomerBid(
-  key: CustomerBidKey
-): Promise<CustomerBidDto> {
+export async function confirmCustomerBid(id: string): Promise<CustomerBidDto> {
   const response = await apiClient.post<ApiResponse<CustomerBidDto>>(
-    `${buildBidPath(key)}/confirm`
+    `${buildBidPath(id)}/confirm`
   );
   return response.data;
 }
@@ -140,21 +140,14 @@ export async function confirmCustomerBid(
  * Unconfirm a customer bid record (clears confirmed_at and confirmed_by)
  */
 export async function unconfirmCustomerBid(
-  key: CustomerBidKey
+  id: string
 ): Promise<CustomerBidDto> {
   const response = await apiClient.post<ApiResponse<CustomerBidDto>>(
-    `${buildBidPath(key)}/unconfirm`
+    `${buildBidPath(id)}/unconfirm`
   );
   return response.data;
 }
 
-/**
- * Build a CustomerBidKey from a CustomerBidDto and school year
- *
- * @param bid - The bid record
- * @param schoolYear - The school year string (e.g., "2026-2027")
- * @returns CustomerBidKey for API calls
- */
 /**
  * Bulk update multiple customer bid records
  * Sends to POST /customer-bids/bulk-update (max 1000 records per request)
@@ -197,17 +190,4 @@ export async function getCustomerBidFilterOptions(): Promise<CustomerBidFilterOp
     "/customer-bids/filter-options"
   );
   return response.data;
-}
-
-export function buildBidKey(
-  bid: CustomerBidDto,
-  schoolYear: string
-): CustomerBidKey {
-  return {
-    sourceDb: bid.sourceDb || "",
-    siteCode: bid.siteCode || "",
-    customerBillTo: bid.customerBillTo || "",
-    itemNo: bid.itemCode,
-    schoolYear,
-  };
 }

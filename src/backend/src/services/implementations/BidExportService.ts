@@ -3,8 +3,8 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { IBidExportService } from "@/services/IBidExportService";
 import {
   QueueBidExportDto,
-  QueueBidExportByKeysDto,
-  CancelBidExportByKeysDto,
+  QueueBidExportByIdsDto,
+  CancelBidExportByIdsDto,
   QueueBidExportResultDto,
   MarkExportedDto,
   MarkExportedResultDto,
@@ -20,7 +20,6 @@ import {
 } from "@/contracts/dtos/bid-export.dto";
 import { CustomerBidDto } from "@/contracts/dtos/customer-bid.dto";
 import { createChildLogger } from "@/telemetry/logger";
-import { buildCompositeKeyWhere } from "@/services/helpers/bid-keys";
 import {
   decimalToNumber,
   mapEstimates,
@@ -33,12 +32,15 @@ const logger = createChildLogger("bid-export");
  * Raw row returned by the queued bid data query
  */
 interface QueuedBidRow {
+  id: string;
+  salesType: number;
   sourceDb: string | null;
   siteCode: string | null;
   schoolYear: string;
   customerName: string | null;
   customerBillTo: string | null;
   coOpCode: string | null;
+  comCoOpCode: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -100,14 +102,10 @@ interface QueuedBidRow {
 }
 
 /**
- * Row returned when resolving filters to composite keys
+ * Row returned when resolving filters to bid UUIDs
  */
-interface BidKeyRow {
-  sourceDb: string;
-  siteCode: string;
-  customerBillTo: string;
-  itemNo: string;
-  schoolYear: string;
+interface BidIdRow {
+  id: string;
 }
 
 @injectable()
@@ -131,10 +129,10 @@ export class BidExportService implements IBidExportService {
       "Queueing bid items for export"
     );
 
-    // Resolve filters into matching bid composite keys
-    const keys = await this.resolveFiltersToBidKeys(schoolYear, filters);
+    // Resolve filters into matching bid UUIDs
+    const bidIds = await this.resolveFiltersToBidIds(schoolYear, filters);
 
-    if (keys.length === 0) {
+    if (bidIds.length === 0) {
       logger.info(
         { event: "bid-export.queue.empty", exportType, schoolYear },
         "No matching bid items found for queue"
@@ -144,12 +142,8 @@ export class BidExportService implements IBidExportService {
 
     // Batch insert QUEUED items
     const result = await this.prisma.customerBidExportItem.createMany({
-      data: keys.map((key) => ({
-        sourceDb: key.sourceDb,
-        siteCode: key.siteCode,
-        customerBillTo: key.customerBillTo,
-        itemNo: key.itemNo,
-        schoolYear: key.schoolYear,
+      data: bidIds.map((bidId) => ({
+        bidId,
         exportType: exportType as "WH" | "NAV",
         status: "QUEUED",
         queuedBy: userEmail,
@@ -197,23 +191,19 @@ export class BidExportService implements IBidExportService {
         },
       });
 
-      // 2. Find all QUEUED items for this export type
-      const queuedItems = await tx.customerBidExportItem.findMany({
+      // 2. Update export items: QUEUED → EXPORTED, link to run
+      const updateResult = await tx.customerBidExportItem.updateMany({
         where: {
           status: "QUEUED",
           exportType: exportType as "WH" | "NAV",
         },
-        select: {
-          id: true,
-          sourceDb: true,
-          siteCode: true,
-          customerBillTo: true,
-          itemNo: true,
-          schoolYear: true,
+        data: {
+          status: "EXPORTED",
+          runId: run.id,
         },
       });
 
-      if (queuedItems.length === 0) {
+      if (updateResult.count === 0) {
         // No items to export — mark run as completed with 0 records
         await tx.customerBidExportRun.update({
           where: { id: run.id },
@@ -227,34 +217,27 @@ export class BidExportService implements IBidExportService {
         return { runId: run.id, totalExported: 0 };
       }
 
-      // 3. Update export items: QUEUED → EXPORTED, link to run
-      await tx.customerBidExportItem.updateMany({
+      // 3. Update lastExportedAt/lastExportedBy on CustomerBidData via relation
+      await tx.customerBidData.updateMany({
         where: {
-          status: "QUEUED",
-          exportType: exportType as "WH" | "NAV",
+          exportItems: { some: { runId: run.id, status: "EXPORTED" } },
         },
-        data: {
-          status: "EXPORTED",
-          runId: run.id,
-        },
+        data: { lastExportedAt: new Date(), lastExportedBy: userEmail },
       });
 
-      // 4. Update lastExportedAt/lastExportedBy on CustomerBidData
-      await this.updateBidDataExportTracking(tx, queuedItems, userEmail);
-
-      // 5. Complete the run
+      // 4. Complete the run
       const durationMs = Date.now() - startTime;
       await tx.customerBidExportRun.update({
         where: { id: run.id },
         data: {
           status: "COMPLETED",
-          totalRecords: queuedItems.length,
+          totalRecords: updateResult.count,
           completedAt: new Date(),
           durationMs,
         },
       });
 
-      return { runId: run.id, totalExported: queuedItems.length };
+      return { runId: run.id, totalExported: updateResult.count };
     });
 
     logger.info(
@@ -302,33 +285,29 @@ export class BidExportService implements IBidExportService {
     return { wh, nav, total: wh + nav };
   }
 
-  async queueExportByKeys(
-    data: QueueBidExportByKeysDto,
+  async queueExportByIds(
+    data: QueueBidExportByIdsDto,
     userEmail: string
   ): Promise<QueueBidExportResultDto> {
-    const { exportType, keys } = data;
+    const { exportType, bidIds } = data;
 
     logger.info(
       {
-        event: "bid-export.queue-by-keys.start",
+        event: "bid-export.queue-by-ids.start",
         exportType,
-        keyCount: keys.length,
+        bidIdCount: bidIds.length,
         userEmail,
       },
-      `Queueing ${keys.length} bid items by explicit keys`
+      `Queueing ${bidIds.length} bid items by explicit ids`
     );
 
-    if (keys.length === 0) {
+    if (bidIds.length === 0) {
       return { itemsQueued: 0 };
     }
 
     const result = await this.prisma.customerBidExportItem.createMany({
-      data: keys.map((key) => ({
-        sourceDb: key.sourceDb,
-        siteCode: key.siteCode,
-        customerBillTo: key.customerBillTo,
-        itemNo: key.itemNo,
-        schoolYear: key.schoolYear,
+      data: bidIds.map((bidId) => ({
+        bidId,
         exportType: exportType as "WH" | "NAV",
         status: "QUEUED",
         queuedBy: userEmail,
@@ -337,7 +316,7 @@ export class BidExportService implements IBidExportService {
 
     logger.info(
       {
-        event: "bid-export.queue-by-keys.complete",
+        event: "bid-export.queue-by-ids.complete",
         exportType,
         itemsQueued: result.count,
         userEmail,
@@ -377,23 +356,8 @@ export class BidExportService implements IBidExportService {
         },
       });
 
-      // 3. Find QUEUED item PKs for lastExportedAt updates
-      const queuedItems = await tx.customerBidExportItem.findMany({
-        where: {
-          status: "QUEUED",
-          exportType: exportType as "WH" | "NAV",
-        },
-        select: {
-          sourceDb: true,
-          siteCode: true,
-          customerBillTo: true,
-          itemNo: true,
-          schoolYear: true,
-        },
-      });
-
-      // 4. Mark QUEUED → EXPORTED
-      await tx.customerBidExportItem.updateMany({
+      // 3. Mark QUEUED → EXPORTED
+      const updateResult = await tx.customerBidExportItem.updateMany({
         where: {
           status: "QUEUED",
           exportType: exportType as "WH" | "NAV",
@@ -404,16 +368,21 @@ export class BidExportService implements IBidExportService {
         },
       });
 
-      // 5. Update lastExportedAt/lastExportedBy on CustomerBidData
-      await this.updateBidDataExportTracking(tx, queuedItems, userEmail);
+      // 4. Update lastExportedAt/lastExportedBy on CustomerBidData via relation
+      await tx.customerBidData.updateMany({
+        where: {
+          exportItems: { some: { runId: run.id, status: "EXPORTED" } },
+        },
+        data: { lastExportedAt: new Date(), lastExportedBy: userEmail },
+      });
 
-      // 6. Complete the run
+      // 5. Complete the run
       const durationMs = Date.now() - startTime;
       await tx.customerBidExportRun.update({
         where: { id: run.id },
         data: {
           status: "COMPLETED",
-          totalRecords: queuedItems.length,
+          totalRecords: updateResult.count,
           completedAt: new Date(),
           durationMs,
         },
@@ -421,7 +390,7 @@ export class BidExportService implements IBidExportService {
 
       return {
         runId: run.id,
-        totalExported: queuedItems.length,
+        totalExported: updateResult.count,
         data: bidData,
       };
     });
@@ -460,90 +429,63 @@ export class BidExportService implements IBidExportService {
     return result.count;
   }
 
-  async cancelByKeys(data: CancelBidExportByKeysDto): Promise<number> {
-    const { keys, exportType } = data;
+  async cancelByIds(data: CancelBidExportByIdsDto): Promise<number> {
+    const { bidIds, exportType } = data;
 
-    if (keys.length === 0) return 0;
+    if (bidIds.length === 0) return 0;
 
     logger.info(
       {
-        event: "bid-export.cancel-by-keys.start",
+        event: "bid-export.cancel-by-ids.start",
         exportType,
-        keyCount: keys.length,
+        bidIdCount: bidIds.length,
       },
-      `Cancelling ${keys.length} queued export items by keys`
+      `Cancelling ${bidIds.length} queued export items by ids`
     );
 
-    let totalCancelled = 0;
-    await this.prisma.$transaction(async (tx) => {
-      for (const key of keys) {
-        const where: Prisma.CustomerBidExportItemWhereInput = {
-          sourceDb: key.sourceDb,
-          siteCode: key.siteCode,
-          customerBillTo: key.customerBillTo,
-          itemNo: key.itemNo,
-          schoolYear: key.schoolYear,
-          status: "QUEUED",
-        };
-        if (exportType) {
-          where.exportType = exportType as "WH" | "NAV";
-        }
-        const result = await tx.customerBidExportItem.updateMany({
-          where,
-          data: { status: "CANCELLED" },
-        });
-        totalCancelled += result.count;
-      }
+    const result = await this.prisma.customerBidExportItem.updateMany({
+      where: {
+        bidId: { in: bidIds },
+        status: "QUEUED",
+        ...(exportType ? { exportType: exportType as "WH" | "NAV" } : {}),
+      },
+      data: { status: "CANCELLED" },
     });
 
     logger.info(
       {
-        event: "bid-export.cancel-by-keys.complete",
+        event: "bid-export.cancel-by-ids.complete",
         exportType,
-        cancelled: totalCancelled,
+        cancelled: result.count,
       },
-      `Cancelled ${totalCancelled} queued export items by keys`
+      `Cancelled ${result.count} queued export items by ids`
     );
 
-    return totalCancelled;
+    return result.count;
   }
 
-  async clearExportByKeys(
-    keys: Array<{
-      sourceDb: string;
-      siteCode: string;
-      customerBillTo: string;
-      itemNo: string;
-      schoolYear: string;
-    }>
-  ): Promise<number> {
-    if (keys.length === 0) return 0;
+  async clearExportByIds(bidIds: string[]): Promise<number> {
+    if (bidIds.length === 0) return 0;
 
     logger.info(
-      { event: "bid-export.clear-export.start", keyCount: keys.length },
-      `Clearing export status on ${keys.length} bid records`
+      { event: "bid-export.clear-export.start", bidIdCount: bidIds.length },
+      `Clearing export status on ${bidIds.length} bid records`
     );
 
-    let totalCleared = 0;
-    await this.prisma.$transaction(async (tx) => {
-      for (const key of keys) {
-        await tx.customerBidData.update({
-          where: buildCompositeKeyWhere(key),
-          data: {
-            lastExportedAt: null,
-            lastExportedBy: null,
-          },
-        });
-        totalCleared++;
-      }
+    const result = await this.prisma.customerBidData.updateMany({
+      where: { id: { in: bidIds } },
+      data: {
+        lastExportedAt: null,
+        lastExportedBy: null,
+      },
     });
 
     logger.info(
-      { event: "bid-export.clear-export.complete", cleared: totalCleared },
-      `Cleared export status on ${totalCleared} bid records`
+      { event: "bid-export.clear-export.complete", cleared: result.count },
+      `Cleared export status on ${result.count} bid records`
     );
 
-    return totalCleared;
+    return result.count;
   }
 
   async prepareWebhookExport(
@@ -653,23 +595,8 @@ export class BidExportService implements IBidExportService {
         );
       }
 
-      // Find all QUEUED items for this run
-      const queuedItems = await tx.customerBidExportItem.findMany({
-        where: {
-          runId,
-          status: "QUEUED",
-        },
-        select: {
-          sourceDb: true,
-          siteCode: true,
-          customerBillTo: true,
-          itemNo: true,
-          schoolYear: true,
-        },
-      });
-
       // Mark QUEUED → EXPORTED for this run
-      await tx.customerBidExportItem.updateMany({
+      const updateResult = await tx.customerBidExportItem.updateMany({
         where: {
           runId,
           status: "QUEUED",
@@ -679,9 +606,14 @@ export class BidExportService implements IBidExportService {
         },
       });
 
-      // Update lastExportedAt/By on CustomerBidData
-      if (queuedItems.length > 0) {
-        await this.updateBidDataExportTracking(tx, queuedItems, userEmail);
+      // Update lastExportedAt/By on CustomerBidData via relation
+      if (updateResult.count > 0) {
+        await tx.customerBidData.updateMany({
+          where: {
+            exportItems: { some: { runId, status: "EXPORTED" } },
+          },
+          data: { lastExportedAt: new Date(), lastExportedBy: userEmail },
+        });
       }
 
       // Mark run COMPLETED
@@ -690,13 +622,13 @@ export class BidExportService implements IBidExportService {
         where: { id: runId },
         data: {
           status: "COMPLETED",
-          totalRecords: queuedItems.length,
+          totalRecords: updateResult.count,
           completedAt: new Date(),
           durationMs,
         },
       });
 
-      return { runId, totalExported: queuedItems.length };
+      return { runId, totalExported: updateResult.count };
     });
 
     logger.info(
@@ -739,12 +671,15 @@ export class BidExportService implements IBidExportService {
       : Prisma.empty;
     return db.$queryRaw<QueuedBidRow[]>(Prisma.sql`
       SELECT DISTINCT
+          cbd.id AS "id",
+          cbd.sales_type AS "salesType",
           cbd.source_db AS "sourceDb",
           cbd.site_code AS "siteCode",
           cbd.school_year AS "schoolYear",
           c."name" AS "customerName",
           cbd.customer_bill_to AS "customerBillTo",
           c.co_op_code AS "coOpCode",
+          cbd.com_co_op_code AS "comCoOpCode",
           c.contact AS "contactName",
           c.e_mail AS "contactEmail",
           c.phone_no_ AS "contactPhone",
@@ -805,11 +740,7 @@ export class BidExportService implements IBidExportService {
           cbd.estimate_dec AS "estimateDec"
       FROM ait.customer_bid_export_item ei
       INNER JOIN ait.customer_bid_data cbd
-          ON ei.source_db = cbd.source_db
-          AND ei.site_code = cbd.site_code
-          AND ei.customer_bill_to = cbd.customer_bill_to
-          AND ei.item_no = cbd.item_no
-          AND ei.school_year = cbd.school_year
+          ON ei.bid_id = cbd.id
       INNER JOIN dw2_nav.customer c
           ON cbd.customer_bill_to = c.no_
           AND cbd.source_db = c.source_db
@@ -824,39 +755,14 @@ export class BidExportService implements IBidExportService {
   }
 
   /**
-   * Update lastExportedAt/lastExportedBy on CustomerBidData for a set of items.
-   */
-  private async updateBidDataExportTracking(
-    tx: Prisma.TransactionClient,
-    items: Array<{
-      sourceDb: string;
-      siteCode: string;
-      customerBillTo: string;
-      itemNo: string;
-      schoolYear: string;
-    }>,
-    userEmail: string
-  ): Promise<void> {
-    for (const item of items) {
-      await tx.customerBidData.update({
-        where: buildCompositeKeyWhere(item),
-        data: {
-          lastExportedAt: new Date(),
-          lastExportedBy: userEmail,
-        },
-      });
-    }
-  }
-
-  /**
-   * Resolve filter criteria to matching bid composite keys.
+   * Resolve filter criteria to matching bid UUIDs.
    * Uses the same WHERE clause logic as CustomerBidService.getCustomerBids
-   * but only SELECTs the 5 PK columns.
+   * but only SELECTs cbd.id.
    */
-  private async resolveFiltersToBidKeys(
+  private async resolveFiltersToBidIds(
     schoolYear: string,
     filters: Record<string, unknown>
-  ): Promise<BidKeyRow[]> {
+  ): Promise<string[]> {
     // Cast untyped filter record to typed params for shared builder
     const whereConditions = buildBidFilterConditions({
       siteCode: filters.siteCode ? String(filters.siteCode) : undefined,
@@ -873,6 +779,12 @@ export class BidExportService implements IBidExportService {
       erpStatus: filters.erpStatus ? String(filters.erpStatus) : undefined,
       sourceDb: filters.sourceDb ? String(filters.sourceDb) : undefined,
       coOpCode: filters.coOpCode ? String(filters.coOpCode) : undefined,
+      comCoOpCode: filters.comCoOpCode
+        ? String(filters.comCoOpCode)
+            .split(",")
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+        : undefined,
       isNew: filters.isNew !== undefined ? Boolean(filters.isNew) : undefined,
       confirmed:
         filters.confirmed !== undefined
@@ -890,13 +802,8 @@ export class BidExportService implements IBidExportService {
         ? Prisma.sql`AND ${Prisma.join(whereConditions, " AND ")}`
         : Prisma.empty;
 
-    return this.prisma.$queryRaw<BidKeyRow[]>(Prisma.sql`
-      SELECT
-          cbd.source_db AS "sourceDb",
-          cbd.site_code AS "siteCode",
-          cbd.customer_bill_to AS "customerBillTo",
-          cbd.item_no AS "itemNo",
-          cbd.school_year AS "schoolYear"
+    const rows = await this.prisma.$queryRaw<BidIdRow[]>(Prisma.sql`
+      SELECT cbd.id AS "id"
       FROM ait.customer_bid_data cbd
       INNER JOIN dw2_nav.customer c
           ON cbd.customer_bill_to = c.no_
@@ -904,6 +811,7 @@ export class BidExportService implements IBidExportService {
       WHERE cbd.school_year = ${schoolYear}
         ${additionalWhere}
     `);
+    return rows.map((r) => r.id);
   }
 
   /**
@@ -911,11 +819,14 @@ export class BidExportService implements IBidExportService {
    */
   private mapRowToDto(row: QueuedBidRow): CustomerBidDto {
     return {
+      id: row.id,
+      salesType: row.salesType,
       sourceDb: row.sourceDb,
       siteCode: row.siteCode,
       customerName: row.customerName,
       customerBillTo: row.customerBillTo,
       coOpCode: row.coOpCode,
+      comCoOpCode: row.comCoOpCode ?? null,
       contactName: row.contactName,
       contactEmail: row.contactEmail,
       contactPhone: row.contactPhone,

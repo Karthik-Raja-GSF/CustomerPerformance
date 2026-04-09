@@ -47,31 +47,19 @@ export interface QueueSummary {
 }
 
 /**
- * Request payload for queueing bid items by explicit composite keys
+ * Request payload for queueing bid items by UUIDs
  */
-export interface QueueBidExportByKeysRequest {
+export interface QueueBidExportByIdsRequest {
   exportType: BidExportType;
-  keys: Array<{
-    sourceDb: string;
-    siteCode: string;
-    customerBillTo: string;
-    itemNo: string;
-    schoolYear: string;
-  }>;
+  bidIds: string[];
 }
 
 /**
- * Request payload for cancelling queued bid items by explicit composite keys
+ * Request payload for cancelling queued bid items by UUIDs
  */
-export interface CancelBidExportByKeysRequest {
+export interface CancelBidExportByIdsRequest {
   exportType?: BidExportType;
-  keys: Array<{
-    sourceDb: string;
-    siteCode: string;
-    customerBillTo: string;
-    itemNo: string;
-    schoolYear: string;
-  }>;
+  bidIds: string[];
 }
 
 /**

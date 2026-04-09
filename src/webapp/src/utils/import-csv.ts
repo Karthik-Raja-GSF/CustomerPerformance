@@ -7,15 +7,13 @@
 
 import * as XLSX from "xlsx";
 import { customerBidExportColumns } from "@/utils/export-csv";
-import type {
-  CustomerBidKey,
-  UpdateCustomerBidDto,
-} from "@/types/customer-bids";
+import type { UpdateCustomerBidDto } from "@/types/customer-bids";
 
 export interface ParsedImportRow {
   /** 1-based row number in the source file (for error reporting) */
   rowNumber: number;
-  key: CustomerBidKey;
+  /** Bid UUID from the file's `Bid ID` column */
+  id: string;
   updates: UpdateCustomerBidDto;
 }
 
@@ -87,13 +85,7 @@ const HEADER_TO_KEY = buildHeaderToKeyMap();
 HEADER_TO_KEY.set("confirmed", "confirmed");
 
 /** Required header names (display names from export) */
-const REQUIRED_HEADERS = [
-  "Source",
-  "Site Code",
-  "Customer Bill To",
-  "Item Code",
-  "School Year",
-];
+const REQUIRED_HEADERS = ["Bid ID"];
 
 function parseBoolean(
   value: unknown,
@@ -127,24 +119,18 @@ function parseNumber(value: unknown): { value: number | null; error?: string } {
   return { value: num };
 }
 
-/** Validate school year format: "YYYY-YYYY" where second year = first + 1 */
-const SCHOOL_YEAR_RE = /^\d{4}-\d{4}$/;
-
-function validateSchoolYear(value: string): string | null {
-  if (!SCHOOL_YEAR_RE.test(value)) {
-    return `Expected format "YYYY-YYYY", got "${value}"`;
-  }
-  const [startStr, endStr] = value.split("-");
-  const start = Number(startStr);
-  const end = Number(endStr);
-  if (end !== start + 1) {
-    return `End year must be start year + 1, got "${value}"`;
-  }
-  return null;
-}
+/**
+ * UUID v4-ish regex (loose: just enough to recognize a UUID-shaped string)
+ */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Parse a CSV or XLSX file into validated import records.
+ *
+ * The file must contain a `Bid ID` column with a UUID per row — that's the only
+ * identifier the importer needs. Any other identity columns (Source, Site Code,
+ * Customer Bill To, Item Code, School Year, Sales Type) are ignored if present.
  *
  * @param file - The uploaded file
  * @returns Parsed and validated records ready for bulk-update API
@@ -256,77 +242,31 @@ export async function parseImportFile(file: File): Promise<ParsedImportResult> {
       return undefined;
     };
 
-    // --- Extract composite key ---
-    const sourceDb = String(getValueByKey("sourceDb") ?? "").trim();
-    const siteCode = String(getValueByKey("siteCode") ?? "").trim();
-    const customerBillTo = String(getValueByKey("customerBillTo") ?? "").trim();
-    const itemCode = String(getValueByKey("itemCode") ?? "").trim();
-    const schoolYear = String(getValueByKey("schoolYear") ?? "").trim();
+    // --- Resolve bid id ---
+    // Bid ID is the only identifier — globally unique UUID per bid record.
+    const rawBidId = String(getValueByKey("id") ?? "").trim();
 
-    let keyValid = true;
-    if (!sourceDb) {
+    if (!rawBidId) {
       errors.push({
         row: rowNum,
-        column: "Source",
+        column: "Bid ID",
         message: "Required field is empty",
       });
-      keyValid = false;
-    }
-    if (!siteCode) {
-      errors.push({
-        row: rowNum,
-        column: "Site Code",
-        message: "Required field is empty",
-      });
-      keyValid = false;
-    }
-    if (!customerBillTo) {
-      errors.push({
-        row: rowNum,
-        column: "Customer Bill To",
-        message: "Required field is empty",
-      });
-      keyValid = false;
-    }
-    if (!itemCode) {
-      errors.push({
-        row: rowNum,
-        column: "Item Code",
-        message: "Required field is empty",
-      });
-      keyValid = false;
-    }
-    if (!schoolYear) {
-      errors.push({
-        row: rowNum,
-        column: "School Year",
-        message: "Required field is empty",
-      });
-      keyValid = false;
-    } else {
-      const formatError = validateSchoolYear(schoolYear);
-      if (formatError) {
-        errors.push({
-          row: rowNum,
-          column: "School Year",
-          message: formatError,
-        });
-        keyValid = false;
-      }
-    }
-
-    if (!keyValid) {
       skippedRows++;
       continue;
     }
 
-    const key: CustomerBidKey = {
-      sourceDb,
-      siteCode,
-      customerBillTo,
-      itemNo: itemCode, // Frontend uses itemCode, backend key uses itemNo
-      schoolYear,
-    };
+    if (!UUID_RE.test(rawBidId)) {
+      errors.push({
+        row: rowNum,
+        column: "Bid ID",
+        message: `Invalid UUID: "${rawBidId}"`,
+      });
+      skippedRows++;
+      continue;
+    }
+
+    const resolvedId = rawBidId;
 
     // --- Extract editable fields ---
     const updates: UpdateCustomerBidDto = {};
@@ -420,20 +360,19 @@ export async function parseImportFile(file: File): Promise<ParsedImportResult> {
       continue;
     }
 
-    allRecords.push({ rowNumber: rowNum, key, updates });
+    allRecords.push({ rowNumber: rowNum, id: resolvedId, updates });
   }
 
-  // --- Deduplicate by composite key (keep last occurrence) ---
+  // --- Deduplicate by id (keep last occurrence) ---
   const keyToIndex = new Map<string, number>();
   let duplicateRows = 0;
 
   for (let i = 0; i < allRecords.length; i++) {
-    const k = allRecords[i]!.key;
-    const compositeKey = `${k.sourceDb}/${k.siteCode}/${k.customerBillTo}/${k.itemNo}/${k.schoolYear}`;
-    if (keyToIndex.has(compositeKey)) {
+    const id = allRecords[i]!.id;
+    if (keyToIndex.has(id)) {
       duplicateRows++;
     }
-    keyToIndex.set(compositeKey, i);
+    keyToIndex.set(id, i);
   }
 
   // Keep only the last occurrence of each key

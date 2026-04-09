@@ -44,11 +44,7 @@ export interface MarkExportedResultDto {
  */
 export interface BidExportItemDto {
   id: string;
-  sourceDb: string;
-  siteCode: string;
-  customerBillTo: string;
-  itemNo: string;
-  schoolYear: string;
+  bidId: string;
   exportType: BidExportType;
   status: BidExportItemStatus;
   queuedBy: string;
@@ -81,31 +77,19 @@ export interface QueueSummaryDto {
 }
 
 /**
- * Request DTO for queueing bid items by explicit composite keys
+ * Request DTO for queueing bid items by UUIDs
  */
-export interface QueueBidExportByKeysDto {
+export interface QueueBidExportByIdsDto {
   exportType: BidExportType;
-  keys: Array<{
-    sourceDb: string;
-    siteCode: string;
-    customerBillTo: string;
-    itemNo: string;
-    schoolYear: string;
-  }>;
+  bidIds: string[];
 }
 
 /**
- * Request DTO for cancelling queued bid items by explicit composite keys
+ * Request DTO for cancelling queued bid items by UUIDs
  */
-export interface CancelBidExportByKeysDto {
+export interface CancelBidExportByIdsDto {
   exportType?: BidExportType;
-  keys: Array<{
-    sourceDb: string;
-    siteCode: string;
-    customerBillTo: string;
-    itemNo: string;
-    schoolYear: string;
-  }>;
+  bidIds: string[];
 }
 
 /**

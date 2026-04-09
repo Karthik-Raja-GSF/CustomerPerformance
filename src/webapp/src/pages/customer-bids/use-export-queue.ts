@@ -7,9 +7,9 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  queueBidExportByKeys,
-  cancelBidExportByKeys,
-  clearExportByKeys,
+  queueBidExportByIds,
+  cancelBidExportByIds,
+  clearExportByIds,
   exportAndReturn,
   getQueueSummary,
 } from "@/apis/bid-exports";
@@ -18,14 +18,9 @@ import { deriveMenuMonthsFromEstimates } from "@/utils/menu-months";
 import type { CustomerBidDto, CustomerBidFilters } from "@/types/customer-bids";
 import type { QueueSummary } from "@/types/bid-export";
 
-/** Check if two bids refer to the same record (composite key match) */
+/** Check if two bids refer to the same record (UUID match) */
 export function isSameBid(a: CustomerBidDto, b: CustomerBidDto): boolean {
-  return (
-    a.sourceDb === b.sourceDb &&
-    a.siteCode === b.siteCode &&
-    a.customerBillTo === b.customerBillTo &&
-    a.itemCode === b.itemCode
-  );
+  return a.id === b.id;
 }
 
 interface UseExportQueueOptions {
@@ -46,6 +41,7 @@ export function useExportQueue({
   enabled,
 }: UseExportQueueOptions) {
   // --- State ---
+  // queuedKeys is a Set of bid UUIDs (was composite-key strings pre-migration)
   const [queuedKeys, setQueuedKeys] = useState<Set<string>>(new Set());
   const [showPendingQueue, setShowPendingQueue] = useState(false);
   const [queueSummary, setQueueSummary] = useState<QueueSummary | null>(null);
@@ -59,25 +55,18 @@ export function useExportQueue({
     }
   }, [showPendingQueue, queuedKeys.size]);
 
-  // --- Helpers ---
-  const bidKeyString = useCallback(
-    (bid: CustomerBidDto) =>
-      `${bid.sourceDb}/${bid.siteCode}/${bid.customerBillTo}/${bid.itemCode}`,
-    []
-  );
-
   // Client-side filter: hide locally queued items (or show only them)
   const displayedBids = useMemo(() => {
     if (showPendingQueue) {
-      return bids.filter((bid) => queuedKeys.has(bidKeyString(bid)));
+      return bids.filter((bid) => queuedKeys.has(bid.id));
     }
     if (queuedKeys.size === 0) return bids;
-    return bids.filter((bid) => !queuedKeys.has(bidKeyString(bid)));
-  }, [bids, queuedKeys, bidKeyString, showPendingQueue]);
+    return bids.filter((bid) => !queuedKeys.has(bid.id));
+  }, [bids, queuedKeys, showPendingQueue]);
 
   const isQueued = useCallback(
-    (bid: CustomerBidDto) => queuedKeys.has(bidKeyString(bid)),
-    [queuedKeys, bidKeyString]
+    (bid: CustomerBidDto) => queuedKeys.has(bid.id),
+    [queuedKeys]
   );
 
   // --- Queue summary ---
@@ -97,31 +86,27 @@ export function useExportQueue({
   }, [fetchQueueSummary]);
 
   // --- Local queue operations ---
-  const handleToggleQueue = useCallback(
-    (bid: CustomerBidDto) => {
-      const key = bidKeyString(bid);
-      setQueuedKeys((prev) => {
-        const next = new Set(prev);
-        if (next.has(key)) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-        return next;
-      });
-    },
-    [bidKeyString]
-  );
+  const handleToggleQueue = useCallback((bid: CustomerBidDto) => {
+    setQueuedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(bid.id)) {
+        next.delete(bid.id);
+      } else {
+        next.add(bid.id);
+      }
+      return next;
+    });
+  }, []);
 
   const handleQueueAll = useCallback(() => {
     setQueuedKeys((prev) => {
       const next = new Set(prev);
       for (const bid of displayedBids) {
-        next.add(bidKeyString(bid));
+        next.add(bid.id);
       }
       return next;
     });
-  }, [displayedBids, bidKeyString]);
+  }, [displayedBids]);
 
   const handleRemoveAllQueued = useCallback(() => {
     setQueuedKeys(new Set());
@@ -133,20 +118,11 @@ export function useExportQueue({
 
     setIsConfirmingQueue(true);
     try {
-      const keys = Array.from(queuedKeys).map((keyStr) => {
-        const parts = keyStr.split("/");
-        return {
-          sourceDb: parts[0] ?? "",
-          siteCode: parts[1] ?? "",
-          customerBillTo: parts[2] ?? "",
-          itemNo: parts[3] ?? "",
-          schoolYear: schoolYearString,
-        };
-      });
+      const bidIds = Array.from(queuedKeys);
 
-      const result = await queueBidExportByKeys({
+      const result = await queueBidExportByIds({
         exportType: "NAV",
-        keys,
+        bidIds,
       });
 
       setQueuedKeys(new Set());
@@ -164,7 +140,7 @@ export function useExportQueue({
     } finally {
       setIsConfirmingQueue(false);
     }
-  }, [queuedKeys, schoolYearString, fetchQueueSummary, fetchData, filters]);
+  }, [queuedKeys, fetchQueueSummary, fetchData, filters]);
 
   // Export NAV: atomic backend call — marks exported + returns bid data for CSV
   const handleExportNAV = useCallback(async () => {
@@ -199,16 +175,8 @@ export function useExportQueue({
   // Dequeue a single item from the backend export queue
   const handleDequeue = useCallback(
     async (bid: CustomerBidDto) => {
-      const key = {
-        sourceDb: bid.sourceDb || "",
-        siteCode: bid.siteCode || "",
-        customerBillTo: bid.customerBillTo || "",
-        itemNo: bid.itemCode,
-        schoolYear: schoolYearString,
-      };
-
       try {
-        await cancelBidExportByKeys({ keys: [key] });
+        await cancelBidExportByIds({ bidIds: [bid.id] });
         setBids((prev) => prev.filter((b) => !isSameBid(b, bid)));
         toast.success("Item removed from export queue");
         void fetchQueueSummary();
@@ -218,22 +186,14 @@ export function useExportQueue({
         toast.error(message);
       }
     },
-    [schoolYearString, fetchQueueSummary, setBids]
+    [fetchQueueSummary, setBids]
   );
 
   // Clear export status on a single exported item
   const handleCancelExport = useCallback(
     async (bid: CustomerBidDto) => {
-      const key = {
-        sourceDb: bid.sourceDb || "",
-        siteCode: bid.siteCode || "",
-        customerBillTo: bid.customerBillTo || "",
-        itemNo: bid.itemCode,
-        schoolYear: schoolYearString,
-      };
-
       try {
-        await clearExportByKeys([key]);
+        await clearExportByIds([bid.id]);
         setBids((prev) => prev.filter((b) => !isSameBid(b, bid)));
         toast.success("Export status cleared");
       } catch (err) {
@@ -242,7 +202,7 @@ export function useExportQueue({
         toast.error(message);
       }
     },
-    [schoolYearString, setBids]
+    [setBids]
   );
 
   return {
@@ -257,7 +217,6 @@ export function useExportQueue({
     displayedBids,
     // Queries
     isQueued,
-    bidKeyString,
     // Local queue
     handleToggleQueue,
     handleQueueAll,

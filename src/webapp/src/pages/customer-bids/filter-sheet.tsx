@@ -34,6 +34,7 @@ export interface FilterInputs {
   itemCode: string;
   erpStatus: string;
   coOpCode: string;
+  comCoOpCode: string;
   excludeItemPrefixes: string;
 }
 
@@ -45,6 +46,7 @@ export const EMPTY_FILTER_INPUTS: FilterInputs = {
   itemCode: "",
   erpStatus: "",
   coOpCode: "",
+  comCoOpCode: "",
   excludeItemPrefixes: "",
 };
 
@@ -73,6 +75,9 @@ interface FilterSheetProps {
   onQueuedFilterChange: (val: boolean | undefined) => void;
   exportedFilter: boolean | undefined;
   onExportedFilterChange: (val: boolean | undefined) => void;
+  // Sales type filter (undefined = all, 0 = Customer, 3 = Campaign)
+  salesTypeFilter: number | undefined;
+  onSalesTypeFilterChange: (val: number | undefined) => void;
   queuedKeysSize: number;
 }
 
@@ -98,6 +103,8 @@ export function FilterSheet({
   onQueuedFilterChange,
   exportedFilter,
   onExportedFilterChange,
+  salesTypeFilter,
+  onSalesTypeFilterChange,
   queuedKeysSize,
 }: FilterSheetProps) {
   const updateField = (key: keyof FilterInputs) => (value: string) => {
@@ -193,6 +200,45 @@ export function FilterSheet({
               placeholder="e.g. COOP001"
               label="Co-Op Code"
             />
+          </div>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-foreground">
+              Sales Type
+            </Label>
+            <Select
+              value={
+                salesTypeFilter === undefined ? "all" : String(salesTypeFilter)
+              }
+              onValueChange={(v) =>
+                onSalesTypeFilterChange(v === "all" ? undefined : Number(v))
+              }
+            >
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="0">Customer</SelectItem>
+                <SelectItem value="3">Campaign</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-3">
+            <Label
+              htmlFor="comCoOpCode"
+              className="text-sm font-medium text-foreground"
+            >
+              Commercial Co-Op Codes
+            </Label>
+            <Input
+              id="comCoOpCode"
+              placeholder="e.g. COOP039, COOP088"
+              value={filterInputs.comCoOpCode}
+              onChange={(e) => updateField("comCoOpCode")(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Comma-separated COOP codes
+            </p>
           </div>
           <div className="space-y-3">
             <Label

@@ -303,6 +303,13 @@ export function buildFilteredExportColumns(
 }
 
 export const customerBidExportColumns: ExportColumn[] = [
+  // Identity (UUID — required for re-import)
+  { key: "id", header: "Bid ID" },
+  {
+    key: "salesType",
+    header: "Sales Type",
+    format: (v) => (v === 3 ? "Campaign" : "Customer"),
+  },
   // Customer info
   { key: "sourceDb", header: "Source" },
   { key: "schoolYear", header: "School Year" },
