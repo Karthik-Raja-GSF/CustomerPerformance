@@ -1269,7 +1269,7 @@ model CustomerBidData {
   // Relations
   exportItems CustomerBidExportItem[]
 
-  @@unique([sourceDb, siteCode, customerBillTo, itemNo, schoolYear, salesType])
+  @@unique([sourceDb, siteCode, customerBillTo, itemNo, schoolYear])
   @@index([schoolYear])
   @@index([confirmedAt])
   @@index([isNew])
