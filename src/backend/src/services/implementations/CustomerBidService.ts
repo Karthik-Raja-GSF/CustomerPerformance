@@ -496,6 +496,211 @@ export class CustomerBidService implements ICustomerBidService {
     }
   }
 
+  private buildExportWhere(query: CustomerBidQueryDto): {
+    schoolYearString: string;
+    additionalWhere: Prisma.Sql;
+  } {
+    const schoolYearString = getSchoolYearString(query.schoolYear ?? "next");
+    const whereConditions = buildBidFilterConditions(query);
+
+    if (query.queued !== undefined) {
+      const queuedSubquery = Prisma.sql`
+        SELECT 1 FROM ait.customer_bid_export_item bei
+        WHERE bei.bid_id = cbd.id AND bei.status = 'QUEUED'
+      `;
+      if (query.queued) {
+        whereConditions.push(Prisma.sql`EXISTS (${queuedSubquery})`);
+      } else {
+        whereConditions.push(Prisma.sql`NOT EXISTS (${queuedSubquery})`);
+      }
+    }
+
+    const additionalWhere =
+      whereConditions.length > 0
+        ? Prisma.sql`AND ${Prisma.join(whereConditions, " AND ")}`
+        : Prisma.empty;
+
+    return { schoolYearString, additionalWhere };
+  }
+
+  async streamCustomerBidsForExport(
+    query: CustomerBidQueryDto,
+    onBatch: (
+      dtos: CustomerBidDto[],
+      meta: {
+        batch: number;
+        rowsSoFar: number;
+        total: number;
+        truncated: boolean;
+      }
+    ) => void,
+    maxRows: number = 5000
+  ): Promise<{
+    totalRows: number;
+    totalMatching: number;
+    truncated: boolean;
+  }> {
+    const BATCH_SIZE = 500;
+    const { schoolYearString, additionalWhere } = this.buildExportWhere(query);
+
+    const [{ count: totalMatching }] = await this.prisma.$queryRaw<
+      [{ count: number }]
+    >(Prisma.sql`
+      SELECT COUNT(*)::int AS "count"
+      FROM ait.customer_bid_data cbd
+      INNER JOIN dw2_nav.customer c
+          ON cbd.customer_bill_to = c.no_ AND cbd.source_db = c.source_db
+      INNER JOIN dw2_nav.item i
+          ON cbd.item_no = i.no_ AND cbd.source_db = i.source_db
+      LEFT JOIN dw2_nav.stockkeeping_unit sku
+          ON cbd.item_no = sku.item_no_ AND cbd.source_db = sku.source_db
+          AND cbd.site_code = sku.location_code
+      WHERE cbd.school_year = ${schoolYearString}
+        ${additionalWhere}
+    `);
+
+    logger.info(
+      { event: "customer-bid.export.count", totalMatching, maxRows },
+      "Export count check complete"
+    );
+
+    if (totalMatching === 0) {
+      return { totalRows: 0, totalMatching: 0, truncated: false };
+    }
+
+    if (totalMatching > maxRows) {
+      throw new CustomerBidQueryError(
+        `Export exceeds the maximum of ${maxRows.toLocaleString()} rows (${totalMatching.toLocaleString()} matched). Please narrow your filters.`
+      );
+    }
+
+    const effectiveLimit = totalMatching;
+
+    const selectFragment = Prisma.sql`
+      SELECT
+          cbd.id AS "id",
+          cbd.sales_type AS "salesType",
+          cbd.source_db AS "sourceDb",
+          cbd.site_code AS "siteCode",
+          c."name" AS "customerName",
+          cbd.customer_bill_to AS "customerBillTo",
+          c.co_op_code AS "coOpCode",
+          cbd.com_co_op_code AS "comCoOpCode",
+          c.contact AS "contactName",
+          c.e_mail AS "contactEmail",
+          c.phone_no_ AS "contactPhone",
+          c.salesperson_code AS "salesRep",
+          cbd.item_no AS "itemNo",
+          i.description AS "itemDescription",
+          i.description_2 AS "brandName",
+          i.pack_size AS "packSize",
+          sku.customer_lead_time AS "customerLeadTime",
+          cbd.bid_qty AS "bidQty",
+          cbd.bid_start AS "bidStart",
+          cbd.bid_end AS "bidEnd",
+          cbd.erp_status AS "erpStatus",
+          cbd.last_year_bid_qty AS "lastYearBidQty",
+          cbd.last_year_actual AS "lastYearActual",
+          cbd.ly_august AS "lyAugust",
+          cbd.ly_september AS "lySeptember",
+          cbd.ly_october AS "lyOctober",
+          cbd.ly_november AS "lyNovember",
+          cbd.ly_december AS "lyDecember",
+          cbd.ly_january AS "lyJanuary",
+          cbd.ly_february AS "lyFebruary",
+          cbd.ly_march AS "lyMarch",
+          cbd.ly_april AS "lyApril",
+          cbd.ly_may AS "lyMay",
+          cbd.ly_june AS "lyJune",
+          cbd.ly_july AS "lyJuly",
+          cbd.cy_august AS "cyAugust",
+          cbd.cy_september AS "cySeptember",
+          cbd.cy_october AS "cyOctober",
+          cbd.cy_november AS "cyNovember",
+          cbd.cy_december AS "cyDecember",
+          cbd.cy_january AS "cyJanuary",
+          cbd.cy_february AS "cyFebruary",
+          cbd.cy_march AS "cyMarch",
+          cbd.cy_april AS "cyApril",
+          cbd.cy_may AS "cyMay",
+          cbd.cy_june AS "cyJune",
+          cbd.cy_july AS "cyJuly",
+          cbd.is_new AS "isNew",
+          cbd.last_updated_at AS "lastUpdatedAt",
+          cbd.last_updated_by AS "lastUpdatedBy",
+          cbd.confirmed_at AS "confirmedAt",
+          cbd.confirmed_by AS "confirmedBy",
+          cbd.last_exported_at AS "lastExportedAt",
+          cbd.last_exported_by AS "lastExportedBy",
+          cbd.year_around AS "yearAround",
+          cbd.estimate_jan AS "estimateJan",
+          cbd.estimate_feb AS "estimateFeb",
+          cbd.estimate_mar AS "estimateMar",
+          cbd.estimate_apr AS "estimateApr",
+          cbd.estimate_may AS "estimateMay",
+          cbd.estimate_jun AS "estimateJun",
+          cbd.estimate_jul AS "estimateJul",
+          cbd.estimate_aug AS "estimateAug",
+          cbd.estimate_sep AS "estimateSep",
+          cbd.estimate_oct AS "estimateOct",
+          cbd.estimate_nov AS "estimateNov",
+          cbd.estimate_dec AS "estimateDec",
+          cbd.open_order_qty AS "openOrderQty"
+      FROM ait.customer_bid_data cbd
+      INNER JOIN dw2_nav.customer c
+          ON cbd.customer_bill_to = c.no_ AND cbd.source_db = c.source_db
+      INNER JOIN dw2_nav.item i
+          ON cbd.item_no = i.no_ AND cbd.source_db = i.source_db
+      LEFT JOIN dw2_nav.stockkeeping_unit sku
+          ON cbd.item_no = sku.item_no_ AND cbd.source_db = sku.source_db
+          AND cbd.site_code = sku.location_code
+      WHERE cbd.school_year = ${schoolYearString}
+        ${additionalWhere}
+      ORDER BY cbd.site_code, cbd.item_no, cbd.customer_bill_to
+    `;
+
+    if (effectiveLimit <= BATCH_SIZE) {
+      const rows = await this.prisma.$queryRaw<BaseBidRow[]>(
+        Prisma.sql`${selectFragment} LIMIT ${effectiveLimit}`
+      );
+      const dtos = rows.map((row) => this.mapBaseRowToDto(row));
+      onBatch(dtos, {
+        batch: 1,
+        rowsSoFar: dtos.length,
+        total: effectiveLimit,
+        truncated: false,
+      });
+      return { totalRows: dtos.length, totalMatching, truncated: false };
+    }
+
+    let totalRows = 0;
+    let batchNum = 0;
+
+    const rows = await this.prisma.$queryRaw<BaseBidRow[]>(
+      Prisma.sql`${selectFragment} LIMIT ${effectiveLimit}`
+    );
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      batchNum++;
+      totalRows += batch.length;
+      const dtos = batch.map((row) => this.mapBaseRowToDto(row));
+      onBatch(dtos, {
+        batch: batchNum,
+        rowsSoFar: totalRows,
+        total: effectiveLimit,
+        truncated: false,
+      });
+    }
+
+    logger.info(
+      { event: "customer-bid.export.complete", totalRows, totalMatching },
+      "Export stream complete"
+    );
+
+    return { totalRows, totalMatching, truncated: false };
+  }
+
   /**
    * Update user-editable fields on a customer bid record
    */

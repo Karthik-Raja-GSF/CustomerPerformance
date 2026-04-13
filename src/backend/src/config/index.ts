@@ -94,4 +94,7 @@ export const config = {
   rbac: {
     enabled: process.env.RBAC_ENABLED === "true",
   },
+  export: {
+    maxRows: parseInt(process.env.EXPORT_MAX_ROWS ?? "5000", 10),
+  },
 };

@@ -72,6 +72,10 @@ import { CSVImportDialog } from "@/components/csv-import-dialog";
 import { BatchMenuMonthsPopover } from "@/components/batch-menu-months-popover";
 import { useExportQueue } from "@/pages/customer-bids/use-export-queue";
 import {
+  streamExportBids,
+  type ExportStreamProgress,
+} from "@/apis/bid-export-stream";
+import {
   FilterSheet,
   EMPTY_FILTER_INPUTS,
   type FilterInputs,
@@ -282,6 +286,10 @@ export default function CustomerBids({
   const [dateRange, setDateRange] = useState<DateRangeDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] =
+    useState<ExportStreamProgress | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
   const [stats, setStats] = useState<CustomerBidStatsDto | null>(null);
   const hasStatsSlot = typeof headerSlot === "function";
 
@@ -830,7 +838,7 @@ export default function CustomerBids({
     } finally {
       setIsConfirmingAll(false);
     }
-  }, [confirmableBids, filters.schoolYear, filters, refreshStats]);
+  }, [confirmableBids, filters, refreshStats]);
 
   // Determine which view mode we're in for column rendering
   const isViewingQueued = queuedFilter === true;
@@ -1012,51 +1020,96 @@ export default function CustomerBids({
           <Button
             variant="outline"
             size="sm"
-            disabled={bids.length === 0 || isLoading}
-            onClick={() => {
-              const filtered = bids.filter((b) => b.id);
-              const filteredColumns = buildFilteredExportColumns(
-                filtered,
-                getMenuMonths,
-                columnVisibility
-              );
-              const exportable = filtered.map((b) => {
-                const months = getMenuMonths(b);
-                const row: Record<string, unknown> = {
-                  ...b,
-                  schoolYear: schoolYearString,
-                };
-                for (const m of ESTIMATE_MONTHS) {
-                  if (!months[m.menuKey]) continue;
-                  if (b[m.estimateKey] != null && b[m.estimateKey] !== 0)
-                    continue;
-                  const lyMonth = LY_MONTHS.find(
-                    (ly) => ly.menuKey === m.menuKey
-                  );
-                  if (lyMonth) {
-                    const lyVal = b[lyMonth.lyKey as keyof CustomerBidDto] as
-                      | number
-                      | null;
-                    if (lyVal != null && lyVal > 0) {
-                      row[m.estimateKey] = lyVal;
+            disabled={isExporting || isLoading}
+            onClick={async () => {
+              setIsExporting(true);
+              setExportProgress(null);
+              const abort = new AbortController();
+              exportAbortRef.current = abort;
+
+              try {
+                const allRows: CustomerBidDto[] = [];
+
+                const result = await streamExportBids(
+                  filters,
+                  {
+                    onBatch: (dtos) => allRows.push(...dtos),
+                    onProgress: (meta) => setExportProgress(meta),
+                  },
+                  abort.signal
+                );
+
+                if (allRows.length === 0) {
+                  toast.info("No rows match the current filters");
+                  return;
+                }
+
+                const filtered = allRows.filter((b) => b.id);
+                const filteredColumns = buildFilteredExportColumns(
+                  filtered,
+                  getMenuMonths,
+                  columnVisibility
+                );
+                const exportable = filtered.map((b) => {
+                  const months = getMenuMonths(b);
+                  const row: Record<string, unknown> = {
+                    ...b,
+                    schoolYear: schoolYearString,
+                  };
+                  for (const m of ESTIMATE_MONTHS) {
+                    if (!months[m.menuKey]) continue;
+                    if (b[m.estimateKey] != null && b[m.estimateKey] !== 0)
+                      continue;
+                    const lyMonth = LY_MONTHS.find(
+                      (ly) => ly.menuKey === m.menuKey
+                    );
+                    if (lyMonth) {
+                      const lyVal = b[lyMonth.lyKey as keyof CustomerBidDto] as
+                        | number
+                        | null;
+                      if (lyVal != null && lyVal > 0) {
+                        row[m.estimateKey] = lyVal;
+                      }
                     }
                   }
+                  return row;
+                });
+                exportToCSV(exportable, filteredColumns, "customer-bids");
+
+                if (result.truncated) {
+                  toast.warning(
+                    `Export capped at ${result.totalRows.toLocaleString()} rows (${result.totalMatching.toLocaleString()} matched). Narrow your filters to export all results.`
+                  );
+                } else {
+                  toast.success(
+                    `Exported ${result.totalRows.toLocaleString()} rows`
+                  );
                 }
-                return row;
-              });
-              exportToCSV(exportable, filteredColumns, "customer-bids");
-              const skipped = bids.length - filtered.length;
-              if (skipped > 0) {
-                toast.success(
-                  `CSV exported (${skipped} record${skipped > 1 ? "s" : ""} skipped — missing key fields)`
+              } catch (err) {
+                if (abort.signal.aborted) return;
+                toast.error(
+                  err instanceof Error ? err.message : "Export failed"
                 );
-              } else {
-                toast.success("CSV exported successfully");
+              } finally {
+                setIsExporting(false);
+                setExportProgress(null);
+                exportAbortRef.current = null;
               }
             }}
           >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            {isExporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {exportProgress
+                  ? `Exporting ${exportProgress.rowsSoFar.toLocaleString()} of ${exportProgress.total.toLocaleString()}...`
+                  : "Preparing export..."}
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </>
+            )}
           </Button>
         )}
 

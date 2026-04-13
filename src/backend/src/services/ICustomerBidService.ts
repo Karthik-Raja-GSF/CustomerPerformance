@@ -130,4 +130,26 @@ export interface ICustomerBidService {
    * @returns Promise resolving to distinct values for each filterable field
    */
   getFilterOptions(): Promise<CustomerBidFilterOptionsDto>;
+
+  /**
+   * Stream all customer bids matching filters for bulk export via SSE.
+   * Uses a COUNT check + fast path for small results, or a Postgres cursor for large ones.
+   */
+  streamCustomerBidsForExport(
+    query: CustomerBidQueryDto,
+    onBatch: (
+      dtos: CustomerBidDto[],
+      meta: {
+        batch: number;
+        rowsSoFar: number;
+        total: number;
+        truncated: boolean;
+      }
+    ) => void,
+    maxRows?: number
+  ): Promise<{
+    totalRows: number;
+    totalMatching: number;
+    truncated: boolean;
+  }>;
 }

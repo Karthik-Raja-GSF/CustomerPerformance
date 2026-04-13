@@ -35,12 +35,25 @@ export interface DmsConstructProps {
   targetDatabaseName: string; // Database name in Aurora to replicate to
 }
 
-// Adds a schema rename transformation rule to DMS mappings if missing.
+interface DmsMappingRule {
+  "rule-type"?: string;
+  "rule-id"?: string;
+  "rule-name"?: string;
+  "rule-target"?: string;
+  "rule-action"?: string;
+  "object-locator"?: { "schema-name"?: string };
+  value?: string;
+}
+
+interface DmsTableMappings {
+  rules: DmsMappingRule[];
+}
+
 function ensureSchemaRenameRule(
-  mappingsObj: any,
+  mappingsObj: DmsTableMappings,
   sourceSchema: string,
   targetSchema: string
-): any {
+): DmsTableMappings {
   if (!mappingsObj || typeof mappingsObj !== "object") return mappingsObj;
   if (!sourceSchema || !targetSchema) return mappingsObj;
   if (sourceSchema === targetSchema) return mappingsObj;
@@ -48,7 +61,7 @@ function ensureSchemaRenameRule(
   if (!Array.isArray(mappingsObj.rules)) mappingsObj.rules = [];
   const rules = mappingsObj.rules;
 
-  const exists = rules.some((r: any) => {
+  const exists = rules.some((r) => {
     return (
       r?.["rule-type"] === "transformation" &&
       r?.["rule-target"] === "schema" &&
@@ -62,7 +75,7 @@ function ensureSchemaRenameRule(
 
   const usedIds = new Set(
     rules
-      .map((r: any) => String(r?.["rule-id"] ?? ""))
+      .map((r) => String(r?.["rule-id"] ?? ""))
       .filter((x: string) => x.length > 0)
   );
 
@@ -74,7 +87,7 @@ function ensureSchemaRenameRule(
     "_"
   );
 
-  const schemaRenameRule = {
+  const schemaRenameRule: DmsMappingRule = {
     "rule-type": "transformation",
     "rule-id": String(ruleId),
     "rule-name": safeName,
@@ -142,9 +155,7 @@ export class DmsConstruct extends Construct {
     // -----------------------
     // Replication task ordinals
     // -----------------------
-    const cfgAny: any = config;
-
-    const normalizeOrdinal = (v: any, fallback: string) => {
+    const normalizeOrdinal = (v: string | undefined, fallback: string) => {
       const s = String(v ?? "").trim();
       if (!s) return fallback;
       if (s.length === 1) return `0${s}`;
@@ -155,7 +166,7 @@ export class DmsConstruct extends Construct {
     const legacyReplTaskId = n.name("dms", "task", legacyTaskOrdinal);
 
     const activeTaskOrdinal = normalizeOrdinal(
-      cfgAny.replicationTaskOrdinal ?? cfgAny.replicationTaskNumber,
+      config.replicationTaskOrdinal ?? config.replicationTaskNumber,
       legacyTaskOrdinal
     );
     const activeReplTaskId = n.name("dms", "task", activeTaskOrdinal);
@@ -317,7 +328,7 @@ export class DmsConstruct extends Construct {
     // ===================
     const tableMappingsPath = path.resolve(
       process.cwd(),
-      config.tableMappingsFile ?? "lib/config/dms/table-mappings.full-load.json"
+      config.tableMappingsFile
     );
 
     const taskSettingsPath = path.resolve(
@@ -325,7 +336,9 @@ export class DmsConstruct extends Construct {
       config.taskSettingsFile ?? "lib/config/dms/task-settings.full-load.json"
     );
 
-    const mappingsObj = JSON.parse(fs.readFileSync(tableMappingsPath, "utf8"));
+    const mappingsObj = JSON.parse(
+      fs.readFileSync(tableMappingsPath, "utf8")
+    ) as DmsTableMappings;
     const patchedMappingsObj = ensureSchemaRenameRule(
       mappingsObj,
       sourceSchemaName,
@@ -334,7 +347,10 @@ export class DmsConstruct extends Construct {
 
     const tableMappings = JSON.stringify(patchedMappingsObj);
     const replicationTaskSettings = JSON.stringify(
-      JSON.parse(fs.readFileSync(taskSettingsPath, "utf8"))
+      JSON.parse(fs.readFileSync(taskSettingsPath, "utf8")) as Record<
+        string,
+        unknown
+      >
     );
 
     const legacyTask = new dms.CfnReplicationTask(
@@ -384,59 +400,63 @@ export class DmsConstruct extends Construct {
     this.replicationTask = activeTask;
 
     // ===================
-    // AUTO-START 
+    // AUTO-START
     // ===================
     if (startTaskOnDeploy) {
       const taskArn = this.replicationTask.ref;
       const activeTaskIdForResourceIds = activeReplTaskId;
 
-      const startTask = new cr.AwsCustomResource(this, "StartReplicationTaskV2", {
-        onCreate: {
-          service: "DMS",
-          action: "startReplicationTask",
-          parameters: {
-            ReplicationTaskArn: taskArn,
-            StartReplicationTaskType: startTaskType,
+      const startTask = new cr.AwsCustomResource(
+        this,
+        "StartReplicationTaskV2",
+        {
+          onCreate: {
+            service: "DMS",
+            action: "startReplicationTask",
+            parameters: {
+              ReplicationTaskArn: taskArn,
+              StartReplicationTaskType: startTaskType,
+            },
+            outputPaths: [],
+            ignoreErrorCodesMatching: "InvalidResourceStateFault",
+            physicalResourceId: cr.PhysicalResourceId.of(
+              `${activeTaskIdForResourceIds}-start-${envName}-v2`
+            ),
           },
-          outputPaths: [],
-          ignoreErrorCodesMatching: "InvalidResourceStateFault",
-          physicalResourceId: cr.PhysicalResourceId.of(
-            `${activeTaskIdForResourceIds}-start-${envName}-v2`
-          ),
-        },
 
-        onUpdate: {
-          service: "DMS",
-          action: "startReplicationTask",
-          parameters: {
-            ReplicationTaskArn: taskArn,
-            StartReplicationTaskType: startTaskType,
+          onUpdate: {
+            service: "DMS",
+            action: "startReplicationTask",
+            parameters: {
+              ReplicationTaskArn: taskArn,
+              StartReplicationTaskType: startTaskType,
+            },
+            outputPaths: [],
+            ignoreErrorCodesMatching: "InvalidResourceStateFault",
+            physicalResourceId: cr.PhysicalResourceId.of(
+              `${activeTaskIdForResourceIds}-start-${envName}-v2`
+            ),
           },
-          outputPaths: [],
-          ignoreErrorCodesMatching: "InvalidResourceStateFault",
-          physicalResourceId: cr.PhysicalResourceId.of(
-            `${activeTaskIdForResourceIds}-start-${envName}-v2`
-          ),
-        },
 
-        onDelete: {
-          service: "DMS",
-          action: "stopReplicationTask",
-          parameters: {
-            ReplicationTaskArn: taskArn,
+          onDelete: {
+            service: "DMS",
+            action: "stopReplicationTask",
+            parameters: {
+              ReplicationTaskArn: taskArn,
+            },
+            outputPaths: [],
+            ignoreErrorCodesMatching:
+              "InvalidResourceStateFault|ResourceNotFoundFault",
+            physicalResourceId: cr.PhysicalResourceId.of(
+              `${activeTaskIdForResourceIds}-stop-${envName}-v2`
+            ),
           },
-          outputPaths: [],
-          ignoreErrorCodesMatching:
-            "InvalidResourceStateFault|ResourceNotFoundFault",
-          physicalResourceId: cr.PhysicalResourceId.of(
-            `${activeTaskIdForResourceIds}-stop-${envName}-v2`
-          ),
-        },
 
-        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
-          resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
-        }),
-      });
+          policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+            resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+          }),
+        }
+      );
 
       startTask.node.addDependency(this.replicationTask);
     }

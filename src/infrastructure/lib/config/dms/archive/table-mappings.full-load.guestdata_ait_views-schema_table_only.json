@@ -4,98 +4,154 @@
       "rule-type": "selection",
       "rule-id": "1",
       "rule-name": "include_customer",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Customer", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Customer",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "2",
       "rule-name": "include_item",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Item",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "3",
       "rule-name": "include_item_ledger_entry",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item Ledger Entry", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Item Ledger Entry",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "4",
       "rule-name": "include_pallet_bin_content",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Pallet Bin Content", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Pallet Bin Content",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "5",
       "rule-name": "include_purch_rcpt_header",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purch[_] Rcpt[_] Header", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Purch[_] Rcpt[_] Header",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "6",
       "rule-name": "include_purchase_header",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purchase Header", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Purchase Header",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "7",
       "rule-name": "include_sales_header",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Header", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Header",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "8",
       "rule-name": "include_sales_invoice_header",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Invoice Header", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Invoice Header",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "9",
       "rule-name": "include_sales_line",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Line", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Line",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "10",
       "rule-name": "include_sales_price",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Price", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Price",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "11",
       "rule-name": "include_short_ship",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Short Ship", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Short Ship",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "12",
       "rule-name": "include_stockkeeping_unit",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Stockkeeping Unit", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Stockkeeping Unit",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "13",
       "rule-name": "include_transfer_header",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Transfer Header", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Transfer Header",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
     {
       "rule-type": "selection",
       "rule-id": "14",
       "rule-name": "include_vendor",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Vendor", "table-type": "view" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Vendor",
+        "table-type": "view"
+      },
       "rule-action": "include"
     },
 
@@ -122,7 +178,10 @@
       "rule-id": "1003",
       "rule-name": "rename_item_ledger_entry",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Item Ledger Entry" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Item Ledger Entry"
+      },
       "rule-action": "rename",
       "value": "item_ledger_entry"
     },
@@ -131,7 +190,10 @@
       "rule-id": "1004",
       "rule-name": "rename_pallet_bin_content",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Pallet Bin Content" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Pallet Bin Content"
+      },
       "rule-action": "rename",
       "value": "pallet_bin_content"
     },
@@ -140,7 +202,10 @@
       "rule-id": "1005",
       "rule-name": "rename_purch_rcpt_header",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purch[_] Rcpt[_] Header" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Purch[_] Rcpt[_] Header"
+      },
       "rule-action": "rename",
       "value": "purch_rcpt_header"
     },
@@ -149,7 +214,10 @@
       "rule-id": "1006",
       "rule-name": "rename_purchase_header",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Purchase Header" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Purchase Header"
+      },
       "rule-action": "rename",
       "value": "purchase_header"
     },
@@ -158,7 +226,10 @@
       "rule-id": "1007",
       "rule-name": "rename_sales_header",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Header" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Header"
+      },
       "rule-action": "rename",
       "value": "sales_header"
     },
@@ -167,7 +238,10 @@
       "rule-id": "1008",
       "rule-name": "rename_sales_invoice_header",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Invoice Header" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Invoice Header"
+      },
       "rule-action": "rename",
       "value": "sales_invoice_header"
     },
@@ -176,7 +250,10 @@
       "rule-id": "1009",
       "rule-name": "rename_sales_line",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Line" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Line"
+      },
       "rule-action": "rename",
       "value": "sales_line"
     },
@@ -185,7 +262,10 @@
       "rule-id": "1010",
       "rule-name": "rename_sales_price",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Sales Price" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Sales Price"
+      },
       "rule-action": "rename",
       "value": "sales_price"
     },
@@ -194,7 +274,10 @@
       "rule-id": "1011",
       "rule-name": "rename_short_ship",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Short Ship" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Short Ship"
+      },
       "rule-action": "rename",
       "value": "short_ship"
     },
@@ -203,7 +286,10 @@
       "rule-id": "1012",
       "rule-name": "rename_stockkeeping_unit",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Stockkeeping Unit" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Stockkeeping Unit"
+      },
       "rule-action": "rename",
       "value": "stockkeeping_unit"
     },
@@ -212,7 +298,10 @@
       "rule-id": "1013",
       "rule-name": "rename_transfer_header",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]Transfer Header" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]Transfer Header"
+      },
       "rule-action": "rename",
       "value": "transfer_header"
     },
@@ -230,7 +319,10 @@
       "rule-id": "1015",
       "rule-name": "rename_user_setup",
       "rule-target": "table",
-      "object-locator": { "schema-name": "AIT", "table-name": "vw[_]User Setup" },
+      "object-locator": {
+        "schema-name": "AIT",
+        "table-name": "vw[_]User Setup"
+      },
       "rule-action": "rename",
       "value": "user_setup"
     },

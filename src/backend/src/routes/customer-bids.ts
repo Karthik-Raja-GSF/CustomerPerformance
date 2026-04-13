@@ -14,6 +14,7 @@ import {
   CustomerBidNotFoundError,
   CustomerBidSyncInProgressError,
 } from "@/utils/errors/customer-bid-errors";
+import { config } from "@/config/index";
 
 const router: IRouter = Router();
 
@@ -247,6 +248,72 @@ router.get(
       });
     } catch (error) {
       handleCustomerBidError(error, res, next);
+    }
+  }
+);
+
+/**
+ * GET /customer-bids/export/stream
+ * Stream all matching customer bids via Server-Sent Events for bulk CSV export.
+ * Uses the same filters as the list endpoint but bypasses pagination.
+ * A configurable row cap (EXPORT_MAX_ROWS, default 5000) prevents runaway exports.
+ */
+router.get(
+  "/export/stream",
+  authenticate,
+  requireFeature(Feature.DEMAND_VALIDATION_TOOL),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = querySchema.safeParse(req.query);
+      if (!parsed.success) {
+        throw new CustomerBidQueryError(
+          `Invalid query parameters: ${parsed.error.errors.map((e) => e.message).join(", ")}`
+        );
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+
+      let clientDisconnected = false;
+      req.on("close", () => {
+        clientDisconnected = true;
+      });
+
+      const service = container.resolve<ICustomerBidService>(
+        CUSTOMER_BID_SERVICE_TOKEN
+      );
+
+      const result = await service.streamCustomerBidsForExport(
+        parsed.data,
+        (dtos, meta) => {
+          if (clientDisconnected) return;
+          res.write(`event: progress\ndata: ${JSON.stringify(meta)}\n\n`);
+          res.write(`event: data\ndata: ${JSON.stringify(dtos)}\n\n`);
+        },
+        config.export.maxRows
+      );
+
+      if (!clientDisconnected) {
+        res.write(
+          `event: done\ndata: ${JSON.stringify({
+            totalRows: result.totalRows,
+            totalMatching: result.totalMatching,
+            truncated: result.truncated,
+          })}\n\n`
+        );
+        res.end();
+      }
+    } catch (error) {
+      if (!res.headersSent) {
+        handleCustomerBidError(error, res, next);
+      } else {
+        const message =
+          error instanceof Error ? error.message : "Export failed";
+        res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
+        res.end();
+      }
     }
   }
 );

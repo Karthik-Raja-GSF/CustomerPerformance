@@ -56,7 +56,7 @@ export interface DmsConfig {
   publiclyAccessible: boolean;
 
   // PATHS TO DMS MAPPINGS AND TASK CONFIG JSON FILES CS 1/5/26
-  tableMappingsFile?: string;
+  tableMappingsFile: string;
   taskSettingsFile?: string;
 
   // SCHEMA FIX: target must be "dw2_nav" CS 1/6/26
@@ -174,8 +174,7 @@ export const environments: Record<string, EnvironmentConfig> = {
 
       // AUTO-RUN full load task after deploy CS 1/6/26
       startTaskOnDeploy: true,
-      startTaskType: "start-replication",
-      replicationTaskOrdinal: "02",
+      startTaskType: "reload-target",
 
       // EventBridge Scheduler: 2am PST daily reload
       scheduler: {
