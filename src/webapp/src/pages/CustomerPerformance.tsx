@@ -1,14 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Download,
   Filter,
-  Package,
-  Truck,
-  Target,
-  BarChart2,
-  TrendingUp,
-  Clock,
-  ArrowRightLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import {
   BarChart,
@@ -28,17 +27,25 @@ import type {
   NameType,
 } from "recharts/types/component/DefaultTooltipContent";
 import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  flexRender,
+  type ColumnDef,
+  type SortingState,
+} from "@tanstack/react-table";
+import {
   getCustomerDetailRows,
-  getChurnRiskRows,
+  getLostSalesReasons,
   computeKpis,
   LOCATIONS,
   MONTHLY_PERFORMANCE,
 } from "@/apis/customer-performance";
 import type {
   CustomerDetailRow,
-  ChurnRiskRow,
-  RiskLevel,
-  OrderTrend,
+  LostSalesReason,
+  ErpStatus,
 } from "@/types/customer-performance";
 import {
   Tabs,
@@ -53,6 +60,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shadcn/components/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/shadcn/components/popover";
+import { Checkbox } from "@/shadcn/components/checkbox";
 import { Input } from "@/shadcn/components/input";
 import { Button } from "@/shadcn/components/button";
 import {
@@ -67,14 +80,11 @@ import { cn } from "@/shadcn/lib/utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt$(v: number): string {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
-  return `$${v.toLocaleString()}`;
-}
+const ALL_MONTHS = MONTHLY_PERFORMANCE.map((m) => m.month);
 
 function exportCsv(rows: CustomerDetailRow[]) {
   const headers = [
+    "Month",
     "Location",
     "Co-Op",
     "Bill To Customer",
@@ -92,6 +102,7 @@ function exportCsv(rows: CustomerDetailRow[]) {
   ];
   const lines = rows.map((r) =>
     [
+      r.month,
       r.location,
       r.coOp,
       r.billToCustomerName,
@@ -124,85 +135,105 @@ function exportCsv(rows: CustomerDetailRow[]) {
 const METRICS = [
   {
     key: "totalQtyOrdered",
-    label: "Total Qty Ordered",
-    icon: Package,
+    label: "Total Bid Qty",
     color: "#F59E0B",
     format: (v: number) => v.toLocaleString(),
+    subtitle: "Expected quantity",
   },
   {
     key: "totalQtyShipped",
-    label: "Total Qty Shipped",
-    icon: Truck,
+    label: "Actuals YTD",
     color: "#3B82F6",
     format: (v: number) => v.toLocaleString(),
-  },
-  {
-    key: "serviceRate",
-    label: "Service Rate",
-    icon: Target,
-    color: "#10B981",
-    format: (v: number) => `${v}%`,
-  },
-  {
-    key: "fillRate",
-    label: "Fill Rate",
-    icon: BarChart2,
-    color: "#8B5CF6",
-    format: (v: number) => `${v}%`,
+    subtitle: "Delivered quantity",
   },
   {
     key: "conversionPct",
     label: "Conversion %",
-    icon: TrendingUp,
-    color: "#F97316",
+    color: "#10B981",
     format: (v: number) => `${v}%`,
-    subtitle: "Bid vs Actuals",
+    showProgress: true,
+    showVariance: true,
+  },
+  {
+    key: "serviceRate",
+    label: "Service Rate",
+    color: "#10B981",
+    format: (v: number) => `${v}%`,
+    subtitle: "Order fulfillment",
+    showProgress: true,
+  },
+  {
+    key: "fillRate",
+    label: "Fill Rate",
+    color: "#8B5CF6",
+    format: (v: number) => `${v}%`,
+    subtitle: "Vendor fill rate",
+    showProgress: true,
   },
   {
     key: "orderToShipVariance",
-    label: "Order To Ship Variance",
-    icon: ArrowRightLeft,
+    label: "Order / Ship Variance",
     color: "#EF4444",
-    format: (v: number) => fmt$(v),
+    format: (v: number) => v.toLocaleString(),
     subtitleKey: "orderToShipVarianceCs" as const,
   },
   {
     key: "avgLeadTime",
-    label: "Avg Order Lead Time",
-    icon: Clock,
+    label: "Avg Lead Time",
     color: "#6366F1",
     format: (v: number) => `${v} days`,
+    subtitle: "Days to ship",
   },
 ] as const;
 
-type _KpiKey = (typeof METRICS)[number]["key"];
+type KpiKey = (typeof METRICS)[number]["key"];
 
 function MetricCard({
   label,
-  icon: Icon,
   color,
   value,
   subtitle,
+  progress,
+  variance,
 }: {
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
   color: string;
   value: string;
   subtitle?: string;
+  progress?: number;
+  variance?: number;
 }) {
   return (
     <div
-      className="flex-1 min-w-[140px] rounded-lg border bg-card px-4 py-3 flex flex-col gap-1"
-      style={{ borderLeftWidth: 4, borderLeftColor: color }}
+      className="flex-1 rounded-xl border bg-card px-5 py-4 flex flex-col gap-1.5"
+      style={{ borderLeft: `4px solid ${color}` }}
     >
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <Icon className="size-3.5" />
-        <span className="text-xs leading-tight">{label}</span>
-      </div>
-      <p className="text-2xl font-bold" style={{ color }}>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="text-3xl font-bold leading-tight" style={{ color }}>
         {value}
       </p>
+      {progress !== undefined && (
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${Math.min(progress, 100)}%`,
+              backgroundColor: color,
+            }}
+          />
+        </div>
+      )}
       {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      {variance !== undefined && (
+        <p
+          className="text-xs font-medium"
+          style={{ color: variance < 0 ? "#EF4444" : "#10B981" }}
+        >
+          Variance: {variance > 0 ? "+" : ""}
+          {variance.toLocaleString()}
+        </p>
+      )}
     </div>
   );
 }
@@ -230,61 +261,297 @@ function QtyTooltip({
   );
 }
 
-// ─── Risk / Trend badges ──────────────────────────────────────────────────────
+// ─── Lost Sales by Reason ─────────────────────────────────────────────────────
 
-const RISK_STYLES: Record<RiskLevel, string> = {
-  High: "bg-red-100 text-red-700",
-  Medium: "bg-amber-100 text-amber-700",
-  Low: "bg-green-100 text-green-700",
-};
+function LostSalesByReason({ data }: { data: LostSalesReason[] }) {
+  const maxPct = Math.max(...data.map((d) => d.pct));
+  return (
+    <div className="rounded-lg border bg-card p-4 flex flex-col gap-4">
+      <p className="text-sm font-semibold">Lost Sales by Reason</p>
+      {data.map((item) => (
+        <div key={item.reason} className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-bold">{item.reason}</span>
+            <span className="text-xs text-muted-foreground">
+              ({item.instances} instances)
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-red-500">{item.pct}%</p>
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-red-500 transition-all"
+              style={{ width: `${(item.pct / maxPct) * 100}%` }}
+            />
+          </div>
+          <div className="flex flex-col gap-1 mt-0.5">
+            {item.vendors.map((v) => (
+              <div
+                key={v.name}
+                className="flex items-center justify-between rounded bg-muted/60 px-2 py-1"
+              >
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {v.name}
+                </span>
+                <span className="text-xs font-semibold text-red-500">
+                  {v.pct}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-const TREND_STYLES: Record<OrderTrend, string> = {
-  Declining: "text-red-600",
-  Stable: "text-amber-600",
-  Growing: "text-green-600",
-};
+// ─── Shared Filter Helpers ────────────────────────────────────────────────────
+
+function useLocationCustomerFilter(allRows: CustomerDetailRow[]) {
+  const [locationFilter, setLocationFilter] = useState("");
+  const [customerFilter, setCustomerFilter] = useState("");
+
+  const customerNames = useMemo(() => {
+    const filtered = locationFilter
+      ? allRows.filter((r) => r.location === locationFilter)
+      : allRows;
+    return [...new Set(filtered.map((r) => r.billToCustomerName))].sort();
+  }, [allRows, locationFilter]);
+
+  function handleLocationChange(val: string) {
+    setLocationFilter(val === "__all__" ? "" : val);
+    setCustomerFilter("");
+  }
+
+  function handleCustomerChange(val: string) {
+    setCustomerFilter(val === "__all__" ? "" : val);
+  }
+
+  return {
+    locationFilter,
+    customerFilter,
+    customerNames,
+    handleLocationChange,
+    handleCustomerChange,
+  };
+}
+
+// ─── Month Multi-Select ───────────────────────────────────────────────────────
+
+function MonthMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (months: string[]) => void;
+}) {
+  function toggle(month: string) {
+    if (selected.includes(month)) {
+      onChange(selected.filter((m) => m !== month));
+    } else {
+      onChange([...selected, month]);
+    }
+  }
+
+  const label =
+    selected.length === 0
+      ? "All Months"
+      : selected.length === ALL_MONTHS.length
+        ? "All Months"
+        : selected.join(", ");
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="h-9 w-full justify-between font-normal text-sm"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="size-4 ml-2 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-44 p-1" align="start">
+        {ALL_MONTHS.map((month) => {
+          const checked = selected.includes(month);
+          return (
+            <div
+              key={month}
+              className="flex items-center gap-2.5 rounded px-2 py-1.5 cursor-pointer hover:bg-muted"
+              onClick={() => toggle(month)}
+            >
+              <Checkbox
+                checked={checked}
+                onCheckedChange={() => toggle(month)}
+                className="pointer-events-none"
+              />
+              <span className="text-sm">{month}</span>
+              {checked && <Check className="size-3.5 ml-auto text-primary" />}
+            </div>
+          );
+        })}
+        {selected.length > 0 && (
+          <div
+            className="mt-1 rounded px-2 py-1.5 text-xs text-muted-foreground cursor-pointer hover:bg-muted border-t"
+            onClick={() => onChange([])}
+          >
+            Clear selection
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // ─── Tab: YTD Performance ────────────────────────────────────────────────────
 
-function YtdPerformanceTab({ rows }: { rows: CustomerDetailRow[] }) {
+function YtdPerformanceTab({ allRows }: { allRows: CustomerDetailRow[] }) {
+  const {
+    locationFilter,
+    customerFilter,
+    customerNames,
+    handleLocationChange,
+    handleCustomerChange,
+  } = useLocationCustomerFilter(allRows);
+
+  const filteredRows = useMemo(() => {
+    return allRows.filter((r) => {
+      if (locationFilter && r.location !== locationFilter) return false;
+      if (customerFilter && r.billToCustomerName !== customerFilter)
+        return false;
+      return true;
+    });
+  }, [allRows, locationFilter, customerFilter]);
+
+  const kpi = useMemo(() => computeKpis(filteredRows), [filteredRows]);
+
+  const lostSales = useMemo(() => getLostSalesReasons(), []);
+
   const byLocation = useMemo(() => {
     const map: Record<string, { qtyOrdered: number; qtyShipped: number }> = {};
-    for (const r of rows) {
+    for (const r of filteredRows) {
       if (!map[r.location]) map[r.location] = { qtyOrdered: 0, qtyShipped: 0 };
       map[r.location]!.qtyOrdered += r.bidQty;
       map[r.location]!.qtyShipped += r.ytdUsage;
     }
     return Object.entries(map).map(([location, v]) => ({ location, ...v }));
-  }, [rows]);
+  }, [filteredRows]);
 
-  const vendorImpactData = useMemo(() => {
-    const map: Record<string, { totalShortage: number; count: number }> = {};
+  const forecastAccuracy = useMemo(() => {
+    return MONTHLY_PERFORMANCE.map((m) => ({
+      month: m.month,
+      estimates: m.estimates,
+      actual: m.qtyShipped,
+      accuracy: Math.round((m.qtyShipped / m.estimates) * 1000) / 10,
+    }));
+  }, []);
 
-    rows.forEach((r) => {
-      const name = r.vendorName || "Unknown";
-      if (!map[name]) map[name] = { totalShortage: 0, count: 0 };
-      // Assuming (100 - fillRate) represents the "Shortage Impact"
-      map[name].totalShortage += 100 - r.vendorItemFillPct;
-      map[name].count += 1;
-    });
-
+  const topCustomers = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const r of filteredRows) {
+      map[r.billToCustomerName] = (map[r.billToCustomerName] ?? 0) + r.ytdUsage;
+    }
     return Object.entries(map)
-      .map(([name, v]) => ({
-        name,
-        shortageImpact: parseFloat((v.totalShortage / v.count).toFixed(1)),
-      }))
-      .sort((a, b) => b.shortageImpact - a.shortageImpact) // Sort descending like the image
-      .slice(0, 6); // Top 6 vendors to keep it clean
-  }, [rows]);
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, ytdUsage]) => ({ name, ytdUsage }));
+  }, [filteredRows]);
+
+  function renderCard(m: (typeof METRICS)[number]) {
+    const val = kpi[m.key];
+    const progress = "showProgress" in m && m.showProgress ? val : undefined;
+    const variance =
+      "showVariance" in m && m.showVariance
+        ? kpi["totalQtyShipped" as KpiKey] - kpi["totalQtyOrdered" as KpiKey]
+        : undefined;
+    const subtitle =
+      "subtitleKey" in m
+        ? `${kpi[m.subtitleKey].toLocaleString()} CS gap`
+        : "subtitle" in m
+          ? m.subtitle
+          : undefined;
+    return (
+      <MetricCard
+        key={m.key}
+        label={m.label}
+        color={m.color}
+        value={m.format(val)}
+        subtitle={subtitle}
+        progress={progress}
+        variance={variance}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 pt-4">
+      {/* Filters */}
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex items-center gap-1.5 text-muted-foreground mb-3">
+          <Filter className="size-4" />
+          <span className="text-sm font-medium">Filters</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Location
+            </label>
+            <Select
+              value={locationFilter || "__all__"}
+              onValueChange={handleLocationChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Locations</SelectItem>
+                {LOCATIONS.map((loc) => (
+                  <SelectItem key={loc} value={loc}>
+                    {loc}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Customer
+            </label>
+            <Select
+              value={customerFilter || "__all__"}
+              onValueChange={handleCustomerChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Customers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Customers</SelectItem>
+                {customerNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Metric Cards */}
+      <div className="flex flex-col gap-3 flex-shrink-0 h-[290px] overflow-hidden px-1 py-2">
+        <div className="flex gap-4 flex-1">
+          {METRICS.slice(0, 3).map(renderCard)}
+        </div>
+        <div className="flex gap-4 flex-1">
+          {METRICS.slice(3).map(renderCard)}
+        </div>
+      </div>
+
       {/* Line chart — full width */}
       <div className="rounded-lg border bg-card p-4">
         <p className="text-sm font-semibold mb-3">
           Performance Trend: Ordered vs Shipped vs Estimates
         </p>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={250}>
           <LineChart
             data={MONTHLY_PERFORMANCE}
             margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
@@ -329,240 +596,147 @@ function YtdPerformanceTab({ rows }: { rows: CustomerDetailRow[] }) {
         </ResponsiveContainer>
       </div>
 
-      {/* Bar charts row */}
+      {/* Middle row: charts (left 2/3) + Lost Sales panel (right 1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-sm font-semibold mb-3">
+              Monthly Qty Ordered vs Shipped
+            </p>
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart
+                data={MONTHLY_PERFORMANCE}
+                margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis
+                  tickFormatter={(v) => `${((v as number) / 1000).toFixed(0)}K`}
+                  tick={{ fontSize: 10 }}
+                />
+                <Tooltip content={<QtyTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar
+                  dataKey="qtyOrdered"
+                  name="Qty Ordered"
+                  fill="#3B82F6"
+                  radius={[3, 3, 0, 0]}
+                />
+                <Bar
+                  dataKey="qtyShipped"
+                  name="Qty Shipped"
+                  fill="#10B981"
+                  radius={[3, 3, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm font-semibold mb-3">
-            Monthly Qty Ordered vs Shipped
-          </p>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart
-              data={MONTHLY_PERFORMANCE}
-              margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis
-                tickFormatter={(v) => `${((v as number) / 1000).toFixed(0)}K`}
-                tick={{ fontSize: 10 }}
-              />
-              <Tooltip content={<QtyTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar
-                dataKey="qtyOrdered"
-                name="Qty Ordered"
-                fill="#3B82F6"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey="qtyShipped"
-                name="Qty Shipped"
-                fill="#10B981"
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-sm font-semibold mb-3">
+              Forecast Accuracy (Estimates vs Actual)
+            </p>
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart
+                data={forecastAccuracy}
+                margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis
+                  tickFormatter={(v) => `${((v as number) / 1000).toFixed(0)}K`}
+                  tick={{ fontSize: 10 }}
+                />
+                <Tooltip content={<QtyTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar
+                  dataKey="estimates"
+                  name="Estimates"
+                  fill="#8B5CF6"
+                  radius={[3, 3, 0, 0]}
+                />
+                <Bar
+                  dataKey="actual"
+                  name="Actual Shipped"
+                  fill="#10B981"
+                  radius={[3, 3, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-sm font-semibold mb-3">
+              Top Customers by YTD Usage
+            </p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart
+                layout="vertical"
+                data={topCustomers}
+                margin={{ top: 0, right: 16, left: 8, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(v) => `${((v as number) / 1000).toFixed(0)}K`}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 10 }}
+                  width={140}
+                />
+                <Tooltip content={<QtyTooltip />} />
+                <Bar
+                  dataKey="ytdUsage"
+                  name="YTD Usage"
+                  fill="#F59E0B"
+                  radius={[0, 3, 3, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm font-semibold mb-3">
-            Vendor Impact on Business
-          </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={vendorImpactData}
-              margin={{ top: 10, right: 10, left: -20, bottom: 60 }} // Extra bottom margin for rotated labels
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                verticalFill={["#f5f5f5"]}
-                fillOpacity={0.4}
-              />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 10, fill: "#666" }}
-                interval={0}
-                angle={-45}
-                textAnchor="end"
-              />
-              <YAxis
-                label={{
-                  value: "Shortage Impact %",
-                  angle: -90,
-                  position: "insideLeft",
-                  offset: 10,
-                  style: { fontSize: "11px", fill: "#666" },
-                }}
-                tick={{ fontSize: 10 }}
-                domain={[0, 20]}
-              />
-              <Tooltip content={<QtyTooltip />} />
-              <Bar
-                dataKey="shortageImpact"
-                name="Shortage Impact %"
-                fill="#ef4444" // The red color from your image
-                radius={[4, 4, 0, 0]}
-                barSize={32}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <LostSalesByReason data={lostSales} />
+      </div>
 
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm font-semibold mb-3">
-            Qty Ordered vs Shipped by Location
-          </p>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart
-              data={byLocation}
-              margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="location" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip content={<QtyTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar
-                dataKey="qtyOrdered"
-                name="Qty Ordered"
-                fill="#3B82F6"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey="qtyShipped"
-                name="Qty Shipped"
-                fill="#10B981"
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {/* Location bar — full width */}
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-sm font-semibold mb-3">
+          Qty Ordered vs Shipped by Location
+        </p>
+        <ResponsiveContainer width="100%" height={210}>
+          <BarChart
+            data={byLocation}
+            margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="location" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip content={<QtyTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar
+              dataKey="qtyOrdered"
+              name="Qty Ordered"
+              fill="#3B82F6"
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              dataKey="qtyShipped"
+              name="Qty Shipped"
+              fill="#10B981"
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
 }
 
-// ─── Tab: Churn Risk ─────────────────────────────────────────────────────────
-
-type ChurnRiskTabProps = { locationFilter: string };
-function ChurnRiskTab({ locationFilter }: ChurnRiskTabProps) {
-  const rows = useMemo(() => {
-    const all = getChurnRiskRows();
-    return locationFilter
-      ? all.filter((r) => r.location === locationFilter)
-      : all;
-  }, [locationFilter]);
-
-  return (
-    <div className="pt-4 rounded-md border overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xs">Customer</TableHead>
-            <TableHead className="text-xs">Customer #</TableHead>
-            <TableHead className="text-xs">Location</TableHead>
-            <TableHead className="text-xs">Co-Op</TableHead>
-            <TableHead className="text-xs">Last Order</TableHead>
-            <TableHead className="text-xs">YTD Qty</TableHead>
-            <TableHead className="text-xs">Prior YTD</TableHead>
-            <TableHead className="text-xs">Trend</TableHead>
-            <TableHead className="text-xs">Fill Rate</TableHead>
-            <TableHead className="text-xs">Risk</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={10}
-                className="text-center text-muted-foreground py-8 text-sm"
-              >
-                No churn risk records for this location.
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((r: ChurnRiskRow) => (
-              <TableRow key={r.customerNo}>
-                <TableCell className="text-sm font-medium">
-                  {r.customerName}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {r.customerNo}
-                </TableCell>
-                <TableCell>
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-                    {r.location}
-                  </span>
-                </TableCell>
-                <TableCell className="text-sm">{r.coOp}</TableCell>
-                <TableCell className="text-sm">{r.lastOrderDate}</TableCell>
-                <TableCell className="text-sm tabular-nums">
-                  {r.ytdQtyOrdered.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-sm tabular-nums">
-                  {r.priorYtdQtyOrdered.toLocaleString()}
-                </TableCell>
-                <TableCell
-                  className={cn("text-sm font-medium", TREND_STYLES[r.trend])}
-                >
-                  {r.trend}
-                </TableCell>
-                <TableCell className="text-sm">{r.fillRateAvg}%</TableCell>
-                <TableCell>
-                  <span
-                    className={cn(
-                      "text-xs rounded-full px-2 py-0.5 font-medium",
-                      RISK_STYLES[r.riskLevel]
-                    )}
-                  >
-                    {r.riskLevel}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
 // ─── Tab: Customer Details ────────────────────────────────────────────────────
-
-const DETAIL_HEADERS = [
-  { label: "Location" },
-  { label: "Co Op (commercial)" },
-  { label: "Bill To Customer Name" },
-  { label: "Bill to Customer #" },
-  { label: "Item #" },
-  { label: "Description" },
-  { label: "Brand" },
-  { label: "Pack" },
-  { label: "Vendor Name" },
-  { label: "Vendor Lead Time", right: true },
-  { label: "Vendor Min Qty", right: true },
-  { label: "Vendor Order Freq" },
-  { label: "ERP Status" },
-  { label: "On Hand", right: true },
-  { label: "On Purch Order", right: true },
-  { label: "Cust Sales Order", right: true },
-  { label: "LY Usage", right: true },
-  { label: "Bid Qty", right: true },
-  { label: "YTD Usage", right: true },
-  { label: "Conversion %", right: true },
-  { label: "Non Bid Item" },
-  { label: "Avg Lead Time", right: true },
-  { label: "Cust Order Freq (30d)", right: true },
-  { label: "Unique Customers", right: true },
-  { label: "Monthly Forecast", right: true },
-  { label: "Safety Stock", right: true },
-  { label: "Monthly Estimates", right: true },
-  { label: "Monthly Actual", right: true },
-  { label: "% Consumed", right: true },
-  { label: "Vendor Item Fill %", right: true },
-];
 
 const ERP_STYLES: Record<string, string> = {
   Active: "bg-green-100 text-green-700",
@@ -580,162 +754,258 @@ function PctCell({ value }: { value: number }) {
   return <span className={cn("font-medium", cls)}>{value}%</span>;
 }
 
-function CustomerDetailsTab({ rows }: { rows: CustomerDetailRow[] }) {
-  return (
-    <div className="pt-4">
-      <p className="text-sm font-semibold mb-3">Customer Performance Details</p>
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {DETAIL_HEADERS.map((h) => (
-                <TableHead
-                  key={h.label}
-                  className={cn(
-                    "text-xs whitespace-nowrap",
-                    h.right && "text-right"
-                  )}
-                >
-                  {h.label}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={DETAIL_HEADERS.length}
-                  className="text-center text-muted-foreground py-8 text-sm"
-                >
-                  No records match the current filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-                      {r.location}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">{r.coOp}</TableCell>
-                  <TableCell className="text-sm font-medium whitespace-nowrap">
-                    {r.billToCustomerName}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {r.billToCustomerNo}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {r.itemNo}
-                  </TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">
-                    {r.description}
-                  </TableCell>
-                  <TableCell className="text-sm">{r.brand}</TableCell>
-                  <TableCell className="text-sm">{r.pack}</TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">
-                    {r.vendorName}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.vendorLeadTime}d
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.vendorMinQty.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {r.vendorOrderFrequency}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "text-xs rounded-full px-2 py-0.5 font-medium",
-                        ERP_STYLES[r.erpStatus] ?? ""
-                      )}
-                    >
-                      {r.erpStatus}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.onHand.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.onPurchOrder.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.custSalesOrder.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.lyUsage.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.bidQty.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.ytdUsage.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right">
-                    <PctCell value={r.conversionPct} />
-                  </TableCell>
-                  <TableCell className="text-sm text-center">
-                    {r.nonBidItemFlag ? "Yes" : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.avgLeadTime}d
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.custOrderFreqLast30}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.uniqueCustomerCount}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.monthlyForecast.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.safetyStock.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.monthlyEstimates.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">
-                    {r.monthlyActual.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm text-right">
-                    <PctCell value={r.pctConsumed} />
-                  </TableCell>
-                  <TableCell className="text-sm text-right">
-                    <PctCell value={r.vendorItemFillPct} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-}
+const DETAIL_COLUMNS: ColumnDef<CustomerDetailRow>[] = [
+  {
+    accessorKey: "month",
+    header: "Month",
+    cell: ({ getValue }) => (
+      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+        {getValue() as string}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+    cell: ({ getValue }) => (
+      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+        {getValue() as string}
+      </span>
+    ),
+  },
+  { accessorKey: "coOp", header: "Co Op" },
+  {
+    accessorKey: "billToCustomerName",
+    header: "Bill To Customer Name",
+    cell: ({ getValue }) => (
+      <span className="text-sm font-medium whitespace-nowrap">
+        {getValue() as string}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "billToCustomerNo",
+    header: "Bill To Customer #",
+    cell: ({ getValue }) => (
+      <span className="text-sm text-muted-foreground">
+        {getValue() as string}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "itemNo",
+    header: "Item #",
+    cell: ({ getValue }) => (
+      <span className="text-sm text-muted-foreground">
+        {getValue() as string}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ getValue }) => (
+      <span className="text-sm whitespace-nowrap">{getValue() as string}</span>
+    ),
+  },
+  { accessorKey: "brand", header: "Brand" },
+  { accessorKey: "pack", header: "Pack" },
+  {
+    accessorKey: "vendorName",
+    header: "Vendor Name",
+    cell: ({ getValue }) => (
+      <span className="text-sm whitespace-nowrap">{getValue() as string}</span>
+    ),
+  },
+  {
+    accessorKey: "vendorLeadTime",
+    header: "Vendor Lead Time",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">{getValue() as number}d</span>
+    ),
+  },
+  {
+    accessorKey: "vendorMinQty",
+    header: "Vendor Min Qty",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  { accessorKey: "vendorOrderFrequency", header: "Vendor Order Freq" },
+  {
+    accessorKey: "erpStatus",
+    header: "ERP Status",
+    cell: ({ getValue }) => {
+      const v = getValue() as ErpStatus;
+      return (
+        <span
+          className={cn(
+            "text-xs rounded-full px-2 py-0.5 font-medium",
+            ERP_STYLES[v] ?? ""
+          )}
+        >
+          {v}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "onHand",
+    header: "On Hand",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "onPurchOrder",
+    header: "On Purch Order",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "custSalesOrder",
+    header: "Cust Sales Order",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "lyUsage",
+    header: "LY Usage",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "bidQty",
+    header: "Bid Qty",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "ytdUsage",
+    header: "YTD Usage",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "conversionPct",
+    header: "Conversion %",
+    cell: ({ getValue }) => <PctCell value={getValue() as number} />,
+  },
+  {
+    accessorKey: "nonBidItemFlag",
+    header: "Non Bid Item",
+    cell: ({ getValue }) => (
+      <span className="text-sm">{getValue() ? "Yes" : "—"}</span>
+    ),
+  },
+  {
+    accessorKey: "avgLeadTime",
+    header: "Avg Lead Time",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">{getValue() as number}d</span>
+    ),
+  },
+  {
+    accessorKey: "custOrderFreqLast30",
+    header: "Cust Order Freq (30d)",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">{getValue() as number}</span>
+    ),
+  },
+  {
+    accessorKey: "uniqueCustomerCount",
+    header: "Unique Customers",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">{getValue() as number}</span>
+    ),
+  },
+  {
+    accessorKey: "monthlyForecast",
+    header: "Monthly Forecast",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "safetyStock",
+    header: "Safety Stock",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "monthlyEstimates",
+    header: "Monthly Estimates",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "monthlyActual",
+    header: "Monthly Actual",
+    cell: ({ getValue }) => (
+      <span className="text-sm tabular-nums">
+        {(getValue() as number).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "pctConsumed",
+    header: "% Consumed",
+    cell: ({ getValue }) => <PctCell value={getValue() as number} />,
+  },
+  {
+    accessorKey: "vendorItemFillPct",
+    header: "Vendor Item Fill %",
+    cell: ({ getValue }) => <PctCell value={getValue() as number} />,
+  },
+];
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default function CustomerPerformance() {
-  const allRows = useMemo(() => getCustomerDetailRows(), []);
-  const [locationFilter, setLocationFilter] = useState("");
-  const [customerFilter, setCustomerFilter] = useState("");
+function CustomerDetailsTab({ allRows }: { allRows: CustomerDetailRow[] }) {
+  const {
+    locationFilter,
+    customerFilter,
+    customerNames,
+    handleLocationChange,
+    handleCustomerChange,
+  } = useLocationCustomerFilter(allRows);
   const [search, setSearch] = useState("");
-
-  const customerNames = useMemo(() => {
-    const filtered = locationFilter
-      ? allRows.filter((r) => r.location === locationFilter)
-      : allRows;
-    return [...new Set(filtered.map((r) => r.billToCustomerName))].sort();
-  }, [allRows, locationFilter]);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
 
   const filteredRows = useMemo(() => {
     return allRows.filter((r) => {
       if (locationFilter && r.location !== locationFilter) return false;
       if (customerFilter && r.billToCustomerName !== customerFilter)
+        return false;
+      if (selectedMonths.length > 0 && !selectedMonths.includes(r.month))
         return false;
       if (search) {
         const q = search.toLowerCase();
@@ -748,49 +1018,53 @@ export default function CustomerPerformance() {
       }
       return true;
     });
-  }, [allRows, locationFilter, customerFilter, search]);
+  }, [allRows, locationFilter, customerFilter, selectedMonths, search]);
 
-  const kpi: Record<KpiKey, number> = useMemo(
-    () => computeKpis(filteredRows),
-    [filteredRows]
-  );
+  useEffect(() => {
+    setPageIndex(0);
+  }, [filteredRows]);
 
-  function handleLocationChange(val: string) {
-    setLocationFilter(val === "__all__" ? "" : val);
-    setCustomerFilter("");
-  }
+  const table = useReactTable({
+    data: filteredRows,
+    columns: DETAIL_COLUMNS,
+    state: { sorting, pagination: { pageIndex, pageSize } },
+    onSortingChange: setSorting,
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex, pageSize })
+          : updater;
+      setPageIndex(next.pageIndex);
+      setPageSize(next.pageSize);
+    },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    autoResetPageIndex: false,
+  });
 
-  function handleCustomerChange(val: string) {
-    setCustomerFilter(val === "__all__" ? "" : val);
-  }
+  const start = pageIndex * pageSize + 1;
+  const end = Math.min((pageIndex + 1) * pageSize, filteredRows.length);
 
   return (
-    <div className="flex flex-col gap-4 p-6 overflow-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Customer Performance</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track YTD performance, churn risk, and customer metrics
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => exportCsv(filteredRows)}
-        >
-          <Download className="size-4 mr-1" />
-          Export
-        </Button>
-      </div>
-
-      {/* Filters */}
+    <div className="flex flex-col gap-4 pt-4">
+      {/* Filters + Export */}
       <div className="rounded-lg border bg-card p-4">
-        <div className="flex items-center gap-1.5 text-muted-foreground mb-3">
-          <Filter className="size-4" />
-          <span className="text-sm font-medium">Filters</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Filter className="size-4" />
+            <span className="text-sm font-medium">Filters</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportCsv(filteredRows)}
+          >
+            <Download className="size-4 mr-1" />
+            Export
+          </Button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               Location
@@ -835,10 +1109,19 @@ export default function CustomerPerformance() {
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">
+              Month
+            </label>
+            <MonthMultiSelect
+              selected={selectedMonths}
+              onChange={setSelectedMonths}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
               Search
             </label>
             <Input
-              placeholder="Search by customer, SKU, or description..."
+              placeholder="Customer, SKU, or description..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9"
@@ -847,47 +1130,158 @@ export default function CustomerPerformance() {
         </div>
       </div>
 
-      {/* KPI Metric Cards */}
-      <div className="flex flex-wrap gap-3 overflow-x-auto pb-1 min-h-[80px]">
-        {METRICS.map((m) => {
-          const val = kpi[m.key as KpiKey] as number;
-          const subtitle =
-            "subtitleKey" in m
-              ? `+${kpi[m.subtitleKey].toLocaleString()} CS`
-              : "subtitle" in m
-                ? m.subtitle
-                : undefined;
-          return (
-            <MetricCard
-              key={m.key}
-              label={m.label}
-              icon={m.icon}
-              color={m.color}
-              value={m.format(val)}
-              subtitle={subtitle}
-            />
-          );
-        })}
+      {/* Data Table */}
+      <div className="rounded-md border overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {table.getFlatHeaders().map((header) => (
+                <TableHead
+                  key={header.id}
+                  className="text-xs whitespace-nowrap cursor-pointer select-none"
+                  onClick={header.column.getToggleSortingHandler()}
+                >
+                  {flexRender(
+                    header.column.columnDef.header,
+                    header.getContext()
+                  )}
+                  {header.column.getIsSorted() === "asc"
+                    ? " ↑"
+                    : header.column.getIsSorted() === "desc"
+                      ? " ↓"
+                      : ""}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={DETAIL_COLUMNS.length}
+                  className="text-center text-muted-foreground py-8 text-sm"
+                >
+                  No records match the current filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="text-sm">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="details">
+      {/* Pagination footer */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          Rows per page
+          <Select
+            value={String(pageSize)}
+            onValueChange={(v) => {
+              setPageSize(Number(v));
+              setPageIndex(0);
+            }}
+          >
+            <SelectTrigger className="h-7 w-[72px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+              <SelectItem value="200">200</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <span className="text-xs text-muted-foreground">
+          {filteredRows.length === 0 ? "0" : `${start}–${end}`} of{" "}
+          {filteredRows.length}
+        </span>
+
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setPageIndex(0)}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronsLeft className="size-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setPageIndex((p) => p - 1)}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronLeft className="size-3.5" />
+          </Button>
+          <span className="text-xs px-2">
+            Page {filteredRows.length === 0 ? 0 : pageIndex + 1} of{" "}
+            {table.getPageCount()}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setPageIndex((p) => p + 1)}
+            disabled={!table.getCanNextPage()}
+          >
+            <ChevronRight className="size-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setPageIndex(table.getPageCount() - 1)}
+            disabled={!table.getCanNextPage()}
+          >
+            <ChevronsRight className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function CustomerPerformance() {
+  const allRows = useMemo(() => getCustomerDetailRows(), []);
+
+  return (
+    <div className="flex flex-col gap-4 p-6 overflow-auto">
+      <div>
+        <h1 className="text-xl font-semibold">Customer Performance</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Track YTD performance and detailed customer metrics
+        </p>
+      </div>
+
+      <Tabs defaultValue="ytd">
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="ytd">YTD Performance</TabsTrigger>
-          <TabsTrigger value="churn">Churn Risk</TabsTrigger>
           <TabsTrigger value="details">Customer Details</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ytd">
-          <YtdPerformanceTab rows={filteredRows} />
-        </TabsContent>
-
-        <TabsContent value="churn">
-          <ChurnRiskTab locationFilter={locationFilter} />
+          <YtdPerformanceTab allRows={allRows} />
         </TabsContent>
 
         <TabsContent value="details">
-          <CustomerDetailsTab rows={filteredRows} />
+          <CustomerDetailsTab allRows={allRows} />
         </TabsContent>
       </Tabs>
     </div>

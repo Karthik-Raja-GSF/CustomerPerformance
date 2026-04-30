@@ -12,11 +12,16 @@ import DemandValidationTool from "@/pages/DemandValidationTool";
 import MonthlyForecast from "@/pages/MonthlyForecast";
 import ConfirmedBidItems from "@/pages/ConfirmedBidItems";
 import BidExportHistory from "@/pages/BidExportHistory";
+import EoDashboard from "@/pages/EoDashboard";
 import EoRiskReview from "@/pages/EoRiskReview";
+import EoActions from "@/pages/EoActions";
+import EoDisposition from "@/pages/EoDisposition";
+import CustomerPerformance from "@/pages/CustomerPerformance";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import ForceChangePassword from "@/pages/ForceChangePassword";
 import { ProtectedLayout } from "@/components/protected-layout";
+import { EoProvider } from "@/contexts/eo-context";
 
 export const routes = [
   { path: "/", title: "StarQ" },
@@ -32,7 +37,11 @@ export const routes = [
     title: "Confirmed Bid Items",
   },
   { path: "/bid-export-history", title: "Bid Items Export History" },
+  { path: "/eo/dashboard", title: "E&O Dashboard" },
   { path: "/eo/risk-review", title: "Risk Review" },
+  { path: "/eo/actions", title: "Actions" },
+  { path: "/eo/disposition", title: "Disposition" },
+  { path: "/customer-performance", title: "Customer Performance" },
   { path: "/settings", title: "Settings - Prompts" },
   { path: "/settings/rbac", title: "Settings - Access Control" },
 ];
@@ -50,7 +59,13 @@ function App() {
         />
 
         {/* Protected routes with layout */}
-        <Route element={<ProtectedLayout />}>
+        <Route
+          element={
+            <EoProvider>
+              <ProtectedLayout />
+            </EoProvider>
+          }
+        >
           <Route
             path="/"
             element={
@@ -108,10 +123,42 @@ function App() {
             }
           />
           <Route
+            path="/eo/dashboard"
+            element={
+              <FeatureGuard feature={Feature.EO_DASHBOARD}>
+                <EoDashboard />
+              </FeatureGuard>
+            }
+          />
+          <Route
             path="/eo/risk-review"
             element={
               <FeatureGuard feature={Feature.EO_RISK_REVIEW}>
                 <EoRiskReview />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/eo/actions"
+            element={
+              <FeatureGuard feature={Feature.EO_ACTIONS}>
+                <EoActions />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/eo/disposition"
+            element={
+              <FeatureGuard feature={Feature.EO_DISPOSITION}>
+                <EoDisposition />
+              </FeatureGuard>
+            }
+          />
+          <Route
+            path="/customer-performance"
+            element={
+              <FeatureGuard feature={Feature.CUSTOMER_PERFORMANCE}>
+                <CustomerPerformance />
               </FeatureGuard>
             }
           />

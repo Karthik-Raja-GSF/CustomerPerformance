@@ -16,6 +16,7 @@ export type CustomerPerformanceKpi = {
 
 export type CustomerDetailRow = {
   id: string;
+  month: string;
   // Identity
   location: string;
   coOp: CoOpType;
@@ -64,6 +65,18 @@ export type ChurnRiskRow = {
   trend: OrderTrend;
   fillRateAvg: number;
   riskLevel: RiskLevel;
+};
+
+export type LostSalesVendor = {
+  name: string;
+  pct: number;
+};
+
+export type LostSalesReason = {
+  reason: string;
+  instances: number;
+  pct: number;
+  vendors: LostSalesVendor[];
 };
 
 export type MonthlyPerformance = {

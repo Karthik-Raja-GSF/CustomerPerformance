@@ -1,8 +1,8 @@
 import type {
   CustomerDetailRow,
-  ChurnRiskRow,
   CustomerPerformanceKpi,
   MonthlyPerformance,
+  LostSalesReason,
 } from "@/types/customer-performance";
 
 export const LOCATIONS = ["DORI", "ATL", "CHI", "DAL", "NYC"] as const;
@@ -73,6 +73,7 @@ function row(
     monthlyActual,
     pctConsumed,
     vendorItemFillPct,
+    month: "",
   };
 }
 
@@ -1074,129 +1075,6 @@ const DETAIL_ROWS: CustomerDetailRow[] = [
   ),
 ];
 
-const CHURN_RISK_ROWS: ChurnRiskRow[] = [
-  {
-    customerNo: "CUST-044",
-    customerName: "Harbor View Cafeteria",
-    location: "NYC",
-    coOp: "Commercial",
-    lastOrderDate: "2026-03-15",
-    ytdQtyOrdered: 420,
-    priorYtdQtyOrdered: 980,
-    trend: "Declining",
-    fillRateAvg: 82.3,
-    riskLevel: "High",
-  },
-  {
-    customerNo: "CUST-024",
-    customerName: "West Side Bistro Group",
-    location: "CHI",
-    coOp: "Commercial",
-    lastOrderDate: "2026-04-01",
-    ytdQtyOrdered: 580,
-    priorYtdQtyOrdered: 1100,
-    trend: "Declining",
-    fillRateAvg: 85.6,
-    riskLevel: "High",
-  },
-  {
-    customerNo: "CUST-034",
-    customerName: "Gulf Coast Catering",
-    location: "DAL",
-    coOp: "Co-Op",
-    lastOrderDate: "2026-04-10",
-    ytdQtyOrdered: 340,
-    priorYtdQtyOrdered: 520,
-    trend: "Declining",
-    fillRateAvg: 88.4,
-    riskLevel: "Medium",
-  },
-  {
-    customerNo: "CUST-014",
-    customerName: "Savannah Hospital Dining",
-    location: "ATL",
-    coOp: "Commercial",
-    lastOrderDate: "2026-03-28",
-    ytdQtyOrdered: 290,
-    priorYtdQtyOrdered: 410,
-    trend: "Declining",
-    fillRateAvg: 87.9,
-    riskLevel: "Medium",
-  },
-  {
-    customerNo: "CUST-005",
-    customerName: "Valley View Nursing Home",
-    location: "DORI",
-    coOp: "Co-Op",
-    lastOrderDate: "2026-04-08",
-    ytdQtyOrdered: 180,
-    priorYtdQtyOrdered: 240,
-    trend: "Declining",
-    fillRateAvg: 89.2,
-    riskLevel: "Medium",
-  },
-  {
-    customerNo: "CUST-045",
-    customerName: "Queens Youth Services",
-    location: "NYC",
-    coOp: "Commercial",
-    lastOrderDate: "2026-04-15",
-    ytdQtyOrdered: 620,
-    priorYtdQtyOrdered: 700,
-    trend: "Stable",
-    fillRateAvg: 91.5,
-    riskLevel: "Low",
-  },
-  {
-    customerNo: "CUST-025",
-    customerName: "Chicago Athletic Club",
-    location: "CHI",
-    coOp: "Commercial",
-    lastOrderDate: "2026-04-18",
-    ytdQtyOrdered: 450,
-    priorYtdQtyOrdered: 480,
-    trend: "Stable",
-    fillRateAvg: 92.8,
-    riskLevel: "Low",
-  },
-  {
-    customerNo: "CUST-006",
-    customerName: "Tri-County Head Start",
-    location: "DORI",
-    coOp: "Co-Op",
-    lastOrderDate: "2026-04-20",
-    ytdQtyOrdered: 210,
-    priorYtdQtyOrdered: 190,
-    trend: "Growing",
-    fillRateAvg: 94.0,
-    riskLevel: "Low",
-  },
-  {
-    customerNo: "CUST-015",
-    customerName: "Augusta Military Base",
-    location: "ATL",
-    coOp: "Commercial",
-    lastOrderDate: "2026-04-22",
-    ytdQtyOrdered: 880,
-    priorYtdQtyOrdered: 820,
-    trend: "Growing",
-    fillRateAvg: 96.2,
-    riskLevel: "Low",
-  },
-  {
-    customerNo: "CUST-035",
-    customerName: "Fort Worth ISD",
-    location: "DAL",
-    coOp: "Commercial",
-    lastOrderDate: "2026-04-23",
-    ytdQtyOrdered: 740,
-    priorYtdQtyOrdered: 680,
-    trend: "Growing",
-    fillRateAvg: 95.8,
-    riskLevel: "Low",
-  },
-];
-
 export const MONTHLY_PERFORMANCE: MonthlyPerformance[] = [
   {
     month: "Jan",
@@ -1243,11 +1121,67 @@ export const MONTHLY_PERFORMANCE: MonthlyPerformance[] = [
 ];
 
 export function getCustomerDetailRows(): CustomerDetailRow[] {
-  return DETAIL_ROWS;
+  const rows = DETAIL_ROWS.slice(0, 15);
+  return rows.map((r, i) => ({
+    ...r,
+    month: MONTHLY_PERFORMANCE[i % MONTHLY_PERFORMANCE.length]!.month,
+  }));
 }
 
-export function getChurnRiskRows(): ChurnRiskRow[] {
-  return CHURN_RISK_ROWS;
+const LOST_SALES_REASONS: LostSalesReason[] = [
+  {
+    reason: "Product Unavailable",
+    instances: 12,
+    pct: 35.0,
+    vendors: [
+      { name: "BIMBO BAKERIES", pct: 45.6 },
+      { name: "TYSON COMMODITIES", pct: 33.5 },
+      { name: "GENERAL MILLS", pct: 20.9 },
+    ],
+  },
+  {
+    reason: "Out of Stock",
+    instances: 15,
+    pct: 27.7,
+    vendors: [
+      { name: "SCHWANS SALE", pct: 41.6 },
+      { name: "LAND O LAKES I", pct: 32.8 },
+      { name: "VENTURA FOODS", pct: 25.6 },
+    ],
+  },
+  {
+    reason: "Delivery Issue",
+    instances: 8,
+    pct: 18.2,
+    vendors: [
+      { name: "IMPERIAL DADE", pct: 54.9 },
+      { name: "DON MIGUEL FOODS", pct: 29.3 },
+      { name: "KRAFT HEINZ II", pct: 15.9 },
+    ],
+  },
+  {
+    reason: "Substitution Requested",
+    instances: 5,
+    pct: 12.4,
+    vendors: [
+      { name: "CONAGRA BRANDS", pct: 48.2 },
+      { name: "PILGRIM'S PRIDE", pct: 31.5 },
+      { name: "JBS USA", pct: 20.3 },
+    ],
+  },
+  {
+    reason: "Customer Cancelled",
+    instances: 4,
+    pct: 6.7,
+    vendors: [
+      { name: "SYSCO CORP", pct: 55.3 },
+      { name: "US FOODS", pct: 44.7 },
+    ],
+  },
+];
+
+export function getLostSalesReasons(): LostSalesReason[] {
+  return LOST_SALES_REASONS;
 }
 
 export function computeKpis(rows: CustomerDetailRow[]): CustomerPerformanceKpi {

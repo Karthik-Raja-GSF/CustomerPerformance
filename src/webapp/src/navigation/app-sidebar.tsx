@@ -1,6 +1,11 @@
 import * as React from "react";
-import { Settings2, BarChart3, TrendingUp, AlertTriangle } from "lucide-react";
-import { StarqIcon } from "@/components/icons/starq-icon";
+import {
+  Settings2,
+  BarChart3,
+  TrendingUp,
+  AlertTriangle,
+  Users2,
+} from "lucide-react";
 import { Feature } from "@/config/features";
 import { usePermissions } from "@/contexts/permissions-context";
 
@@ -18,13 +23,13 @@ import {
 // Navigation data with feature requirements
 const data = {
   navMain: [
-    {
-      title: "StarQ",
-      url: "/",
-      icon: StarqIcon,
-      feature: Feature.STARQ,
-      badge: "Beta",
-    },
+    // {
+    //   title: "StarQ",
+    //   url: "/",
+    //   icon: StarqIcon,
+    //   feature: Feature.STARQ,
+    //   badge: "Beta",
+    // },
     {
       title: "Sales Insights",
       url: "/sales-insights/demand-validation-tool",
@@ -34,6 +39,23 @@ const data = {
           title: "Demand Validation Tool",
           url: "/sales-insights/demand-validation-tool",
           feature: Feature.DEMAND_VALIDATION_TOOL,
+        },
+      ],
+    },
+    {
+      title: "Customer Performance",
+      url: "/customer-performance",
+      icon: Users2,
+      items: [
+        {
+          title: "Demand Validation Tool",
+          url: "/customer-performance/dashboard",
+          feature: Feature.CUSTOMER_PERFORMANCE_DASHBOARD,
+        },
+        {
+          title: "Customer Performance",
+          url: "/customer-performance/performance",
+          feature: Feature.CUSTOMER_PERFORMANCE,
         },
       ],
     },
@@ -56,13 +78,28 @@ const data = {
     },
     {
       title: "E&O",
-      url: "/eo/risk-review",
+      url: "/eo/dashboard",
       icon: AlertTriangle,
       items: [
+        {
+          title: "Dashboard",
+          url: "/eo/dashboard",
+          feature: Feature.EO_DASHBOARD,
+        },
         {
           title: "Risk Review",
           url: "/eo/risk-review",
           feature: Feature.EO_RISK_REVIEW,
+        },
+        {
+          title: "Actions",
+          url: "/eo/actions",
+          feature: Feature.EO_ACTIONS,
+        },
+        {
+          title: "Disposition",
+          url: "/eo/disposition",
+          feature: Feature.EO_DISPOSITION,
         },
       ],
     },

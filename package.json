@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm run --parallel --filter './src/*' dev",
+    "dev": "pnpm --filter webapp --filter backend --parallel run dev",
     "dev:ui": "pnpm --filter webapp dev",
     "dev:be": "pnpm --filter backend dev",
     "build": "pnpm run --filter './src/*' build",

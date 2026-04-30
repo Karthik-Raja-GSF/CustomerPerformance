@@ -1,4 +1,5 @@
 import { inject, injectable } from "tsyringe";
+import { inject, injectable } from "tsyringe";
 import { PrismaClient } from "@prisma/client";
 import { config } from "@/config/index";
 import { Feature } from "@/contracts/rbac/feature";
