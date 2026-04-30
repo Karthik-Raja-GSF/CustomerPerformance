@@ -175,7 +175,7 @@ const METRICS = [
   },
 ] as const;
 
-// type KpiKey = typeof METRICS[number]["key"];
+type _KpiKey = (typeof METRICS)[number]["key"];
 
 function MetricCard({
   label,
@@ -750,7 +750,10 @@ export default function CustomerPerformance() {
     });
   }, [allRows, locationFilter, customerFilter, search]);
 
-  const kpi = useMemo(() => computeKpis(filteredRows), [filteredRows]);
+  const kpi: Record<KpiKey, number> = useMemo(
+    () => computeKpis(filteredRows),
+    [filteredRows]
+  );
 
   function handleLocationChange(val: string) {
     setLocationFilter(val === "__all__" ? "" : val);
